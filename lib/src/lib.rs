@@ -1,5 +1,5 @@
 mod errors;
-pub mod literals;
+pub mod tokens;
 pub mod utils;
 
 pub use errors::Error;

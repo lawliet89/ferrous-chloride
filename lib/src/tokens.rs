@@ -1,11 +1,9 @@
-//! Parse literals
+//! Tokens and literals
 
 use std::str::FromStr;
 
 use nom::types::CompleteStr;
 use nom::{complete, do_parse, map_res, named, one_of, opt, recognize};
-
-use crate::errors::Error;
 
 // Parse Literal Values
 // NUMBER  // 12345
