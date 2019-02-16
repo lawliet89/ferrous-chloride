@@ -7,7 +7,7 @@ use nom::types::CompleteStr;
 use nom::ErrorKind;
 use nom::{
     alt, call, complete, delimited, do_parse, escaped_transform, map_res, named, opt, preceded,
-    return_error, tag, take_while1, take_while_m_n,
+    return_error, tag, take_while1, take_while_m_n, named_args
 };
 
 use crate::errors::InternalKind;
@@ -108,8 +108,8 @@ named!(
 
 /// Heredoc marker
 #[derive(Debug, Eq, PartialEq)]
-struct HereDoc {
-    identifier: String,
+struct HereDoc<'a> {
+    identifier: &'a [u8],
     indented: bool,
 }
 
@@ -120,9 +120,19 @@ named!(heredoc_begin(&[u8]) -> HereDoc,
         >> identifier: call!(nom::alphanumeric1)
         >> call!(nom::eol)
         >> (HereDoc {
-                identifier: String::from_utf8_lossy(identifier).into_owned(),
+                identifier,
                 indented: indented == Some(b"-")
            })
+    )
+);
+
+named_args!(
+    heredoc_end<'a>(identifier: &'a HereDoc<'a>)<()>,
+    do_parse!(
+        // Whitespace?
+        tag!(identifier.identifier)
+        >> call!(nom::eol)
+        >> ()
     )
 );
 
@@ -210,14 +220,14 @@ mod tests {
             (
                 "<<EOF\n",
                 HereDoc {
-                    identifier: "EOF".to_string(),
+                    identifier: b"EOF",
                     indented: false,
                 },
             ),
             (
                 "<<-EOH\n",
                 HereDoc {
-                    identifier: "EOH".to_string(),
+                    identifier: b"EOH",
                     indented: true,
                 },
             ),
@@ -226,6 +236,30 @@ mod tests {
         for (input, expected) in test_cases.iter() {
             let (_, actual) = heredoc_begin(input.as_bytes()).unwrap();
             assert_eq!(&actual, expected);
+        }
+    }
+
+    #[test]
+    fn heredoc_end_is_parsed_correctly() {
+        let test_cases = [
+            (
+                "EOF\n",
+                HereDoc {
+                    identifier: b"EOF",
+                    indented: false,
+                },
+            ),
+            (
+                "EOH\n",
+                HereDoc {
+                    identifier: b"EOH",
+                    indented: true,
+                },
+            ),
+        ];
+
+        for (input, identifier) in test_cases.iter() {
+            let _ = heredoc_end(input.as_bytes(), &identifier).unwrap();
         }
     }
 }
