@@ -1,6 +1,7 @@
 pub mod errors;
+pub mod utils;
 
-use nom::{complete, map, map_res, named, one_of, opt};
+use nom::{complete, map_res, named, one_of, opt};
 
 pub use errors::Error;
 
@@ -11,7 +12,7 @@ pub use errors::Error;
 // 	STRING  // "abc"
 // HEREDOC // <<FOO\nbar\nFOO
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum NumericSign {
     Positive,
     Negative,
@@ -38,15 +39,12 @@ named!(numeric_sign(&[u8]) -> NumericSign,
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_numeric_sign() {
-        dbg!(numeric_sign("+".as_bytes()));
-        dbg!(numeric_sign("-".as_bytes()));
-        dbg!(numeric_sign("".as_bytes()));
-    }
+    use utils::ResultUtils;
 
     #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+    fn numeric_sign_is_parsed_correctly() {
+        assert_eq!(numeric_sign("+".as_bytes()).unwrap_output(), NumericSign::Positive);
+        assert_eq!(numeric_sign("-".as_bytes()).unwrap_output(), NumericSign::Negative);
+        assert_eq!(numeric_sign("".as_bytes()).unwrap_output(), NumericSign::Positive);
     }
 }
