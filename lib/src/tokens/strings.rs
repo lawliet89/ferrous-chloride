@@ -1,18 +1,21 @@
 // https://www.reddit.com/r/rust/comments/8rpzjd/parsing_string_literals_in_nom/
 // https://github.com/Geal/nom/issues/787
 
+use log::debug;
 use nom::types::CompleteStr;
 use nom::ErrorKind;
 use nom::{
-    alt, complete, escaped_transform, map_res, named, preceded, return_error, tag, take_while1,
-    take_while_m_n,
+    alt, complete, delimited, escaped_transform, map_res, named, preceded, return_error, tag,
+    take_while1, take_while_m_n,
 };
+use nom::map;
 
 use crate::errors::InternalKind;
-use crate::Error;
 
-fn not_escape(c: char) -> bool {
-    c != '\\'
+fn not_single_line_string_illegal(c: char) -> bool {
+    let test = c != '\\' && c != '"' && c != '\n' && c != '\r';
+    debug!("Checking valid string character {:?}: {:?}", c, test);
+    test
 }
 
 fn octal_to_string(s: CompleteStr) -> String {
@@ -80,12 +83,26 @@ named!(hex_to_unicode(CompleteStr) -> String,
     )
 );
 
+/// Contents of a single line string
 named!(
-    string_content(CompleteStr) -> String,
+    pub single_line_string_content(CompleteStr) -> String,
     escaped_transform!(
-        take_while1!(not_escape),
+        take_while1!(not_single_line_string_illegal),
+        // nom::alpha,
         '\\',
         unescape
+    )
+);
+
+named!(
+    single_line_string(CompleteStr) -> String,
+    map!(
+        delimited!(
+            tag!("\""),
+            single_line_string_content,
+            tag!("\"")
+        ),
+        |s| s.to_string()
     )
 );
 
@@ -128,7 +145,7 @@ mod tests {
     #[test]
     fn simple_string_content_are_parsed_correctly() {
         assert_eq!(
-            string_content(CompleteStr("abcd")).unwrap_output(),
+            single_line_string_content(CompleteStr("abcd")).unwrap_output(),
             "abcd".to_string()
         );
     }
@@ -144,7 +161,24 @@ mod tests {
 
         for (input, expected) in test_cases.iter() {
             assert_eq!(
-                string_content(CompleteStr(input)).unwrap_output(),
+                single_line_string_content(CompleteStr(input)).unwrap_output(),
+                expected.to_string()
+            );
+        }
+    }
+
+    #[test]
+    fn single_line_string_literals_are_parsed_correctly() {
+        let test_cases = [
+            (r#""ab\"cd""#, r#"ab"cd"#),
+            (r#""ab \\ cd""#, r#"ab \ cd"#),
+            (r#""ab \n cd""#, "ab \n cd"),
+            (r#""ab \? cd""#, "ab ? cd"),
+        ];
+
+        for (input, expected) in test_cases.iter() {
+            assert_eq!(
+                single_line_string(CompleteStr(input)).unwrap_output(),
                 expected.to_string()
             );
         }

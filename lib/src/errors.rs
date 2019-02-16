@@ -49,9 +49,9 @@ where
         match err {
             nom::Err::Failure(ref context) => match Error::from_context(context) {
                 Some(e) => e,
-                None => Error::ParseError(format!("{:#?}", err)),
+                None => Error::ParseError(format!("{:#}", err)),
             },
-            err => Error::ParseError(format!("{:#?}", err)),
+            err => Error::ParseError(format!("{:#}", err)),
         }
     }
 }
