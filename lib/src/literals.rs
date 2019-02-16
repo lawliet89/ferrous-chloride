@@ -1,9 +1,11 @@
+//! Parse literals
+
 use std::str::FromStr;
 
 use nom::types::CompleteStr;
 use nom::{complete, do_parse, map_res, named, one_of, opt, recognize};
 
-pub use crate::errors::Error;
+use crate::errors::Error;
 
 // Parse Literal Values
 // NUMBER  // 12345
@@ -32,7 +34,8 @@ impl<'a> Integer<'a> {
     }
 }
 
-named!(integer(CompleteStr) -> i64,
+/// Parse an interger literal
+named!(pub integer(CompleteStr) -> i64,
     map_res!(
         do_parse!(
             sign: opt!(complete!(one_of!("+-")))
@@ -42,6 +45,9 @@ named!(integer(CompleteStr) -> i64,
         |integer: Integer| integer.to_integer::<i64>()
     )
 );
+
+/// Parse a float literal
+named!(pub float(CompleteStr) -> f64, complete!(nom::double));
 
 #[cfg(test)]
 mod tests {
@@ -54,5 +60,12 @@ mod tests {
         assert_eq!(integer(CompleteStr("12345")).unwrap_output(), 12345);
         assert_eq!(integer(CompleteStr("+12345")).unwrap_output(), 12345);
         assert_eq!(integer(CompleteStr("-12345")).unwrap_output(), -12345);
+    }
+
+    #[test]
+    fn try_this() {
+        assert_eq!(float(CompleteStr("12.34")).unwrap_output(), 12.34);
+        assert_eq!(float(CompleteStr("+12.34")).unwrap_output(), 12.34);
+        assert_eq!(float(CompleteStr("-12.34")).unwrap_output(), -12.34);
     }
 }
