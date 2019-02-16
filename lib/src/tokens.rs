@@ -1,5 +1,7 @@
 //! Tokens and literals
 
+pub mod strings;
+
 use std::str::FromStr;
 
 use nom::types::CompleteStr;
