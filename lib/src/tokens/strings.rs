@@ -4,7 +4,7 @@
 use nom::types::CompleteStr;
 use nom::ErrorKind;
 use nom::{
-    alt, escaped_transform, map_res, named, preceded, return_error, tag,
+    alt, complete, escaped_transform, map_res, named, preceded, return_error, tag,
     take_while1, take_while_m_n,
 };
 
@@ -58,15 +58,26 @@ named!(unescape(CompleteStr) -> String,
             | tag!("\\") => { |_| "\\".to_string() }
             | tag!("\"") => { |_| "\"".to_string() }
             | tag!("?") => { |_| "?".to_string() }
+            | complete!(take_while_m_n!(1, 3, is_octal)) => { |s| octal_to_string(s) }
             // Technically the C++ spec allows characters of arbitrary length but the HashiCorp
             // Go implementation only scans up to two.
-            | map_res!(preceded!(tag!("x"), take_while_m_n!(1, 2, is_hex)), |s| hex_to_string(s))
-            | take_while_m_n!(1, 3, is_octal) => { |s| octal_to_string(s) }
+            | hex_to_unicode
+        )
+);
+
+named!(hex_to_unicode(CompleteStr) -> String,
+    return_error!(
+        ErrorKind::Custom(InternalKind::InvalidUnicode as u32),
+        alt!(
+            // Technically the C++ spec allows characters of arbitrary length but the HashiCorp
+            // Go implementation only scans up to two.
+            map_res!(preceded!(tag!("x"), take_while_m_n!(1, 2, is_hex)), |s| hex_to_string(s))
             | map_res!(preceded!(tag!("u"), take_while_m_n!(1, 4, is_hex)), |s| hex_to_string(s))
             // The official unicode code points only go up to 6 digits, but the HashiCorp implementation
             // parses till 8
             | map_res!(preceded!(tag!("U"), take_while_m_n!(1, 6, is_hex)), |s| hex_to_string(s))
         )
+    )
 );
 
 named!(
@@ -109,8 +120,9 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected="Custom(0)")]
     fn unescaping_invalid_unicode_errors() {
-        unescape(CompleteStr("UD800")).unwrap_output();
+        unescape(CompleteStr("UD800")).unwrap_output_compact();
     }
 
     #[test]
