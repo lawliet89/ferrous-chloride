@@ -3,7 +3,7 @@
 use std::str::FromStr;
 
 use nom::types::CompleteStr;
-use nom::{complete, do_parse, map_res, named, one_of, opt, recognize};
+use nom::{alt, complete, do_parse, map, map_res, named, one_of, opt, recognize, tag};
 
 // Parse Literal Values
 // NUMBER  // 12345
@@ -47,6 +47,17 @@ named!(pub integer(CompleteStr) -> i64,
 /// Parse a float literal
 named!(pub float(CompleteStr) -> f64, complete!(nom::double));
 
+/// Parse a boolean literal
+named!(pub boolean(CompleteStr) -> bool,
+    map!(
+        alt!(
+            tag!("true")
+            | tag!("false")
+        ),
+        |s| s.as_ref() == "true"    // Can only ever be "true" or "false"
+    )
+);
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -61,9 +72,15 @@ mod tests {
     }
 
     #[test]
-    fn try_this() {
+    fn floats_are_parsed_correctly() {
         assert_eq!(float(CompleteStr("12.34")).unwrap_output(), 12.34);
         assert_eq!(float(CompleteStr("+12.34")).unwrap_output(), 12.34);
         assert_eq!(float(CompleteStr("-12.34")).unwrap_output(), -12.34);
+    }
+
+    #[test]
+    fn booleans_are_parsed_correctly() {
+        assert_eq!(boolean(CompleteStr("true")).unwrap_output(), true);
+        assert_eq!(boolean(CompleteStr("false")).unwrap_output(), false);
     }
 }
