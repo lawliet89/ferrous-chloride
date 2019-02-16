@@ -37,7 +37,7 @@ named!(pub integer(CompleteStr) -> i64,
     map_res!(
         do_parse!(
             sign: opt!(complete!(one_of!("+-")))
-            >>  digits: recognize!(nom::digit)
+            >> digits: recognize!(nom::digit)
             >> (Integer { sign, digits })
         ),
         |integer: Integer| integer.to_integer::<i64>()

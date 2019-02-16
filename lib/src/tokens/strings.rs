@@ -2,13 +2,13 @@
 // https://github.com/Geal/nom/issues/787
 
 use log::debug;
+use nom::map;
 use nom::types::CompleteStr;
 use nom::ErrorKind;
 use nom::{
-    alt, complete, delimited, escaped_transform, map_res, named, preceded, return_error, tag,
-    take_while1, take_while_m_n,
+    alt, call, complete, delimited, do_parse, escaped_transform, map_res, named, opt, preceded,
+    return_error, tag, take_while1, take_while_m_n,
 };
-use nom::map;
 
 use crate::errors::InternalKind;
 
@@ -106,6 +106,26 @@ named!(
     )
 );
 
+/// Heredoc marker
+#[derive(Debug, Eq, PartialEq)]
+struct HereDoc {
+    identifier: String,
+    indented: bool,
+}
+
+named!(heredoc_begin(&[u8]) -> HereDoc,
+    do_parse!(
+        tag!("<<")
+        >> indented: opt!(complete!(tag!("-")))
+        >> identifier: call!(nom::alphanumeric1)
+        >> call!(nom::eol)
+        >> (HereDoc {
+                identifier: String::from_utf8_lossy(identifier).into_owned(),
+                indented: indented == Some(b"-")
+           })
+    )
+);
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -181,6 +201,31 @@ mod tests {
                 single_line_string(CompleteStr(input)).unwrap_output(),
                 expected.to_string()
             );
+        }
+    }
+
+    #[test]
+    fn heredoc_identifier_is_parsed_correctly() {
+        let test_cases = [
+            (
+                "<<EOF\n",
+                HereDoc {
+                    identifier: "EOF".to_string(),
+                    indented: false,
+                },
+            ),
+            (
+                "<<-EOH\n",
+                HereDoc {
+                    identifier: "EOH".to_string(),
+                    indented: true,
+                },
+            ),
+        ];
+
+        for (input, expected) in test_cases.iter() {
+            let (_, actual) = heredoc_begin(input.as_bytes()).unwrap();
+            assert_eq!(&actual, expected);
         }
     }
 }
