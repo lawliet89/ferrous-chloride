@@ -2,37 +2,70 @@
 // https://github.com/Geal/nom/issues/787
 
 use nom::types::CompleteStr;
-use nom::{alt, digit, escaped_transform, named, tag, take_while1, take_while_m_n};
+use nom::ErrorKind;
+use nom::{
+    alt, escaped_transform, map_res, named, preceded, return_error, tag,
+    take_while1, take_while_m_n,
+};
+
+use crate::errors::ErrorKind as InternalKind;
+use crate::Error;
 
 fn not_escape(c: char) -> bool {
     c != '\\'
 }
 
-fn bytes_to_string_safe(i: Vec<u8>) -> String {
-    String::from_utf8_lossy(&i).into_owned()
+fn octal_to_string(s: CompleteStr) -> String {
+    use std::char;
+
+    let octal = u32::from_str_radix(s.as_ref(), 8).expect("Parser to have caught invalid inputs");
+    char::from_u32(octal)
+        .map(|c| c.to_string())
+        .expect("To never fail between 0 and 511.")
 }
 
-fn octal_to_string(s: &str) -> CompleteStr {
-    CompleteStr("")
+fn hex_to_string(s: CompleteStr) -> Result<String, InternalKind> {
+    use std::char;
+
+    let byte = u32::from_str_radix(s.as_ref(), 16).expect("Parser to have caught invalid inputs");
+    char::from_u32(byte)
+        .map(|c| c.to_string())
+        .ok_or_else(|| InternalKind::InvalidUnicode)
+}
+
+fn is_octal(s: char) -> bool {
+    s.len_utf8() == 1 && nom::is_oct_digit(s as u8)
+}
+
+fn is_hex(s: char) -> bool {
+    s.len_utf8() == 1 && nom::is_hex_digit(s as u8)
 }
 
 /// Unescape characters according to the reference https://en.cppreference.com/w/cpp/language/escape
 /// Source: https://github.com/hashicorp/hcl/blob/ef8a98b0bbce4a65b5aa4c368430a80ddc533168/hcl/scanner/scanner.go#L513
-named!(unescape(CompleteStr) -> CompleteStr,
+/// Unicode References: https://en.wikipedia.org/wiki/List_of_Unicode_characters
+// TODO: Issues with variable length alt https://docs.rs/nom/4.2.0/nom/macro.alt.html#behaviour-of-alt
+named!(unescape(CompleteStr) -> String,
         alt!(
             // Control Chracters
-            tag!("a")  => { |_| CompleteStr("\x07") }
-            | tag!("b")  => { |_| CompleteStr("\x08") }
-            | tag!("f")  => { |_| CompleteStr("\x0c") }
-            | tag!("n") => { |_| CompleteStr("\n") }
-            | tag!("r")  => { |_| CompleteStr("\r") }
-            | tag!("t")  => { |_| CompleteStr("\t") }
-            | tag!("v")  => { |_| CompleteStr("\x0b") }
-            | tag!("\\") => { |_| CompleteStr("\\") }
-            | tag!("\"") => { |_| CompleteStr("\"") }
-            | tag!("?") => { |_| CompleteStr("?") }
-            // // Octal, at most 3
-            // | take_while_m_n!(1, 3, digit) => { |s| octal_to_string(s) }
+            tag!("a")  => { |_| "\x07".to_string() }
+            | tag!("b")  => { |_| "\x08".to_string() }
+            | tag!("f")  => { |_| "\x0c".to_string() }
+            | tag!("n") => { |_| "\n".to_string() }
+            | tag!("r")  => { |_| "\r".to_string() }
+            | tag!("t")  => { |_| "\t".to_string() }
+            | tag!("v")  => { |_| "\x0b".to_string() }
+            | tag!("\\") => { |_| "\\".to_string() }
+            | tag!("\"") => { |_| "\"".to_string() }
+            | tag!("?") => { |_| "?".to_string() }
+            // Technically the C++ spec allows characters of arbitrary length but the HashiCorp
+            // Go implementation only scans up to two.
+            | map_res!(preceded!(tag!("x"), take_while_m_n!(1, 2, is_hex)), |s| hex_to_string(s))
+            | take_while_m_n!(1, 3, is_octal) => { |s| octal_to_string(s) }
+            | map_res!(preceded!(tag!("u"), take_while_m_n!(1, 4, is_hex)), |s| hex_to_string(s))
+            // The official unicode code points only go up to 6 digits, but the HashiCorp implementation
+            // parses till 8
+            | map_res!(preceded!(tag!("U"), take_while_m_n!(1, 6, is_hex)), |s| hex_to_string(s))
         )
 );
 
@@ -64,14 +97,20 @@ mod tests {
             (r#"\"#, "\\"),
             (r#"""#, "\""),
             ("?", "?"),
+            (r#"xff"#, "ÿ"), // Hex
+            (r#"251"#, "©"), // Octal
+            (r#"uD000"#, "\u{D000}"),
+            (r#"U29000"#, "\u{29000}"),
         ];
 
         for (input, expected) in test_cases.iter() {
-            assert_eq!(
-                unescape(CompleteStr(input)).unwrap_output(),
-                CompleteStr(expected)
-            );
+            assert_eq!(unescape(CompleteStr(input)).unwrap_output(), *expected);
         }
+    }
+
+    #[test]
+    fn unescaping_invalid_unicode_errors() {
+        unescape(CompleteStr("UD800")).unwrap_output();
     }
 
     #[test]

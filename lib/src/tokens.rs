@@ -15,14 +15,12 @@ use nom::{alt, complete, do_parse, map, map_res, named, one_of, opt, recognize, 
 // HEREDOC // <<FOO\nbar\nFOO
 
 /// Parsed Integer Literal
-#[allow(dead_code)]
 struct Integer<'a> {
     pub sign: Option<char>,
     pub digits: CompleteStr<'a>,
 }
 
 impl<'a> Integer<'a> {
-    #[allow(dead_code)]
     pub(crate) fn to_integer<T>(&self) -> Result<T, std::num::ParseIntError>
     where
         T: FromStr<Err = std::num::ParseIntError>,
