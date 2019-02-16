@@ -7,4 +7,5 @@ edition = "2018"
 [dependencies]
 failure = { version = "0.1.3", features=["backtrace"] }
 failure_derive = "0.1.3"
+log = "0.4"
 nom = { version = "^4.2", features = ["verbose-errors"] }

@@ -4,11 +4,11 @@
 use nom::types::CompleteStr;
 use nom::ErrorKind;
 use nom::{
-    alt, complete, escaped_transform, map_res, named, preceded, return_error, tag,
-    take_while1, take_while_m_n,
+    alt, complete, escaped_transform, map_res, named, preceded, return_error, tag, take_while1,
+    take_while_m_n,
 };
 
-use crate::errors::ErrorKind as InternalKind;
+use crate::errors::InternalKind;
 use crate::Error;
 
 fn not_escape(c: char) -> bool {
@@ -120,9 +120,9 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected="Custom(0)")]
+    #[should_panic(expected = "Invalid Unicode Code Points \\UD800")]
     fn unescaping_invalid_unicode_errors() {
-        unescape(CompleteStr("UD800")).unwrap_output_compact();
+        unescape(CompleteStr("UD800")).unwrap_output();
     }
 
     #[test]
