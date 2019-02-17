@@ -6,8 +6,8 @@ use nom::map;
 use nom::types::CompleteStr;
 use nom::ErrorKind;
 use nom::{
-    alt, call, complete, delimited, do_parse, escaped_transform, map_res, named, opt, preceded,
-    return_error, tag, take_while1, take_while_m_n, named_args
+    alt, call, complete, delimited, do_parse, escaped_transform, many_till, map_res, named,
+    named_args, opt, preceded, return_error, tag, take_while1, take_while_m_n,
 };
 
 use crate::errors::InternalKind;
@@ -129,10 +129,20 @@ named!(heredoc_begin(&[u8]) -> HereDoc,
 named_args!(
     heredoc_end<'a>(identifier: &'a HereDoc<'a>)<()>,
     do_parse!(
-        // Whitespace?
-        tag!(identifier.identifier)
+        call!(nom::eol)
+        >> call!(nom::multispace0)
+        >> tag!(identifier.identifier)
         >> call!(nom::eol)
         >> ()
+    )
+);
+
+named!(
+    heredoc_string(&[u8]) -> String,
+    do_parse!(
+        identifier: call!(heredoc_begin)
+        >> strings: many_till!(call!(nom::anychar), call!(heredoc_end, &identifier))
+        >> (strings.0.into_iter().collect())
     )
 );
 
@@ -243,14 +253,14 @@ mod tests {
     fn heredoc_end_is_parsed_correctly() {
         let test_cases = [
             (
-                "EOF\n",
+                "\nEOF\n",
                 HereDoc {
                     identifier: b"EOF",
                     indented: false,
                 },
             ),
             (
-                "EOH\n",
+                "\n    EOH\n",
                 HereDoc {
                     identifier: b"EOH",
                     indented: true,
@@ -260,6 +270,39 @@ mod tests {
 
         for (input, identifier) in test_cases.iter() {
             let _ = heredoc_end(input.as_bytes(), &identifier).unwrap();
+        }
+    }
+
+    #[test]
+    fn heredoc_strings_are_pased_correctly() {
+        let test_cases = [
+            (
+                r#"<<EOF
+something
+EOF
+"#,
+                "something",
+            ),
+            (
+                r#"<<EOH
+something
+with
+new lines
+and quotes "
+                    EOH
+"#,
+                r#"something
+with
+new lines
+and quotes ""#,
+            ),
+        ];
+
+        for (input, expected) in test_cases.iter() {
+            assert_eq!(
+                heredoc_string(input.as_bytes()).unwrap().1,
+                expected.to_string()
+            );
         }
     }
 }
