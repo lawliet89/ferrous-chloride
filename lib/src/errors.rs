@@ -22,7 +22,9 @@ impl Error {
         I: nom::AsBytes + Debug,
     {
         Self::from_err(err, |s| {
-            std::str::from_utf8(s.as_bytes()).ok().map(|s| s.to_string())
+            std::str::from_utf8(s.as_bytes())
+                .ok()
+                .map(|s| s.to_string())
         })
     }
 

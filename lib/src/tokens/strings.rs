@@ -9,8 +9,8 @@ use nom::is_hex_digit;
 use nom::types::CompleteByteSlice;
 use nom::ErrorKind;
 use nom::{
-    alt, call, complete, delimited, do_parse, escaped_transform, flat_map, many_till, map_res,
-    named, named_args, opt, preceded, return_error, tag, take_while1, take_while_m_n,
+    alt, call, complete, delimited, do_parse, escaped_transform, many_till, map_res, named,
+    named_args, opt, preceded, return_error, tag, take_while1, take_while_m_n,
 };
 
 fn not_single_line_string_illegal_byte(c: u8) -> bool {
@@ -82,11 +82,12 @@ named!(hex_to_unicode_bytes(CompleteByteSlice) -> Vec<u8>,
 
 /// Contents of a single line string
 named!(
-    single_line_string_content_bytes(&[u8]) -> Vec<u8>,
+    single_line_string_content_bytes(CompleteByteSlice) -> Vec<u8>,
     escaped_transform!(
         take_while1!(not_single_line_string_illegal_byte),
         '\\',
-        crate::utils::wrap(unescape_bytes)
+        unescape_bytes
+        // crate::utils::wrap(unescape_bytes)
     )
 );
 
@@ -94,7 +95,7 @@ named!(
     single_line_string_bytes(&[u8]) -> Vec<u8>,
     delimited!(
         tag!("\""),
-        single_line_string_content_bytes,
+        call!(crate::utils::wrap_bytes(single_line_string_content_bytes)),
         tag!("\"")
     )
 );
@@ -193,11 +194,8 @@ mod tests {
 
         for (input, expected) in test_cases.iter() {
             println!("Testing {}", input);
-            let actual = single_line_string_content_bytes(input.as_bytes());
-            assert_eq!(
-                ResultUtils::unwrap_output(actual),
-                expected.as_bytes()
-            );
+            let actual = single_line_string_content_bytes(CompleteByteSlice(input.as_bytes()));
+            assert_eq!(ResultUtils::unwrap_output(actual), expected.as_bytes());
         }
     }
 
