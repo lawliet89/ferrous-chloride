@@ -19,10 +19,10 @@ impl Error {
     /// Convert a Nom Err into something useful
     pub fn from_err_bytes<I>(err: nom::Err<I>) -> Self
     where
-        I: AsRef<[u8]> + Debug,
+        I: nom::AsBytes + Debug,
     {
         Self::from_err(err, |s| {
-            std::str::from_utf8(s.as_ref()).ok().map(|s| s.to_string())
+            std::str::from_utf8(s.as_bytes()).ok().map(|s| s.to_string())
         })
     }
 

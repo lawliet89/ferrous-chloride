@@ -9,8 +9,8 @@ use nom::is_hex_digit;
 use nom::types::CompleteByteSlice;
 use nom::ErrorKind;
 use nom::{
-    alt, call, complete, delimited, do_parse, escaped_transform, many_till, map_res, named,
-    named_args, opt, preceded, return_error, tag, take_while1, take_while_m_n,
+    alt, call, complete, delimited, do_parse, escaped_transform, flat_map, many_till, map_res,
+    named, named_args, opt, preceded, return_error, tag, take_while1, take_while_m_n,
 };
 
 fn not_single_line_string_illegal_byte(c: u8) -> bool {
@@ -48,7 +48,7 @@ fn hex_to_bytes(s: &[u8]) -> Result<Vec<u8>, InternalKind> {
 /// Source: https://github.com/hashicorp/hcl/blob/ef8a98b0bbce4a65b5aa4c368430a80ddc533168/hcl/scanner/scanner.go#L513
 /// Unicode References: https://en.wikipedia.org/wiki/List_of_Unicode_characters
 // TODO: Issues with variable length alt https://docs.rs/nom/4.2.0/nom/macro.alt.html#behaviour-of-alt
-named!(unescape_bytes(&[u8]) -> Vec<u8>,
+named!(unescape_bytes(CompleteByteSlice) -> Vec<u8>,
         alt!(
             // Control Chracters
             tag!("a")  => { |_| b"\x07".to_vec() }
@@ -61,21 +61,21 @@ named!(unescape_bytes(&[u8]) -> Vec<u8>,
             | tag!("\\") => { |_| b"\\".to_vec() }
             | tag!("\"") => { |_| b"\"".to_vec() }
             | tag!("?") => { |_| b"?".to_vec() }
-            | map_res!(complete!(take_while_m_n!(1, 3, nom::is_oct_digit)), |s| octal_to_bytes(s))
+            | map_res!(complete!(take_while_m_n!(1, 3, nom::is_oct_digit)), |s: CompleteByteSlice| octal_to_bytes(s.0))
             | hex_to_unicode_bytes
         )
 );
 
-named!(hex_to_unicode_bytes(&[u8]) -> Vec<u8>,
+named!(hex_to_unicode_bytes(CompleteByteSlice) -> Vec<u8>,
     return_error!(
         ErrorKind::Custom(InternalKind::InvalidUnicodeCodePoint as u32),
         alt!(
             // Technically the C++ spec allows characters of arbitrary length but the HashiCorp
             // Go implementation only scans up to two.
-            map_res!(preceded!(tag!("x"), take_while_m_n!(1, 2, is_hex_digit)), |s| hex_to_bytes(s))
-            | map_res!(preceded!(tag!("u"), take_while_m_n!(1, 4, is_hex_digit)), |s| hex_to_bytes(s))
+            map_res!(preceded!(tag!("x"), take_while_m_n!(1, 2, is_hex_digit)), |s: CompleteByteSlice| hex_to_bytes(s.0))
+            | map_res!(preceded!(tag!("u"), take_while_m_n!(1, 4, is_hex_digit)), |s: CompleteByteSlice| hex_to_bytes(s.0))
             // The official unicode code points only go up to 6 digits
-            | map_res!(preceded!(tag!("U"), take_while_m_n!(1, 8, is_hex_digit)), |s| hex_to_bytes(s))
+            | map_res!(preceded!(tag!("U"), take_while_m_n!(1, 8, is_hex_digit)), |s: CompleteByteSlice| hex_to_bytes(s.0))
         )
     )
 );
@@ -86,7 +86,7 @@ named!(
     escaped_transform!(
         take_while1!(not_single_line_string_illegal_byte),
         '\\',
-        unescape_bytes
+        crate::utils::wrap(unescape_bytes)
     )
 );
 
@@ -166,7 +166,7 @@ mod tests {
 
         for (input, expected) in test_cases.iter() {
             println!("Testing {}", input);
-            let actual = unescape_bytes(input.as_bytes());
+            let actual = unescape_bytes(CompleteByteSlice(input.as_bytes()));
             assert_eq!(actual.unwrap_output(), expected.as_bytes());
         }
     }
@@ -174,7 +174,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "Invalid Unicode Code Points \\UD800")]
     fn unescaping_invalid_unicode_errors() {
-        unescape_bytes(b"UD800").unwrap_output();
+        unescape_bytes(CompleteByteSlice(b"UD800")).unwrap_output();
     }
 
     #[test]
@@ -193,8 +193,9 @@ mod tests {
 
         for (input, expected) in test_cases.iter() {
             println!("Testing {}", input);
+            let actual = single_line_string_content_bytes(input.as_bytes());
             assert_eq!(
-                single_line_string_content_bytes(input.as_bytes()).unwrap_output(),
+                ResultUtils::unwrap_output(actual),
                 expected.as_bytes()
             );
         }
