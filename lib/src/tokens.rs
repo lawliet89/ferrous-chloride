@@ -62,7 +62,7 @@ named!(pub boolean(CompleteStr) -> bool,
 mod tests {
     use super::*;
 
-    use crate::utils::ResultUtils;
+    use crate::utils::ResultUtilsString;
 
     #[test]
     fn integers_are_parsed_correctly() {

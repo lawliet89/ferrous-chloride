@@ -1,108 +1,102 @@
 // https://www.reddit.com/r/rust/comments/8rpzjd/parsing_string_literals_in_nom/
 // https://github.com/Geal/nom/issues/787
 
+use std::str;
+
+use crate::errors::InternalKind;
 use log::debug;
-use nom::map;
-use nom::types::CompleteStr;
+use nom::is_hex_digit;
+use nom::types::CompleteByteSlice;
 use nom::ErrorKind;
 use nom::{
     alt, call, complete, delimited, do_parse, escaped_transform, many_till, map_res, named,
     named_args, opt, preceded, return_error, tag, take_while1, take_while_m_n,
 };
 
-use crate::errors::InternalKind;
-
-fn not_single_line_string_illegal(c: char) -> bool {
+fn not_single_line_string_illegal_byte(c: u8) -> bool {
+    let c = c as char;
     let test = c != '\\' && c != '"' && c != '\n' && c != '\r';
     debug!("Checking valid string character {:?}: {:?}", c, test);
     test
 }
 
-fn octal_to_string(s: CompleteStr) -> String {
+fn octal_to_bytes(s: &[u8]) -> Result<Vec<u8>, InternalKind> {
     use std::char;
 
-    let octal = u32::from_str_radix(s.as_ref(), 8).expect("Parser to have caught invalid inputs");
-    char::from_u32(octal)
-        .map(|c| c.to_string())
-        .expect("To never fail between 0 and 511.")
+    let octal =
+        u32::from_str_radix(str::from_utf8(s)?, 8).expect("Parser to have caught invalid inputs");
+    let c = char::from_u32(octal).ok_or_else(|| InternalKind::InvalidUnicodeCodePoint)?;
+
+    let mut buffer: Vec<u8> = vec![0; c.len_utf8()];
+    c.encode_utf8(buffer.as_mut_slice());
+    Ok(buffer)
 }
 
-fn hex_to_string(s: CompleteStr) -> Result<String, InternalKind> {
+fn hex_to_bytes(s: &[u8]) -> Result<Vec<u8>, InternalKind> {
     use std::char;
 
-    let byte = u32::from_str_radix(s.as_ref(), 16).expect("Parser to have caught invalid inputs");
-    char::from_u32(byte)
-        .map(|c| c.to_string())
-        .ok_or_else(|| InternalKind::InvalidUnicode)
-}
+    let byte =
+        u32::from_str_radix(str::from_utf8(s)?, 16).expect("Parser to have caught invalid inputs");
+    let c = char::from_u32(byte).ok_or_else(|| InternalKind::InvalidUnicodeCodePoint)?;
 
-fn is_octal(s: char) -> bool {
-    s.len_utf8() == 1 && nom::is_oct_digit(s as u8)
-}
-
-fn is_hex(s: char) -> bool {
-    s.len_utf8() == 1 && nom::is_hex_digit(s as u8)
+    let mut buffer: Vec<u8> = vec![0; c.len_utf8()];
+    c.encode_utf8(buffer.as_mut_slice());
+    Ok(buffer)
 }
 
 /// Unescape characters according to the reference https://en.cppreference.com/w/cpp/language/escape
 /// Source: https://github.com/hashicorp/hcl/blob/ef8a98b0bbce4a65b5aa4c368430a80ddc533168/hcl/scanner/scanner.go#L513
 /// Unicode References: https://en.wikipedia.org/wiki/List_of_Unicode_characters
 // TODO: Issues with variable length alt https://docs.rs/nom/4.2.0/nom/macro.alt.html#behaviour-of-alt
-named!(unescape(CompleteStr) -> String,
+named!(unescape_bytes(CompleteByteSlice) -> Vec<u8>,
         alt!(
             // Control Chracters
-            tag!("a")  => { |_| "\x07".to_string() }
-            | tag!("b")  => { |_| "\x08".to_string() }
-            | tag!("f")  => { |_| "\x0c".to_string() }
-            | tag!("n") => { |_| "\n".to_string() }
-            | tag!("r")  => { |_| "\r".to_string() }
-            | tag!("t")  => { |_| "\t".to_string() }
-            | tag!("v")  => { |_| "\x0b".to_string() }
-            | tag!("\\") => { |_| "\\".to_string() }
-            | tag!("\"") => { |_| "\"".to_string() }
-            | tag!("?") => { |_| "?".to_string() }
-            | complete!(take_while_m_n!(1, 3, is_octal)) => { |s| octal_to_string(s) }
-            // Technically the C++ spec allows characters of arbitrary length but the HashiCorp
-            // Go implementation only scans up to two.
-            | hex_to_unicode
+            tag!("a")  => { |_| b"\x07".to_vec() }
+            | tag!("b")  => { |_| b"\x08".to_vec() }
+            | tag!("f")  => { |_| b"\x0c".to_vec() }
+            | tag!("n") => { |_| b"\n".to_vec() }
+            | tag!("r")  => { |_| b"\r".to_vec() }
+            | tag!("t")  => { |_| b"\t".to_vec() }
+            | tag!("v")  => { |_| b"\x0b".to_vec() }
+            | tag!("\\") => { |_| b"\\".to_vec() }
+            | tag!("\"") => { |_| b"\"".to_vec() }
+            | tag!("?") => { |_| b"?".to_vec() }
+            | map_res!(complete!(take_while_m_n!(1, 3, nom::is_oct_digit)), |s: CompleteByteSlice| octal_to_bytes(s.0))
+            | hex_to_unicode_bytes
         )
 );
 
-named!(hex_to_unicode(CompleteStr) -> String,
+named!(hex_to_unicode_bytes(CompleteByteSlice) -> Vec<u8>,
     return_error!(
-        ErrorKind::Custom(InternalKind::InvalidUnicode as u32),
+        ErrorKind::Custom(InternalKind::InvalidUnicodeCodePoint as u32),
         alt!(
             // Technically the C++ spec allows characters of arbitrary length but the HashiCorp
             // Go implementation only scans up to two.
-            map_res!(preceded!(tag!("x"), take_while_m_n!(1, 2, is_hex)), |s| hex_to_string(s))
-            | map_res!(preceded!(tag!("u"), take_while_m_n!(1, 4, is_hex)), |s| hex_to_string(s))
-            // The official unicode code points only go up to 6 digits, but the HashiCorp implementation
-            // parses till 8
-            | map_res!(preceded!(tag!("U"), take_while_m_n!(1, 6, is_hex)), |s| hex_to_string(s))
+            map_res!(preceded!(tag!("x"), take_while_m_n!(1, 2, is_hex_digit)), |s: CompleteByteSlice| hex_to_bytes(s.0))
+            | map_res!(preceded!(tag!("u"), take_while_m_n!(1, 4, is_hex_digit)), |s: CompleteByteSlice| hex_to_bytes(s.0))
+            // The official unicode code points only go up to 6 digits
+            | map_res!(preceded!(tag!("U"), take_while_m_n!(1, 8, is_hex_digit)), |s: CompleteByteSlice| hex_to_bytes(s.0))
         )
     )
 );
 
 /// Contents of a single line string
 named!(
-    pub single_line_string_content(CompleteStr) -> String,
+    single_line_string_content_bytes(CompleteByteSlice) -> Vec<u8>,
     escaped_transform!(
-        take_while1!(not_single_line_string_illegal),
-        // nom::alpha,
+        take_while1!(not_single_line_string_illegal_byte),
         '\\',
-        unescape
+        unescape_bytes
+        // crate::utils::wrap(unescape_bytes)
     )
 );
 
 named!(
-    single_line_string(CompleteStr) -> String,
-    map!(
-        delimited!(
-            tag!("\""),
-            single_line_string_content,
-            tag!("\"")
-        ),
-        |s| s.to_string()
+    single_line_string_bytes(&[u8]) -> Vec<u8>,
+    delimited!(
+        tag!("\""),
+        call!(crate::utils::wrap_bytes(single_line_string_content_bytes)),
+        tag!("\"")
     )
 );
 
@@ -146,11 +140,19 @@ named!(
     )
 );
 
+named!(
+    pub string(&[u8]) -> String,
+    alt!(
+        map_res!(single_line_string_bytes, |s| String::from_utf8(s))
+        | heredoc_string
+    )
+);
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    use crate::utils::ResultUtils;
+    use crate::utils::*;
 
     #[test]
     fn unescaping_works_correctly() {
@@ -165,61 +167,65 @@ mod tests {
             (r#"\"#, "\\"),
             (r#"""#, "\""),
             ("?", "?"),
-            (r#"xff"#, "ÿ"), // Hex
-            (r#"251"#, "©"), // Octal
-            (r#"uD000"#, "\u{D000}"),
-            (r#"U29000"#, "\u{29000}"),
+            (r#"xff"#, "ÿ"),           // Hex
+            (r#"251"#, "©"),           // Octal
+            (r#"uD000"#, "\u{D000}"),   // Unicode up to 4 bytes
+            (r#"U29000"#, "\u{29000}"), // Unicode up to 8 bytes... but max unicode is only up to 6
         ];
 
         for (input, expected) in test_cases.iter() {
-            assert_eq!(unescape(CompleteStr(input)).unwrap_output(), *expected);
+            println!("Testing {}", input);
+            let actual = unescape_bytes(CompleteByteSlice(input.as_bytes()));
+            assert_eq!(actual.unwrap_output(), expected.as_bytes());
         }
     }
 
     #[test]
     #[should_panic(expected = "Invalid Unicode Code Points \\UD800")]
     fn unescaping_invalid_unicode_errors() {
-        unescape(CompleteStr("UD800")).unwrap_output();
+        unescape_bytes(CompleteByteSlice(b"UD800")).unwrap_output();
     }
 
     #[test]
-    fn simple_string_content_are_parsed_correctly() {
-        assert_eq!(
-            single_line_string_content(CompleteStr("abcd")).unwrap_output(),
-            "abcd".to_string()
-        );
-    }
-
-    #[test]
-    fn escaped_string_content_are_parsed_correctly() {
+    fn string_content_are_parsed_correctly() {
         let test_cases = [
+            (r#"abcd"#, r#"abcd"#),
             (r#"ab\"cd"#, r#"ab"cd"#),
             (r#"ab \\ cd"#, r#"ab \ cd"#),
             (r#"ab \n cd"#, "ab \n cd"),
             (r#"ab \? cd"#, "ab ? cd"),
+            (
+                r#"ab \xff \251 \uD000 \U29000"#,
+                "ab ÿ © \u{D000} \u{29000}",
+            ),
         ];
 
         for (input, expected) in test_cases.iter() {
-            assert_eq!(
-                single_line_string_content(CompleteStr(input)).unwrap_output(),
-                expected.to_string()
-            );
+            println!("Testing {}", input);
+            let actual = single_line_string_content_bytes(CompleteByteSlice(input.as_bytes()));
+            assert_eq!(ResultUtils::unwrap_output(actual), expected.as_bytes());
         }
     }
 
     #[test]
     fn single_line_string_literals_are_parsed_correctly() {
         let test_cases = [
+            (r#""abcd""#, r#"abcd"#),
             (r#""ab\"cd""#, r#"ab"cd"#),
             (r#""ab \\ cd""#, r#"ab \ cd"#),
             (r#""ab \n cd""#, "ab \n cd"),
             (r#""ab \? cd""#, "ab ? cd"),
+            (
+                r#""ab \xff \251 \uD000 \U29000""#,
+                "ab ÿ © \u{D000} \u{29000}",
+            ),
         ];
 
         for (input, expected) in test_cases.iter() {
+            println!("Testing {}", input);
             assert_eq!(
-                single_line_string(CompleteStr(input)).unwrap_output(),
-                expected.to_string()
+                single_line_string_bytes(input.as_bytes()).unwrap_output(),
+                expected.as_bytes()
             );
         }
     }
@@ -244,6 +250,7 @@ mod tests {
         ];
 
         for (input, expected) in test_cases.iter() {
+            println!("Testing {}", input);
             let (_, actual) = heredoc_begin(input.as_bytes()).unwrap();
             assert_eq!(&actual, expected);
         }
@@ -269,6 +276,7 @@ mod tests {
         ];
 
         for (input, identifier) in test_cases.iter() {
+            println!("Testing {}", input);
             let _ = heredoc_end(input.as_bytes(), &identifier).unwrap();
         }
     }
@@ -299,10 +307,52 @@ and quotes ""#,
         ];
 
         for (input, expected) in test_cases.iter() {
+            println!("Testing {}", input);
             assert_eq!(
                 heredoc_string(input.as_bytes()).unwrap().1,
                 expected.to_string()
             );
+        }
+    }
+
+    #[test]
+    fn strings_are_parsed_correctly() {
+        let test_cases = [
+            (r#""abcd""#, r#"abcd"#),
+            (r#""ab\"cd""#, r#"ab"cd"#),
+            (r#""ab \\ cd""#, r#"ab \ cd"#),
+            (r#""ab \n cd""#, "ab \n cd"),
+            (r#""ab \? cd""#, "ab ? cd"),
+            (
+                r#""ab \xff \251 \uD000 \U29000""#,
+                "ab ÿ © \u{D000} \u{29000}",
+            ),
+            (
+                r#"<<EOF
+something
+EOF
+"#,
+                "something",
+            ),
+            (
+                r#"<<EOH
+something
+with
+new lines
+and quotes "
+                    EOH
+"#,
+                r#"something
+with
+new lines
+and quotes ""#,
+            ),
+        ];
+
+        for (input, expected) in test_cases.iter() {
+            println!("Testing {}", input);
+            let actual = string(input.as_bytes()).unwrap_output();
+            assert_eq!(&actual, expected);
         }
     }
 }
