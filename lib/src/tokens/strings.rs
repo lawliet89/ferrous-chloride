@@ -165,37 +165,34 @@ mod tests {
         ];
 
         for (input, expected) in test_cases.iter() {
-            let mut actual = unescape_bytes(input.as_bytes());
-            // while actual.
-
+            println!("Testing {}", input);
+            let actual = unescape_bytes(input.as_bytes());
             assert_eq!(actual.unwrap_output(), expected.as_bytes());
         }
     }
 
-    // #[test]
-    // #[should_panic(expected = "Invalid Unicode Code Points \\UD800")]
-    // fn unescaping_invalid_unicode_errors() {
-    //     unescape(CompleteStr("UD800")).unwrap_output();
-    // }
-
-    // #[test]
-    // fn simple_string_content_are_parsed_correctly() {
-    //     assert_eq!(
-    //         single_line_string_content(CompleteStr("abcd")).unwrap_output(),
-    //         "abcd".to_string()
-    //     );
-    // }
+    #[test]
+    #[should_panic(expected = "Invalid Unicode Code Points \\UD800")]
+    fn unescaping_invalid_unicode_errors() {
+        unescape_bytes(b"UD800").unwrap_output();
+    }
 
     #[test]
-    fn escaped_string_content_are_parsed_correctly() {
+    fn string_content_are_parsed_correctly() {
         let test_cases = [
+            (r#"abcd"#, r#"abcd"#),
             (r#"ab\"cd"#, r#"ab"cd"#),
             (r#"ab \\ cd"#, r#"ab \ cd"#),
             (r#"ab \n cd"#, "ab \n cd"),
             (r#"ab \? cd"#, "ab ? cd"),
+            (
+                r#"ab \xff \251 \uD000 \U29000"#,
+                "ab ÿ © \u{D000} \u{29000}",
+            ),
         ];
 
         for (input, expected) in test_cases.iter() {
+            println!("Testing {}", input);
             assert_eq!(
                 single_line_string_content_bytes(input.as_bytes()).unwrap_output(),
                 expected.as_bytes()
@@ -206,6 +203,7 @@ mod tests {
     #[test]
     fn single_line_string_literals_are_parsed_correctly() {
         let test_cases = [
+            (r#""abcd""#, r#"abcd"#),
             (r#""ab\"cd""#, r#"ab"cd"#),
             (r#""ab \\ cd""#, r#"ab \ cd"#),
             (r#""ab \n cd""#, "ab \n cd"),
@@ -217,6 +215,7 @@ mod tests {
         ];
 
         for (input, expected) in test_cases.iter() {
+            println!("Testing {}", input);
             assert_eq!(
                 single_line_string_bytes(input.as_bytes()).unwrap_output(),
                 expected.as_bytes()
@@ -244,6 +243,7 @@ mod tests {
         ];
 
         for (input, expected) in test_cases.iter() {
+            println!("Testing {}", input);
             let (_, actual) = heredoc_begin(input.as_bytes()).unwrap();
             assert_eq!(&actual, expected);
         }
@@ -269,6 +269,7 @@ mod tests {
         ];
 
         for (input, identifier) in test_cases.iter() {
+            println!("Testing {}", input);
             let _ = heredoc_end(input.as_bytes(), &identifier).unwrap();
         }
     }
@@ -299,6 +300,7 @@ and quotes ""#,
         ];
 
         for (input, expected) in test_cases.iter() {
+            println!("Testing {}", input);
             assert_eq!(
                 heredoc_string(input.as_bytes()).unwrap().1,
                 expected.to_string()
