@@ -140,11 +140,19 @@ named!(
     )
 );
 
+named!(
+    pub string(&[u8]) -> String,
+    alt!(
+        map_res!(single_line_string_bytes, |s| String::from_utf8(s))
+        | heredoc_string
+    )
+);
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    use crate::utils::ResultUtils;
+    use crate::utils::*;
 
     #[test]
     fn unescaping_works_correctly() {
@@ -304,6 +312,47 @@ and quotes ""#,
                 heredoc_string(input.as_bytes()).unwrap().1,
                 expected.to_string()
             );
+        }
+    }
+
+    #[test]
+    fn strings_are_parsed_correctly() {
+        let test_cases = [
+            (r#""abcd""#, r#"abcd"#),
+            (r#""ab\"cd""#, r#"ab"cd"#),
+            (r#""ab \\ cd""#, r#"ab \ cd"#),
+            (r#""ab \n cd""#, "ab \n cd"),
+            (r#""ab \? cd""#, "ab ? cd"),
+            (
+                r#""ab \xff \251 \uD000 \U29000""#,
+                "ab ÿ © \u{D000} \u{29000}",
+            ),
+            (
+                r#"<<EOF
+something
+EOF
+"#,
+                "something",
+            ),
+            (
+                r#"<<EOH
+something
+with
+new lines
+and quotes "
+                    EOH
+"#,
+                r#"something
+with
+new lines
+and quotes ""#,
+            ),
+        ];
+
+        for (input, expected) in test_cases.iter() {
+            println!("Testing {}", input);
+            let actual = string(input.as_bytes()).unwrap_output();
+            assert_eq!(&actual, expected);
         }
     }
 }

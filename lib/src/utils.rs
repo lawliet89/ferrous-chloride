@@ -75,12 +75,8 @@ mod bytes {
             Ok((i, o)) => Ok((i.0, o)),
             Err(e) => Err(match e {
                 nom::Err::Incomplete(n) => nom::Err::Incomplete(n),
-                nom::Err::Failure(c) => {
-                    nom::Err::Failure(context_unwrap_complete_bytes(c))
-                }
-                nom::Err::Error(c) => {
-                    nom::Err::Error(context_unwrap_complete_bytes(c))
-                }
+                nom::Err::Failure(c) => nom::Err::Failure(context_unwrap_complete_bytes(c)),
+                nom::Err::Error(c) => nom::Err::Error(context_unwrap_complete_bytes(c)),
             }),
         }
     }
