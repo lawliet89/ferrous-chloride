@@ -5,14 +5,7 @@ pub mod strings;
 use std::str::FromStr;
 
 use nom::types::CompleteStr;
-use nom::{alt, complete, do_parse, map, map_res, named, one_of, opt, recognize, tag};
-
-// Parse Literal Values
-// NUMBER  // 12345
-// 	FLOAT   // 123.45
-// 	BOOL    // true,false
-// 	STRING  // "abc"
-// HEREDOC // <<FOO\nbar\nFOO
+use nom::{alt, call, complete, do_parse, map, map_res, named, one_of, opt, recognize, tag};
 
 /// Parsed Integer Literal
 struct Integer<'a> {
@@ -58,6 +51,14 @@ named!(pub boolean(CompleteStr) -> bool,
     )
 );
 
+/// Parse an identifier
+named!(pub identifier(CompleteStr) -> &str,
+    map!(
+        call!(crate::utils::while_predicate1, |c| c.is_alphanumeric() || c == '_' || c == '-' || c == '.'),
+        |s| s.0
+    )
+);
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -83,4 +84,11 @@ mod tests {
         assert_eq!(boolean(CompleteStr("true")).unwrap_output(), true);
         assert_eq!(boolean(CompleteStr("false")).unwrap_output(), false);
     }
+
+    // #[test]
+    // fn identifiers_are_parsed_correctly() {
+    //     let test_cases = [
+    //         ("abc123")
+    //     ]
+    // }
 }

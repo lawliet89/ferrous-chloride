@@ -12,9 +12,15 @@ pub enum Value {
     Integer(i64),
     Float(f64),
     Boolean(bool),
-    r#String(String),
+    String(String),
     Array(Vec<Value>),
+    Stanza(Stanza),
     Object(HashMap<String, Value>),
 }
 
 // https://github.com/Geal/nom/blob/master/tests/json.rs
+#[derive(Debug, PartialEq)]
+pub struct Stanza {
+    pub keys: Vec<String>,
+    pub values: HashMap<String, Value>,
+}

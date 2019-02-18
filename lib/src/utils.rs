@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use nom::types::{CompleteByteSlice, CompleteStr};
+use nom::types::CompleteStr;
 use nom::verbose_errors::Context;
 use nom::IResult;
 
@@ -53,6 +53,22 @@ where
     }
 }
 
+/// Recognizes at least 1 character while a predicate holds true
+pub fn while_predicate1<T, F>(input: T, predicate: F) -> nom::IResult<T, T>
+where
+    F: Fn(char) -> bool,
+    T: nom::InputTakeAtPosition,
+    <T as nom::InputTakeAtPosition>::Item: nom::AsChar,
+{
+    use nom::AsChar;
+
+    input.split_at_position1(
+        |item| !predicate(item.as_char()),
+        nom::ErrorKind::AlphaNumeric,
+    )
+}
+
+/*
 /// Given a parser `F` that takes in a `CompleteByteSlice`, wrap your inputs which are
 /// `& [u8]`, call parser `F` and then unwrap it afterwards.
 pub(crate) fn wrap_bytes<'a, F, O>(parser: F) -> impl FnOnce(&'a [u8]) -> IResult<&'a [u8], O>
@@ -91,6 +107,7 @@ mod bytes {
     }
 
 }
+*/
 
 /// Given a parser `F` that takes in a `CompleteStr`, wrap your inputs which are
 /// `&str`, call parser `F` and then unwrap it afterwards.

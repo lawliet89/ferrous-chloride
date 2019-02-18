@@ -112,7 +112,7 @@ named!(heredoc_begin(&str) -> HereDoc,
     do_parse!(
         tag!("<<")
         >> indented: opt!(complete!(tag!("-")))
-        >> identifier: call!(nom::alphanumeric1)
+        >> identifier: call!(crate::utils::while_predicate1, |c| c.is_alphanumeric() || c == '_')
         >> call!(nom::eol)
         >> (HereDoc {
                 identifier,
@@ -181,10 +181,7 @@ mod tests {
         for (input, expected) in test_cases.iter() {
             println!("Testing {}", input);
             let actual = unescape(CompleteStr(input)).map(|(i, o)| (i, o.into_owned()));
-            assert_eq!(
-                ResultUtilsString::unwrap_output(actual),
-                *expected
-            );
+            assert_eq!(ResultUtilsString::unwrap_output(actual), *expected);
         }
     }
 
@@ -261,6 +258,13 @@ mod tests {
                     indented: true,
                 },
             ),
+            (
+                "<<藏_\n",
+                HereDoc {
+                    identifier: "藏_",
+                    indented: false,
+                },
+            ),
         ];
 
         for (input, expected) in test_cases.iter() {
@@ -327,57 +331,54 @@ and quotes ""#,
 
         for (input, expected) in test_cases.iter() {
             println!("Testing {}", input);
-            assert_eq!(
-                heredoc_string(input).unwrap().1,
-                expected.to_string()
-            );
+            assert_eq!(heredoc_string(input).unwrap().1, expected.to_string());
         }
     }
 
-        #[test]
-        fn strings_are_parsed_correctly() {
-            let test_cases = [
-                (r#""""#, ""),
-                (r#""abcd""#, r#"abcd"#),
-                (r#""ab\"cd""#, r#"ab"cd"#),
-                (r#""ab \\ cd""#, r#"ab \ cd"#),
-                (r#""ab \n cd""#, "ab \n cd"),
-                (r#""ab \? cd""#, "ab ? cd"),
-                (
-                    r#"<<EOF
+    #[test]
+    fn strings_are_parsed_correctly() {
+        let test_cases = [
+            (r#""""#, ""),
+            (r#""abcd""#, r#"abcd"#),
+            (r#""ab\"cd""#, r#"ab"cd"#),
+            (r#""ab \\ cd""#, r#"ab \ cd"#),
+            (r#""ab \n cd""#, "ab \n cd"),
+            (r#""ab \? cd""#, "ab ? cd"),
+            (
+                r#"<<EOF
     EOF"#,
-                    "",
-                ),
-                (
-                    r#""ab \xff \251 \uD000 \U29000""#,
-                    "ab ÿ © \u{D000} \u{29000}",
-                ),
-                (
-                    r#"<<EOF
+                "",
+            ),
+            (
+                r#""ab \xff \251 \uD000 \U29000""#,
+                "ab ÿ © \u{D000} \u{29000}",
+            ),
+            (
+                r#"<<EOF
 something
     EOF
     "#,
-                    "something",
-                ),
-                (
-                    r#"<<EOH
+                "something",
+            ),
+            (
+                r#"<<EOH
 something
 with
 new lines
 and quotes "
                         EOH
     "#,
-                    r#"something
+                r#"something
 with
 new lines
 and quotes ""#,
-                ),
-            ];
+            ),
+        ];
 
-            for (input, expected) in test_cases.iter() {
-                println!("Testing {}", input);
-                let actual = ResultUtilsString::unwrap_output(string(input));
-                assert_eq!(&actual, expected);
-            }
+        for (input, expected) in test_cases.iter() {
+            println!("Testing {}", input);
+            let actual = ResultUtilsString::unwrap_output(string(input));
+            assert_eq!(&actual, expected);
         }
+    }
 }
