@@ -5,7 +5,9 @@ pub mod strings;
 use std::str::FromStr;
 
 use nom::types::CompleteStr;
-use nom::{alt, call, complete, do_parse, map, map_res, named, one_of, opt, recognize, tag};
+use nom::{
+    alt, call, complete, do_parse, map, map_res, named, one_of, opt, recognize, tag, verify,
+};
 
 /// Parsed Integer Literal
 struct Integer<'a> {
@@ -53,9 +55,18 @@ named!(pub boolean(CompleteStr) -> bool,
 
 /// Parse an identifier
 named!(pub identifier(CompleteStr) -> &str,
-    map!(
-        call!(crate::utils::while_predicate1, |c| c.is_alphanumeric() || c == '_' || c == '-' || c == '.'),
-        |s| s.0
+    do_parse!(
+        identifier: verify!(
+            call!(crate::utils::while_predicate1, |c| c.is_alphanumeric() || c == '_' || c == '-' || c == '.'),
+            |s: CompleteStr| {
+                let first = s.chars().nth(0);
+                match first {
+                    None => false,
+                    Some(c) => c.is_alphabetic() || c == '_'
+                }
+            }
+        )
+        >> (identifier.0)
     )
 );
 
@@ -85,10 +96,27 @@ mod tests {
         assert_eq!(boolean(CompleteStr("false")).unwrap_output(), false);
     }
 
-    // #[test]
-    // fn identifiers_are_parsed_correctly() {
-    //     let test_cases = [
-    //         ("abc123")
-    //     ]
-    // }
+    #[test]
+    fn identifiers_are_parsed_correctly() {
+        let test_cases = [
+            ("abcd123", "abcd123"),
+            ("_abc", "_abc"),
+            ("藏_①", "藏_①"),
+        ];
+
+        for (input, expected) in test_cases.into_iter() {
+            println!("Testing {}", input);
+            assert_eq!(identifier(CompleteStr(input)).unwrap_output(), *expected);
+        }
+    }
+
+    #[test]
+    fn incorrect_identifiers_are_not_accepted() {
+        let test_cases = ["1abc", "①_is_some_number"];
+
+        for input in test_cases.into_iter() {
+            println!("Testing {}", input);
+            assert!(identifier(CompleteStr(input)).is_err());
+        }
+    }
 }
