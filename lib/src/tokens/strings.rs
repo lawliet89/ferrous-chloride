@@ -135,8 +135,8 @@ named!(
     heredoc_string(&[u8]) -> String,
     do_parse!(
         identifier: call!(heredoc_begin)
-        >> strings: many_till!(call!(nom::anychar), call!(heredoc_end, &identifier))
-        >> (strings.0.into_iter().collect())
+        >> strings: opt!(complete!(many_till!(call!(nom::anychar), call!(heredoc_end, &identifier))))
+        >> (strings.map(|s| s.0.into_iter().collect()).unwrap_or_else(|| "".to_string()))
     )
 );
 
@@ -189,6 +189,7 @@ mod tests {
     #[test]
     fn string_content_are_parsed_correctly() {
         let test_cases = [
+            ("", ""),
             (r#"abcd"#, r#"abcd"#),
             (r#"ab\"cd"#, r#"ab"cd"#),
             (r#"ab \\ cd"#, r#"ab \ cd"#),
@@ -210,6 +211,7 @@ mod tests {
     #[test]
     fn single_line_string_literals_are_parsed_correctly() {
         let test_cases = [
+            (r#""""#, ""),
             (r#""abcd""#, r#"abcd"#),
             (r#""ab\"cd""#, r#"ab"cd"#),
             (r#""ab \\ cd""#, r#"ab \ cd"#),
@@ -286,6 +288,11 @@ mod tests {
         let test_cases = [
             (
                 r#"<<EOF
+EOF"#,
+                "",
+            ),
+            (
+                r#"<<EOF
 something
 EOF
 "#,
@@ -318,11 +325,17 @@ and quotes ""#,
     #[test]
     fn strings_are_parsed_correctly() {
         let test_cases = [
+            (r#""""#, ""),
             (r#""abcd""#, r#"abcd"#),
             (r#""ab\"cd""#, r#"ab"cd"#),
             (r#""ab \\ cd""#, r#"ab \ cd"#),
             (r#""ab \n cd""#, "ab \n cd"),
             (r#""ab \? cd""#, "ab ? cd"),
+            (
+                r#"<<EOF
+EOF"#,
+                "",
+            ),
             (
                 r#""ab \xff \251 \uD000 \U29000""#,
                 "ab ÿ © \u{D000} \u{29000}",
