@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use failure_derive::Fail;
 use nom::verbose_errors::Context;
 use nom::ErrorKind;
@@ -15,14 +17,19 @@ pub enum Error {
 
 impl Error {
     /// Convert a Nom Err into something useful
-    pub fn from_err_bytes(err: nom::Err<&[u8]>) -> Self {
-        Self::from_err(err, |s| std::str::from_utf8(s).ok().map(|s| s.to_string()))
+    pub fn from_err_bytes<I>(err: nom::Err<I>) -> Self
+    where
+        I: AsRef<[u8]> + Debug,
+    {
+        Self::from_err(err, |s| {
+            std::str::from_utf8(s.as_ref()).ok().map(|s| s.to_string())
+        })
     }
 
     /// Convert a Nom Err into something useful
     pub fn from_err_str<I>(err: nom::Err<I>) -> Self
     where
-        I: AsRef<str> + std::fmt::Debug,
+        I: AsRef<str> + Debug,
     {
         Self::from_err(err, |s| Some(s.as_ref().to_string()))
     }

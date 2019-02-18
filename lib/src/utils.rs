@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use nom::IResult;
 
 pub(crate) trait ResultUtils<O> {
@@ -19,7 +21,10 @@ pub(crate) trait ResultUtilsString<O> {
     fn unwrap_output(self) -> O;
 }
 
-impl<O> ResultUtils<O> for IResult<&[u8], O, u32> {
+impl<I, O> ResultUtils<O> for IResult<I, O, u32>
+where
+    I: AsRef<[u8]> + Debug,
+{
     fn unwrap_output(self) -> O {
         match self {
             Err(e) => {

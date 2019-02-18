@@ -158,9 +158,9 @@ mod tests {
             (r#"\"#, "\\"),
             (r#"""#, "\""),
             ("?", "?"),
-            (r#"xff"#, "ÿ"), // Hex
-            (r#"251"#, "©"), // Octal
-            (r#"uD000"#, "\u{D000}"), // Unicode up to 4 bytes
+            (r#"xff"#, "ÿ"),           // Hex
+            (r#"251"#, "©"),           // Octal
+            (r#"uD000"#, "\u{D000}"),   // Unicode up to 4 bytes
             (r#"U29000"#, "\u{29000}"), // Unicode up to 8 bytes... but max unicode is only up to 6
         ];
 
