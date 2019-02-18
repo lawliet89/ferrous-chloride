@@ -1,6 +1,6 @@
 mod errors;
 pub mod tokens;
-pub mod utils;
+mod utils;
 
 pub use errors::Error;
 
