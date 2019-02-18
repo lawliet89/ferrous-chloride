@@ -1,101 +1,102 @@
 // https://www.reddit.com/r/rust/comments/8rpzjd/parsing_string_literals_in_nom/
 // https://github.com/Geal/nom/issues/787
 
+use std::borrow::Cow;
 use std::str;
 
 use crate::errors::InternalKind;
 use log::debug;
-use nom::is_hex_digit;
-use nom::types::CompleteByteSlice;
+use nom::types::CompleteStr;
 use nom::ErrorKind;
 use nom::{
-    alt, call, complete, delimited, do_parse, escaped_transform, many_till, map_res, named,
+    alt, call, complete, delimited, do_parse, escaped_transform, many_till, map, map_res, named,
     named_args, opt, preceded, return_error, tag, take_while1, take_while_m_n,
 };
 
-fn not_single_line_string_illegal_byte(c: u8) -> bool {
-    let c = c as char;
+fn is_hex_digit(c: char) -> bool {
+    c.is_digit(16)
+}
+
+fn is_oct_digit(c: char) -> bool {
+    c.is_digit(8)
+}
+
+fn not_single_line_string_illegal_char(c: char) -> bool {
     let test = c != '\\' && c != '"' && c != '\n' && c != '\r';
     debug!("Checking valid string character {:?}: {:?}", c, test);
     test
 }
 
-fn octal_to_bytes(s: &[u8]) -> Result<Vec<u8>, InternalKind> {
+fn octal_to_string(s: &str) -> Result<String, InternalKind> {
     use std::char;
 
-    let octal =
-        u32::from_str_radix(str::from_utf8(s)?, 8).expect("Parser to have caught invalid inputs");
-    let c = char::from_u32(octal).ok_or_else(|| InternalKind::InvalidUnicodeCodePoint)?;
-
-    let mut buffer: Vec<u8> = vec![0; c.len_utf8()];
-    c.encode_utf8(buffer.as_mut_slice());
-    Ok(buffer)
+    let octal = u32::from_str_radix(s, 8).expect("Parser to have caught invalid inputs");
+    Ok(char::from_u32(octal)
+        .ok_or_else(|| InternalKind::InvalidUnicodeCodePoint)?
+        .to_string())
 }
 
-fn hex_to_bytes(s: &[u8]) -> Result<Vec<u8>, InternalKind> {
-    use std::char;
-
-    let byte =
-        u32::from_str_radix(str::from_utf8(s)?, 16).expect("Parser to have caught invalid inputs");
-    let c = char::from_u32(byte).ok_or_else(|| InternalKind::InvalidUnicodeCodePoint)?;
-
-    let mut buffer: Vec<u8> = vec![0; c.len_utf8()];
-    c.encode_utf8(buffer.as_mut_slice());
-    Ok(buffer)
+fn hex_to_string(s: &str) -> Result<String, InternalKind> {
+    let byte = u32::from_str_radix(s, 16).expect("Parser to have caught invalid inputs");
+    Ok(std::char::from_u32(byte)
+        .ok_or_else(|| InternalKind::InvalidUnicodeCodePoint)?
+        .to_string())
 }
 
 /// Unescape characters according to the reference https://en.cppreference.com/w/cpp/language/escape
 /// Source: https://github.com/hashicorp/hcl/blob/ef8a98b0bbce4a65b5aa4c368430a80ddc533168/hcl/scanner/scanner.go#L513
 /// Unicode References: https://en.wikipedia.org/wiki/List_of_Unicode_characters
 // TODO: Issues with variable length alt https://docs.rs/nom/4.2.0/nom/macro.alt.html#behaviour-of-alt
-named!(unescape_bytes(CompleteByteSlice) -> Vec<u8>,
+named!(unescape(CompleteStr) -> Cow<str>,
         alt!(
             // Control Chracters
-            tag!("a")  => { |_| b"\x07".to_vec() }
-            | tag!("b")  => { |_| b"\x08".to_vec() }
-            | tag!("f")  => { |_| b"\x0c".to_vec() }
-            | tag!("n") => { |_| b"\n".to_vec() }
-            | tag!("r")  => { |_| b"\r".to_vec() }
-            | tag!("t")  => { |_| b"\t".to_vec() }
-            | tag!("v")  => { |_| b"\x0b".to_vec() }
-            | tag!("\\") => { |_| b"\\".to_vec() }
-            | tag!("\"") => { |_| b"\"".to_vec() }
-            | tag!("?") => { |_| b"?".to_vec() }
-            | map_res!(complete!(take_while_m_n!(1, 3, nom::is_oct_digit)), |s: CompleteByteSlice| octal_to_bytes(s.0))
-            | hex_to_unicode_bytes
+            tag!("a")  => { |_| Cow::Borrowed("\x07") }
+            | tag!("b")  => { |_| Cow::Borrowed("\x08") }
+            | tag!("f")  => { |_| Cow::Borrowed("\x0c") }
+            | tag!("n") => { |_| Cow::Borrowed("\n") }
+            | tag!("r")  => { |_| Cow::Borrowed("\r") }
+            | tag!("t")  => { |_| Cow::Borrowed("\t") }
+            | tag!("v")  => { |_| Cow::Borrowed("\x0b") }
+            | tag!("\\") => { |_| Cow::Borrowed("\\") }
+            | tag!("\"") => { |_| Cow::Borrowed("\"") }
+            | tag!("?") => { |_| Cow::Borrowed("?") }
+            | map!(map_res!(complete!(take_while_m_n!(1, 3, is_oct_digit)), |s: CompleteStr| octal_to_string(s.0)), |s| Cow::Owned(s))
+            | hex_to_unicode
         )
 );
 
-named!(hex_to_unicode_bytes(CompleteByteSlice) -> Vec<u8>,
+named!(hex_to_unicode(CompleteStr) -> Cow<str>,
     return_error!(
         ErrorKind::Custom(InternalKind::InvalidUnicodeCodePoint as u32),
-        alt!(
-            // Technically the C++ spec allows characters of arbitrary length but the HashiCorp
-            // Go implementation only scans up to two.
-            map_res!(preceded!(tag!("x"), take_while_m_n!(1, 2, is_hex_digit)), |s: CompleteByteSlice| hex_to_bytes(s.0))
-            | map_res!(preceded!(tag!("u"), take_while_m_n!(1, 4, is_hex_digit)), |s: CompleteByteSlice| hex_to_bytes(s.0))
-            // The official unicode code points only go up to 6 digits
-            | map_res!(preceded!(tag!("U"), take_while_m_n!(1, 8, is_hex_digit)), |s: CompleteByteSlice| hex_to_bytes(s.0))
+        map!(
+            alt!(
+                // Technically the C++ spec allows characters of arbitrary length but the HashiCorp
+                // Go implementation only scans up to two.
+                map_res!(preceded!(tag!("x"), take_while_m_n!(1, 2, is_hex_digit)), |s: CompleteStr| hex_to_string(s.0))
+                | map_res!(preceded!(tag!("u"), take_while_m_n!(1, 4, is_hex_digit)), |s: CompleteStr| hex_to_string(s.0))
+                // The official unicode code points only go up to 6 digits
+                | map_res!(preceded!(tag!("U"), take_while_m_n!(1, 8, is_hex_digit)), |s: CompleteStr| hex_to_string(s.0))
+            ),
+            |s| Cow::Owned(s)
         )
     )
 );
 
 /// Contents of a single line string
 named!(
-    single_line_string_content_bytes(CompleteByteSlice) -> Vec<u8>,
+    single_line_string_content(CompleteStr) -> String,
     escaped_transform!(
-        take_while1!(not_single_line_string_illegal_byte),
+        take_while1!(not_single_line_string_illegal_char),
         '\\',
-        unescape_bytes
-        // crate::utils::wrap(unescape_bytes)
+        unescape
     )
 );
 
 named!(
-    single_line_string_bytes(&[u8]) -> Vec<u8>,
+    single_line_string(&str) -> String,
     delimited!(
         tag!("\""),
-        call!(crate::utils::wrap_bytes(single_line_string_content_bytes)),
+        call!(crate::utils::wrap_str(single_line_string_content)),
         tag!("\"")
     )
 );
@@ -103,11 +104,11 @@ named!(
 /// Heredoc marker
 #[derive(Debug, Eq, PartialEq)]
 struct HereDoc<'a> {
-    identifier: &'a [u8],
+    identifier: &'a str,
     indented: bool,
 }
 
-named!(heredoc_begin(&[u8]) -> HereDoc,
+named!(heredoc_begin(&str) -> HereDoc,
     do_parse!(
         tag!("<<")
         >> indented: opt!(complete!(tag!("-")))
@@ -115,13 +116,13 @@ named!(heredoc_begin(&[u8]) -> HereDoc,
         >> call!(nom::eol)
         >> (HereDoc {
                 identifier,
-                indented: indented == Some(b"-")
+                indented: indented == Some("-")
            })
     )
 );
 
 named_args!(
-    heredoc_end<'a>(identifier: &'a HereDoc<'a>)<()>,
+    heredoc_end<'a>(identifier: &'_ HereDoc<'_>)<&'a str, ()>,
     do_parse!(
         call!(nom::eol)
         >> call!(nom::multispace0)
@@ -132,7 +133,7 @@ named_args!(
 );
 
 named!(
-    heredoc_string(&[u8]) -> String,
+    heredoc_string(&str) -> String,
     do_parse!(
         identifier: call!(heredoc_begin)
         >> strings: opt!(complete!(many_till!(call!(nom::anychar), call!(heredoc_end, &identifier))))
@@ -141,12 +142,16 @@ named!(
 );
 
 named!(
-    pub string(&[u8]) -> String,
+    pub string(&str) -> String,
     alt!(
-        map_res!(single_line_string_bytes, |s| String::from_utf8(s))
+        single_line_string
         | heredoc_string
     )
 );
+
+// TODO:
+// - Interpolation `${test("...")}`
+// - Unindent heredoc: https://github.com/hashicorp/hcl/blob/65a6292f0157eff210d03ed1bf6c59b190b8b906/hcl/token/token.go#L174
 
 #[cfg(test)]
 mod tests {
@@ -175,15 +180,19 @@ mod tests {
 
         for (input, expected) in test_cases.iter() {
             println!("Testing {}", input);
-            let actual = unescape_bytes(CompleteByteSlice(input.as_bytes()));
-            assert_eq!(actual.unwrap_output(), expected.as_bytes());
+            let actual = unescape(CompleteStr(input)).map(|(i, o)| (i, o.into_owned()));
+            assert_eq!(
+                ResultUtilsString::unwrap_output(actual),
+                *expected
+            );
         }
     }
 
     #[test]
     #[should_panic(expected = "Invalid Unicode Code Points \\UD800")]
     fn unescaping_invalid_unicode_errors() {
-        unescape_bytes(CompleteByteSlice(b"UD800")).unwrap_output();
+        let actual = unescape(CompleteStr("UD800")).map(|(i, o)| (i, o.into_owned()));
+        ResultUtilsString::unwrap_output(actual);
     }
 
     #[test]
@@ -203,8 +212,11 @@ mod tests {
 
         for (input, expected) in test_cases.iter() {
             println!("Testing {}", input);
-            let actual = single_line_string_content_bytes(CompleteByteSlice(input.as_bytes()));
-            assert_eq!(ResultUtils::unwrap_output(actual), expected.as_bytes());
+            let actual = single_line_string_content(CompleteStr(input));
+            assert_eq!(
+                ResultUtilsString::unwrap_output(actual.map(|s| s.to_owned())),
+                *expected
+            );
         }
     }
 
@@ -226,8 +238,8 @@ mod tests {
         for (input, expected) in test_cases.iter() {
             println!("Testing {}", input);
             assert_eq!(
-                single_line_string_bytes(input.as_bytes()).unwrap_output(),
-                expected.as_bytes()
+                ResultUtilsString::unwrap_output(single_line_string(input)),
+                *expected
             );
         }
     }
@@ -238,14 +250,14 @@ mod tests {
             (
                 "<<EOF\n",
                 HereDoc {
-                    identifier: b"EOF",
+                    identifier: "EOF",
                     indented: false,
                 },
             ),
             (
                 "<<-EOH\n",
                 HereDoc {
-                    identifier: b"EOH",
+                    identifier: "EOH",
                     indented: true,
                 },
             ),
@@ -253,7 +265,7 @@ mod tests {
 
         for (input, expected) in test_cases.iter() {
             println!("Testing {}", input);
-            let (_, actual) = heredoc_begin(input.as_bytes()).unwrap();
+            let (_, actual) = heredoc_begin(input).unwrap();
             assert_eq!(&actual, expected);
         }
     }
@@ -264,14 +276,14 @@ mod tests {
             (
                 "\nEOF\n",
                 HereDoc {
-                    identifier: b"EOF",
+                    identifier: "EOF",
                     indented: false,
                 },
             ),
             (
                 "\n    EOH\n",
                 HereDoc {
-                    identifier: b"EOH",
+                    identifier: "EOH",
                     indented: true,
                 },
             ),
@@ -279,7 +291,7 @@ mod tests {
 
         for (input, identifier) in test_cases.iter() {
             println!("Testing {}", input);
-            let _ = heredoc_end(input.as_bytes(), &identifier).unwrap();
+            let _ = heredoc_end(input, &identifier).unwrap();
         }
     }
 
@@ -316,56 +328,56 @@ and quotes ""#,
         for (input, expected) in test_cases.iter() {
             println!("Testing {}", input);
             assert_eq!(
-                heredoc_string(input.as_bytes()).unwrap().1,
+                heredoc_string(input).unwrap().1,
                 expected.to_string()
             );
         }
     }
 
-    #[test]
-    fn strings_are_parsed_correctly() {
-        let test_cases = [
-            (r#""""#, ""),
-            (r#""abcd""#, r#"abcd"#),
-            (r#""ab\"cd""#, r#"ab"cd"#),
-            (r#""ab \\ cd""#, r#"ab \ cd"#),
-            (r#""ab \n cd""#, "ab \n cd"),
-            (r#""ab \? cd""#, "ab ? cd"),
-            (
-                r#"<<EOF
-EOF"#,
-                "",
-            ),
-            (
-                r#""ab \xff \251 \uD000 \U29000""#,
-                "ab ÿ © \u{D000} \u{29000}",
-            ),
-            (
-                r#"<<EOF
+        #[test]
+        fn strings_are_parsed_correctly() {
+            let test_cases = [
+                (r#""""#, ""),
+                (r#""abcd""#, r#"abcd"#),
+                (r#""ab\"cd""#, r#"ab"cd"#),
+                (r#""ab \\ cd""#, r#"ab \ cd"#),
+                (r#""ab \n cd""#, "ab \n cd"),
+                (r#""ab \? cd""#, "ab ? cd"),
+                (
+                    r#"<<EOF
+    EOF"#,
+                    "",
+                ),
+                (
+                    r#""ab \xff \251 \uD000 \U29000""#,
+                    "ab ÿ © \u{D000} \u{29000}",
+                ),
+                (
+                    r#"<<EOF
 something
-EOF
-"#,
-                "something",
-            ),
-            (
-                r#"<<EOH
+    EOF
+    "#,
+                    "something",
+                ),
+                (
+                    r#"<<EOH
 something
 with
 new lines
 and quotes "
-                    EOH
-"#,
-                r#"something
+                        EOH
+    "#,
+                    r#"something
 with
 new lines
 and quotes ""#,
-            ),
-        ];
+                ),
+            ];
 
-        for (input, expected) in test_cases.iter() {
-            println!("Testing {}", input);
-            let actual = string(input.as_bytes()).unwrap_output();
-            assert_eq!(&actual, expected);
+            for (input, expected) in test_cases.iter() {
+                println!("Testing {}", input);
+                let actual = ResultUtilsString::unwrap_output(string(input));
+                assert_eq!(&actual, expected);
+            }
         }
-    }
 }
