@@ -1,16 +1,17 @@
 // https://www.reddit.com/r/rust/comments/8rpzjd/parsing_string_literals_in_nom/
 // https://github.com/Geal/nom/issues/787
 
+use std::str;
+
+use crate::errors::InternalKind;
 use log::debug;
-use nom::map;
+use nom::is_hex_digit;
 use nom::types::CompleteStr;
 use nom::ErrorKind;
 use nom::{
-    alt, call, complete, delimited, do_parse, escaped_transform, many_till, map_res, named,
+    alt, call, complete, delimited, do_parse, escaped_transform, many_till, map, map_res, named,
     named_args, opt, preceded, return_error, tag, take_while1, take_while_m_n,
 };
-
-use crate::errors::InternalKind;
 
 fn not_single_line_string_illegal(c: char) -> bool {
     let test = c != '\\' && c != '"' && c != '\n' && c != '\r';
@@ -27,13 +28,37 @@ fn octal_to_string(s: CompleteStr) -> String {
         .expect("To never fail between 0 and 511.")
 }
 
+fn octal_to_bytes(s: &[u8]) -> Result<Vec<u8>, InternalKind> {
+    use std::char;
+
+    let octal =
+        u32::from_str_radix(str::from_utf8(s)?, 8).expect("Parser to have caught invalid inputs");
+    let c = char::from_u32(octal).ok_or_else(|| InternalKind::InvalidUnicodeCodePoint)?;
+
+    let mut buffer: Vec<u8> = Vec::with_capacity(c.len_utf8());
+    c.encode_utf8(buffer.as_mut_slice());
+    Ok(buffer)
+}
+
 fn hex_to_string(s: CompleteStr) -> Result<String, InternalKind> {
     use std::char;
 
     let byte = u32::from_str_radix(s.as_ref(), 16).expect("Parser to have caught invalid inputs");
     char::from_u32(byte)
         .map(|c| c.to_string())
-        .ok_or_else(|| InternalKind::InvalidUnicode)
+        .ok_or_else(|| InternalKind::InvalidUnicodeCodePoint)
+}
+
+fn hex_to_bytes(s: &[u8]) -> Result<Vec<u8>, InternalKind> {
+    use std::char;
+
+    let byte =
+        u32::from_str_radix(str::from_utf8(s)?, 16).expect("Parser to have caught invalid inputs");
+    let c = char::from_u32(byte).ok_or_else(|| InternalKind::InvalidUnicodeCodePoint)?;
+
+    let mut buffer: Vec<u8> = Vec::with_capacity(c.len_utf8());
+    c.encode_utf8(buffer.as_mut_slice());
+    Ok(buffer)
 }
 
 fn is_octal(s: char) -> bool {
@@ -41,7 +66,7 @@ fn is_octal(s: char) -> bool {
 }
 
 fn is_hex(s: char) -> bool {
-    s.len_utf8() == 1 && nom::is_hex_digit(s as u8)
+    s.len_utf8() == 1 && is_hex_digit(s as u8)
 }
 
 /// Unescape characters according to the reference https://en.cppreference.com/w/cpp/language/escape
@@ -70,7 +95,7 @@ named!(unescape(CompleteStr) -> String,
 
 named!(hex_to_unicode(CompleteStr) -> String,
     return_error!(
-        ErrorKind::Custom(InternalKind::InvalidUnicode as u32),
+        ErrorKind::Custom(InternalKind::InvalidUnicodeCodePoint as u32),
         alt!(
             // Technically the C++ spec allows characters of arbitrary length but the HashiCorp
             // Go implementation only scans up to two.
@@ -79,6 +104,41 @@ named!(hex_to_unicode(CompleteStr) -> String,
             // The official unicode code points only go up to 6 digits, but the HashiCorp implementation
             // parses till 8
             | map_res!(preceded!(tag!("U"), take_while_m_n!(1, 6, is_hex)), |s| hex_to_string(s))
+        )
+    )
+);
+
+named!(unescape_bytes(&[u8]) -> Vec<u8>,
+        alt!(
+            // Control Chracters
+            tag!("a")  => { |_| b"\x07".to_vec() }
+            | tag!("b")  => { |_| b"\x08".to_vec() }
+            | tag!("f")  => { |_| b"\x0c".to_vec() }
+            | tag!("n") => { |_| b"\n".to_vec() }
+            | tag!("r")  => { |_| b"\r".to_vec() }
+            | tag!("t")  => { |_| b"\t".to_vec() }
+            | tag!("v")  => { |_| b"\x0b".to_vec() }
+            | tag!("\\") => { |_| b"\\".to_vec() }
+            | tag!("\"") => { |_| b"\"".to_vec() }
+            | tag!("?") => { |_| b"?".to_vec() }
+            | map_res!(complete!(take_while_m_n!(1, 3, nom::is_oct_digit)), |s| octal_to_bytes(s))
+            // Technically the C++ spec allows characters of arbitrary length but the HashiCorp
+            // Go implementation only scans up to two.
+            | hex_to_unicode_bytes
+        )
+);
+
+named!(hex_to_unicode_bytes(&[u8]) -> Vec<u8>,
+    return_error!(
+        ErrorKind::Custom(InternalKind::InvalidUnicodeCodePoint as u32),
+        alt!(
+            // Technically the C++ spec allows characters of arbitrary length but the HashiCorp
+            // Go implementation only scans up to two.
+            map_res!(preceded!(tag!("x"), take_while_m_n!(1, 2, is_hex_digit)), |s| hex_to_bytes(s))
+            | map_res!(preceded!(tag!("u"), take_while_m_n!(1, 4, is_hex_digit)), |s| hex_to_bytes(s))
+            // The official unicode code points only go up to 6 digits, but the HashiCorp implementation
+            // parses till 8
+            | map_res!(preceded!(tag!("U"), take_while_m_n!(1, 6, is_hex_digit)), |s| hex_to_bytes(s))
         )
     )
 );

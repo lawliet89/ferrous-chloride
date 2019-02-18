@@ -6,7 +6,9 @@ use nom::ErrorKind;
 #[derive(Debug, Fail)]
 pub enum Error {
     #[fail(display = "Invalid Unicode Code Points \\{}", _0)]
-    InvalidUnicode(String),
+    InvalidUnicodeCodePoint(String),
+    #[fail(display = "Bytes contain invalid unicode: {:#?}", _0)]
+    InvalidUnicode(Vec<u8>),
     #[fail(display = "Generic Parse Error {}", _0)]
     ParseError(String),
 }
@@ -33,7 +35,11 @@ impl Error {
         let kind = InternalKind::from_u32(code);
         if let Some(kind) = kind {
             match kind {
-                InternalKind::InvalidUnicode => Some(Error::InvalidUnicode(input.to_string())),
+                InternalKind::InvalidUnicodeCodePoint => {
+                    Some(Error::InvalidUnicodeCodePoint(input.to_string()))
+                }
+                InternalKind::InvalidUnicode => None, // TODO!
+                InternalKind::InvalidInteger => None, // TODO!
             }
         } else {
             None
@@ -86,5 +92,19 @@ macro_rules! enum_number {
 
 /// Custom ErrorKind
 enum_number!(InternalKind {
-    InvalidUnicode = 0,
+    InvalidUnicodeCodePoint = 0,
+    InvalidUnicode = 1,
+    InvalidInteger = 2,
 });
+
+impl From<std::str::Utf8Error> for InternalKind {
+    fn from(_: std::str::Utf8Error) -> Self {
+        InternalKind::InvalidUnicode
+    }
+}
+
+impl From<std::num::ParseIntError> for InternalKind {
+    fn from(_: std::num::ParseIntError) -> Self {
+        InternalKind::InvalidInteger
+    }
+}
