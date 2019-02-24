@@ -108,7 +108,12 @@ impl<'a> Map<'a> {
             keys: keys.iter().map(|s| s.as_ref().to_string()).collect(),
             values: values
                 .iter()
-                .map(|(k, v)| (literals::Key::Identifier(Cow::Borrowed(k.as_ref())), Into::into(v)))
+                .map(|(k, v)| {
+                    (
+                        literals::Key::Identifier(Cow::Borrowed(k.as_ref())),
+                        Into::into(v),
+                    )
+                })
                 .collect(),
         }
     }
@@ -338,19 +343,25 @@ EOF
     fn maps_are_parsed_correctly() {
         let test_cases = [
             (
-            r#"test {
+                r#"test {
 foo = "bar"
 }"#,
-            ("test", Value::from(Map::new::<&str, _, _>(&[], &[("foo", "bar")]))),
-        ),
+                (
+                    "test",
+                    Value::from(Map::new::<&str, _, _>(&[], &[("foo", "bar")])),
+                ),
+            ),
             (
-            r#"test = {
+                r#"test = {
 foo = "bar"
 
 
 }"#,
-            ("test", Value::from(Map::new::<&str, _, _>(&[], &[("foo", "bar")]))),
-        ),
+                (
+                    "test",
+                    Value::from(Map::new::<&str, _, _>(&[], &[("foo", "bar")])),
+                ),
+            ),
         ];
 
         for (input, (expected_key, expected_value)) in test_cases.into_iter() {

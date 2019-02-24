@@ -21,8 +21,8 @@ fn is_oct_digit(c: char) -> bool {
     c.is_digit(8)
 }
 
-fn not_single_line_string_illegal_char(c: char) -> bool {
-    let test = c != '\\' && c != '"' && c != '\n' && c != '\r';
+fn not_quoted_string_illegal_char(c: char) -> bool {
+    let test = c != '\\' && c != '"';
     debug!("Checking valid string character {:?}: {:?}", c, test);
     test
 }
@@ -84,19 +84,19 @@ named!(hex_to_unicode(CompleteStr) -> Cow<str>,
 
 /// Contents of a single line string
 named!(
-    single_line_string_content(CompleteStr) -> String,
+    quoted_string_content(CompleteStr) -> String,
     escaped_transform!(
-        take_while1!(not_single_line_string_illegal_char),
+        take_while1!(not_quoted_string_illegal_char),
         '\\',
         unescape
     )
 );
 
 named!(
-    single_line_string(CompleteStr) -> String,
+    quoted_string(CompleteStr) -> String,
     delimited!(
         tag!("\""),
-        call!(single_line_string_content),
+        call!(quoted_string_content),
         tag!("\"")
     )
 );
@@ -144,7 +144,7 @@ named!(
 named!(
     pub string(CompleteStr) -> String,
     alt!(
-        single_line_string
+        quoted_string
         | heredoc_string
     )
 );
@@ -205,11 +205,12 @@ mod tests {
                 r#"ab \xff \251 \uD000 \U29000"#,
                 "ab ÿ © \u{D000} \u{29000}",
             ),
+            ("ab\ncd", "ab\ncd"),
         ];
 
         for (input, expected) in test_cases.iter() {
             println!("Testing {}", input);
-            let actual = single_line_string_content(CompleteStr(input));
+            let actual = quoted_string_content(CompleteStr(input));
             assert_eq!(
                 ResultUtilsString::unwrap_output(actual.map(|s| s.to_owned())),
                 *expected
@@ -218,7 +219,7 @@ mod tests {
     }
 
     #[test]
-    fn single_line_string_literals_are_parsed_correctly() {
+    fn quoted_string_literals_are_parsed_correctly() {
         let test_cases = [
             (r#""""#, ""),
             (r#""abcd""#, r#"abcd"#),
@@ -230,12 +231,13 @@ mod tests {
                 r#""ab \xff \251 \uD000 \U29000""#,
                 "ab ÿ © \u{D000} \u{29000}",
             ),
+            ("\"ab\ncd\"", "ab\ncd"),
         ];
 
         for (input, expected) in test_cases.iter() {
             println!("Testing {}", input);
             assert_eq!(
-                ResultUtilsString::unwrap_output(single_line_string(CompleteStr(input))),
+                ResultUtilsString::unwrap_output(quoted_string(CompleteStr(input))),
                 *expected
             );
         }
