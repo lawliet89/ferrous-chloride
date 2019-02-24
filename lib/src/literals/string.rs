@@ -27,6 +27,12 @@ fn not_quoted_string_illegal_char(c: char) -> bool {
     test
 }
 
+fn not_quoted_single_line_string_illegal_char(c: char) -> bool {
+    let test = c != '\\' && c != '"' && c != '\r' && c != '\n';
+    debug!("Checking valid string character {:?}: {:?}", c, test);
+    test
+}
+
 fn octal_to_string(s: &str) -> Result<String, InternalKind> {
     use std::char;
 
@@ -97,6 +103,24 @@ named!(
     delimited!(
         tag!("\""),
         call!(quoted_string_content),
+        tag!("\"")
+    )
+);
+
+named!(
+    quoted_single_line_string_content(CompleteStr) -> String,
+    escaped_transform!(
+        take_while1!(not_quoted_single_line_string_illegal_char),
+        '\\',
+        unescape
+    )
+);
+
+named!(
+    pub quoted_single_line_string(CompleteStr) -> String,
+    delimited!(
+        tag!("\""),
+        call!(quoted_single_line_string_content),
         tag!("\"")
     )
 );

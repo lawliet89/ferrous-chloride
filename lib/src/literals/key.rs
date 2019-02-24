@@ -58,7 +58,7 @@ named!(
     pub key(CompleteStr) -> Key,
     alt_complete!(
         call!(super::identifier) => { |s| Key::Identifier(Cow::Borrowed(s)) }
-        | super::string => { |s| Key::String(Cow::Owned(s)) }
+        | super::string::quoted_single_line_string => { |s| Key::String(Cow::Owned(s)) }
     )
 );
 

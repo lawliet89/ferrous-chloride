@@ -117,6 +117,10 @@ impl<'a> Map<'a> {
                 .collect(),
         }
     }
+
+    pub fn new_direct(keys: Vec<String>, values: MapValues<'a>) -> Self {
+        Map { keys, values }
+    }
 }
 
 impl<'a> From<MapValues<'a>> for Map<'a> {
@@ -177,6 +181,14 @@ named!(
                     >> values: whitespace!(call!(map_values))
                     >> char!('}')
                     >> (literals::Key::Identifier(Cow::Borrowed(identifier)), Value::from(values))
+                )
+                | do_parse!(
+                    identifier: call!(literals::identifier)
+                    >> keys: many0!(literals::quoted_single_line_string)
+                    >> whitespace!(char!('{'))
+                    >> values: whitespace!(call!(map_values))
+                    >> char!('}')
+                    >> (literals::Key::Identifier(Cow::Borrowed(identifier)), Value::from(Map::new_direct(keys, values)))
                 )
         )
     )
@@ -360,6 +372,15 @@ foo = "bar"
                 (
                     "test",
                     Value::from(Map::new::<&str, _, _>(&[], &[("foo", "bar")])),
+                ),
+            ),
+            (
+                r#"test "one" "two" {
+foo = "bar"
+}"#,
+                (
+                    "test",
+                    Value::from(Map::new(&["one", "two"], &[("foo", "bar")])),
                 ),
             ),
         ];

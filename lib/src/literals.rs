@@ -10,4 +10,4 @@ pub use boolean::boolean;
 pub use identifier::identifier;
 pub use key::{key, Key};
 pub use number::{number, Number};
-pub use string::string;
+pub use string::{quoted_single_line_string, string};
