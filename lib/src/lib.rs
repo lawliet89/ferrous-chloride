@@ -5,7 +5,7 @@ pub mod literals;
 mod utils;
 
 pub use errors::Error;
-use nom::{alt, call, char, do_parse, named, tag, terminated};
+use nom::{alt, call, char, named, tag, terminated};
 
 use std::collections::HashMap;
 
