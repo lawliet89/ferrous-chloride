@@ -13,6 +13,7 @@ use nom::{
 use nom::types::CompleteStr;
 
 pub type MapValues<'a> = HashMap<literals::Key<'a>, Value<'a>>;
+pub type Stanza<'a> = HashMap<Vec<String>, MapValues<'a>>;
 
 #[derive(Debug, PartialEq, Clone)]
 /// Value in HCL
@@ -22,7 +23,8 @@ pub enum Value<'a> {
     Boolean(bool),
     String(String),
     List(Vec<Value<'a>>),
-    Map(Vec<Map<'a>>),
+    Map(Vec<MapValues<'a>>),
+    Stanza(Stanza<'a>),
 }
 
 macro_rules! impl_from_value (
@@ -60,7 +62,8 @@ impl_from_value!(Integer, i64);
 impl_from_value!(Float, f64);
 impl_from_value!(Boolean, bool);
 impl_from_value!(String, String);
-impl_from_value!(Map, Vec<Map<'a>>);
+impl_from_value!(Map, Vec<MapValues<'a>>);
+impl_from_value!(Stanza, Stanza<'a>);
 
 /// Special Snowflake treatment for &str and friends
 impl<'a, 'b> From<&'b str> for Value<'a> {
@@ -78,57 +81,9 @@ impl<'a> From<Option<Vec<Value<'a>>>> for Value<'a> {
     }
 }
 
-impl<'a> From<Map<'a>> for Value<'a> {
-    fn from(map: Map<'a>) -> Self {
-        Value::Map(vec![map])
-    }
-}
-
 impl<'a> From<MapValues<'a>> for Value<'a> {
     fn from(values: MapValues<'a>) -> Self {
-        Value::from(Map::from(values))
-    }
-}
-
-// https://github.com/Geal/nom/blob/master/tests/json.rs
-#[derive(Debug, PartialEq, Clone)]
-pub struct Map<'a> {
-    pub keys: Vec<String>,
-    pub values: MapValues<'a>,
-}
-
-impl<'a> Map<'a> {
-    pub fn new<S, K, V>(keys: &[S], values: &'a [(K, V)]) -> Self
-    where
-        S: AsRef<str>,
-        K: AsRef<str>,
-        V: Into<Value<'a>> + Clone,
-    {
-        Map {
-            keys: keys.iter().map(|s| s.as_ref().to_string()).collect(),
-            values: values
-                .iter()
-                .map(|(k, v)| {
-                    (
-                        literals::Key::Identifier(Cow::Borrowed(k.as_ref())),
-                        Into::into(v),
-                    )
-                })
-                .collect(),
-        }
-    }
-
-    pub fn new_direct(keys: Vec<String>, values: MapValues<'a>) -> Self {
-        Map { keys, values }
-    }
-}
-
-impl<'a> From<MapValues<'a>> for Map<'a> {
-    fn from(values: MapValues<'a>) -> Self {
-        Map {
-            keys: vec![],
-            values,
-        }
+        Value::from(vec![values])
     }
 }
 
@@ -188,7 +143,7 @@ named!(
                     >> whitespace!(char!('{'))
                     >> values: whitespace!(call!(map_values))
                     >> char!('}')
-                    >> (literals::Key::Identifier(Cow::Borrowed(identifier)), Value::from(Map::new_direct(keys, values)))
+                    >> (literals::Key::Identifier(Cow::Borrowed(identifier)), Value::Stanza(vec![(keys, values)].into_iter().collect()))
                 )
         )
     )
