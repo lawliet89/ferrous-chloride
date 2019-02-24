@@ -1,15 +1,16 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 use crate::literals;
 
 use nom::{
-    alt, alt_complete, call, char, delimited, do_parse, many0, many1, map, named, opt, preceded,
+    alt, alt_complete, call, char, do_parse, many0, many1, map, named, opt, preceded,
     separated_list, tag, terminated, ws,
 };
 
 use nom::types::CompleteStr;
 
-pub type Map<'a> = HashMap<literals::Key<'a>, Value<'a>>;
+pub type MapValues<'a> = HashMap<literals::Key<'a>, Value<'a>>;
 
 #[derive(Debug, PartialEq, Clone)]
 /// Value in HCL
@@ -19,8 +20,7 @@ pub enum Value<'a> {
     Boolean(bool),
     String(String),
     List(Vec<Value<'a>>),
-    Stanza(Stanza<'a>),
-    Map(Map<'a>),
+    Map(Vec<Map<'a>>),
 }
 
 macro_rules! impl_from_value (
@@ -58,8 +58,7 @@ impl_from_value!(Integer, i64);
 impl_from_value!(Float, f64);
 impl_from_value!(Boolean, bool);
 impl_from_value!(String, String);
-impl_from_value!(Stanza, Stanza<'a>);
-impl_from_value!(Map, Map<'a>);
+impl_from_value!(Map, Vec<Map<'a>>);
 
 /// Special Snowflake treatment for &str and friends
 impl<'a, 'b> From<&'b str> for Value<'a> {
@@ -79,9 +78,9 @@ impl<'a> From<Option<Vec<Value<'a>>>> for Value<'a> {
 
 // https://github.com/Geal/nom/blob/master/tests/json.rs
 #[derive(Debug, PartialEq, Clone)]
-pub struct Stanza<'a> {
+pub struct Map<'a> {
     pub keys: Vec<String>,
-    pub values: Map<'a>,
+    pub values: MapValues<'a>,
 }
 
 // From https://github.com/Geal/nom/issues/14#issuecomment-158788226
@@ -94,7 +93,7 @@ named!(
             whitespace!(
                 separated_list!(
                     char!(','),
-                    value
+                    single_value
                 )
             ),
             terminated!(
@@ -106,23 +105,7 @@ named!(
 );
 
 named!(
-    pub map_values(CompleteStr) -> Map,
-    do_parse!(
-        values: many0!(
-                    terminated!(
-                        call!(key_value),
-                        alt!(
-                            whitespace!(tag!(","))
-                            | map!(many1!(nom::eol), |_| CompleteStr(""))
-                        )
-                    )
-                )
-        >> (values.into_iter().collect())
-    )
-);
-
-named!(
-    pub value(CompleteStr) -> Value,
+    pub single_value(CompleteStr) -> Value,
     alt_complete!(
         call!(literals::number) => { |v| From::from(v) }
         | call!(literals::boolean) => { |v| Value::Boolean(v) }
@@ -138,9 +121,25 @@ named!(
         do_parse!(
             key: call!(literals::key)
             >> char!('=')
-            >> value: call!(value)
+            >> value: call!(single_value)
             >> (key, value)
         )
+    )
+);
+
+named!(
+    pub map_values(CompleteStr) -> MapValues,
+    do_parse!(
+        values: many0!(
+                    terminated!(
+                        call!(key_value),
+                        alt!(
+                            whitespace!(tag!(","))
+                            | map!(many1!(nom::eol), |_| CompleteStr(""))
+                        )
+                    )
+                )
+        >> (values.into_iter().collect())
     )
 );
 
@@ -149,7 +148,6 @@ mod tests {
     use super::*;
 
     use crate::utils::ResultUtilsString;
-    use std::ops::Deref;
 
     #[test]
     fn list_values_are_parsed_successfully() {
@@ -198,7 +196,7 @@ mod tests {
     }
 
     #[test]
-    fn values_are_parsed_successfully() {
+    fn single_values_are_parsed_successfully() {
         let test_cases = [
             (r#"123"#, Value::Integer(123)),
             ("123", Value::Integer(123)),
@@ -231,7 +229,7 @@ EOF
 
         for (input, expected_value) in test_cases.into_iter() {
             println!("Testing {}", input);
-            let actual_value = value(CompleteStr(input)).unwrap_output();
+            let actual_value = single_value(CompleteStr(input)).unwrap_output();
             assert_eq!(actual_value, *expected_value);
         }
     }
@@ -284,6 +282,23 @@ EOF
             assert_eq!(actual_key.unwrap(), *expected_key);
             assert_eq!(actual_value, *expected_value);
         }
+    }
+
+    #[test]
+    fn empty_map_values_are_parsed_correctly() {
+        let hcl = include_str!("../fixtures/empty.hcl");
+        let parsed = map_values(CompleteStr(hcl)).unwrap_output();
+
+        assert_eq!(0, parsed.len());
+    }
+
+    #[test]
+    fn single_map_values_are_parsed_correctly() {
+        let hcl = include_str!("../fixtures/single.hcl");
+        let parsed = map_values(CompleteStr(hcl)).unwrap_output();
+
+        assert_eq!(1, parsed.len());
+        assert_eq!(parsed["foo"], Value::from("bar"));
     }
 
     #[test]
@@ -366,5 +381,34 @@ EOF
             let actual_value = &parsed[expected_key];
             assert_eq!(*actual_value, expected_value);
         }
+    }
+
+    #[test]
+    fn map_map_values_are_parsed_correctly() {
+        let hcl = include_str!("../fixtures/map.hcl");
+        let parsed = map_values(CompleteStr(hcl)).unwrap_output();
+
+        let expected: HashMap<_, _> = vec![
+            ("test_unsigned_int", Value::from(123)),
+            ("test_signed_int", Value::from(-123)),
+            ("test_float", Value::from(-1.23)),
+            ("bool_true", Value::from(true)),
+            ("bool_false", Value::from(false)),
+            ("comma_separed", Value::from("oh my, a rebel!")),
+            ("string", Value::from("Hello World!")),
+            ("long_string", Value::from("hihi\nanother line!")),
+            ("string_escaped", Value::from("\" Hello World!")),
+        ]
+        .into_iter()
+        .collect();
+
+        println!("{}", hcl);
+        println!("{:#?}", parsed);
+        assert_eq!(expected.iter().len(), parsed.iter().len());
+        // for (expected_key, expected_value) in expected {
+        //     println!("Checking {}", expected_key);
+        //     let actual_value = &parsed[expected_key];
+        //     assert_eq!(*actual_value, expected_value);
+        // }
     }
 }
