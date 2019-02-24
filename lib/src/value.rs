@@ -87,20 +87,21 @@ pub struct Stanza<'a> {
 }
 
 // From https://github.com/Geal/nom/issues/14#issuecomment-158788226
+ // whitespace! Must not be captured after `]`!
 named!(
     pub list(CompleteStr) -> Vec<Value>,
-    whitespace!(
-        preceded!(
-            char!('['),
-            terminated!(
+    preceded!(
+        whitespace!(char!('[')),
+        terminated!(
+            whitespace!(
                 separated_list!(
                     char!(','),
                     value
-                ),
-                terminated!(
-                    opt!(char!(',')),
-                    char!(']')
                 )
+            ),
+            terminated!(
+                whitespace!(opt!(char!(','))),
+                char!(']')
             )
         )
     )
@@ -159,8 +160,7 @@ mod tests {
                         false,
                         123,
                         -123.456,
-                        "testing",
-                        [
+                        "testing",                        [
                             "inside voice!",
                             "lol"
                         ],
@@ -188,12 +188,12 @@ mod tests {
     #[test]
     fn values_are_parsed_successfully() {
         let test_cases = [
-            (r#"123"#, Value::Integer(123)), // Comma separated
-            ("123", Value::Integer(123)),    // New line
-            ("123", Value::Integer(123)),    // Windows New line
+            (r#"123"#, Value::Integer(123)),
+            ("123", Value::Integer(123)),
+            ("123", Value::Integer(123)),
             ("true", Value::Boolean(true)),
             ("123.456", Value::Float(123.456)),
-            ("123", Value::Integer(123)), // Random spaces
+            ("123", Value::Integer(123)),
             (r#""foobar""#, Value::String("foobar".to_string())),
             (
                 r#"<<EOF
