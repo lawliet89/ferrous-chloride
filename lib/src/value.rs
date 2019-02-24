@@ -112,7 +112,7 @@ named!(
                     terminated!(
                         call!(key_value),
                         alt!(
-                            tag!(",")
+                            whitespace!(tag!(","))
                             | map!(many1!(nom::eol), |_| CompleteStr(""))
                         )
                     )
@@ -148,8 +148,8 @@ named!(
 mod tests {
     use super::*;
 
-    use std::ops::Deref;
     use crate::utils::ResultUtilsString;
+    use std::ops::Deref;
 
     #[test]
     fn list_values_are_parsed_successfully() {
@@ -305,9 +305,66 @@ EOF
         .into_iter()
         .collect();
 
-        for (actual_key, actual_value) in parsed {
-            let expected_value = &expected[actual_key.deref()];
-            assert_eq!(actual_value, *expected_value);
+        assert_eq!(expected.iter().len(), parsed.iter().len());
+        for (expected_key, expected_value) in expected {
+            println!("Checking {}", expected_key);
+            let actual_value = &parsed[expected_key];
+            assert_eq!(*actual_value, expected_value);
+        }
+    }
+
+    #[test]
+    fn list_map_values_are_parsed_correctly() {
+        let hcl = include_str!("../fixtures/list.hcl");
+        let parsed = map_values(CompleteStr(hcl)).unwrap_output();
+
+        let expected: HashMap<_, _> = vec![
+            (
+                "list",
+                [
+                    Value::from(true),
+                    Value::from(false),
+                    Value::from(123),
+                    Value::from(-123.456),
+                    Value::from("foobar"),
+                ]
+                .into_iter()
+                .collect(),
+            ),
+            (
+                "list_multi",
+                [
+                    Value::from(true),
+                    Value::from(false),
+                    Value::from(123),
+                    Value::from(-123.456),
+                    Value::from("foobar"),
+                ]
+                .into_iter()
+                .collect(),
+            ),
+            (
+                "list_in_list",
+                [
+                    [Value::from("test"), Value::from("foobar")]
+                        .into_iter()
+                        .collect(),
+                    Value::from(1),
+                    Value::from(2),
+                    Value::from(-3),
+                ]
+                .into_iter()
+                .collect(),
+            ),
+        ]
+        .into_iter()
+        .collect();
+
+        assert_eq!(expected.iter().len(), parsed.iter().len());
+        for (expected_key, expected_value) in expected {
+            println!("Checking {}", expected_key);
+            let actual_value = &parsed[expected_key];
+            assert_eq!(*actual_value, expected_value);
         }
     }
 }

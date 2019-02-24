@@ -10,7 +10,7 @@ comma_separed = "oh my, a rebel!",
 string = "Hello World!"
 
 long_string = <<EOF
-hiihi
+hihi
 another line!
 EOF
 string_escaped = "\" Hello World!"

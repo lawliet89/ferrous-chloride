@@ -1,11 +1,12 @@
-use std::borrow::Cow;
+use std::borrow::{Borrow, Cow};
+use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
 use nom::types::CompleteStr;
 use nom::{alt_complete, call, named};
 
 /// A "key" in a map
-#[derive(Eq, PartialEq, Debug, Hash, Clone)]
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub enum Key<'a> {
     Identifier(Cow<'a, str>),
     String(Cow<'a, str>),
@@ -37,6 +38,18 @@ where
 {
     fn from(s: T) -> Self {
         Key::String(Cow::Owned(s.as_ref().to_string()))
+    }
+}
+
+impl<'a> Borrow<str> for Key<'a> {
+    fn borrow(&self) -> &str {
+        self.deref()
+    }
+}
+
+impl<'a> Hash for Key<'a> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.deref().hash(state);
     }
 }
 
