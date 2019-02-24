@@ -70,6 +70,36 @@ mod tests {
     use crate::utils::ResultUtilsString;
 
     #[test]
+    fn values_are_parsed_successfully() {
+        let test_cases = [
+            (r#"123"#, Value::Integer(123)), // Comma separated
+            ("123", Value::Integer(123)),   // New line
+            ("123", Value::Integer(123)), // Windows New line
+            ("true", Value::Boolean(true)),
+            ("123.456", Value::Float(123.456)),
+            ("123", Value::Integer(123)), // Random spaces
+            (
+                r#""foobar""#,
+                Value::String("foobar".to_string()),
+            ),
+            (
+                r#"<<EOF
+new
+line
+EOF
+"#,
+                Value::String("new\nline".to_string()),
+            ),
+        ];
+
+        for (input, expected_value) in test_cases.into_iter() {
+            println!("Testing {}", input);
+            let actual_value = value(input).unwrap_output();
+            assert_eq!(actual_value, *expected_value);
+        }
+    }
+
+    #[test]
     fn key_value_pairs_are_parsed_successfully() {
         let test_cases = [
             (r#"test = 123,"#, ("test", Value::Integer(123))), // Comma separated
