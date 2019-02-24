@@ -39,7 +39,6 @@ named!(
     )
 );
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

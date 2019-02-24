@@ -45,7 +45,6 @@ mod tests {
         for input in test_cases.into_iter() {
             println!("Testing {}", input);
             assert!(identifier(CompleteStr(input)).is_err());
-
         }
     }
 }
