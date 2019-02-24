@@ -1,10 +1,12 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::iter::FromIterator;
 
 use crate::literals;
 
+use nom::dbg;
 use nom::{
-    alt, alt_complete, call, char, do_parse, many0, many1, map, named, opt, preceded,
+    alt, alt_complete, call, char, complete, do_parse, many0, many1, map, named, opt, preceded,
     separated_list, tag, terminated, ws,
 };
 
@@ -76,11 +78,49 @@ impl<'a> From<Option<Vec<Value<'a>>>> for Value<'a> {
     }
 }
 
+impl<'a> From<Map<'a>> for Value<'a> {
+    fn from(map: Map<'a>) -> Self {
+        Value::Map(vec![map])
+    }
+}
+
+impl<'a> From<MapValues<'a>> for Value<'a> {
+    fn from(values: MapValues<'a>) -> Self {
+        Value::from(Map::from(values))
+    }
+}
+
 // https://github.com/Geal/nom/blob/master/tests/json.rs
 #[derive(Debug, PartialEq, Clone)]
 pub struct Map<'a> {
     pub keys: Vec<String>,
     pub values: MapValues<'a>,
+}
+
+impl<'a> Map<'a> {
+    pub fn new<S, K, V>(keys: &[S], values: &'a [(K, V)]) -> Self
+    where
+        S: AsRef<str>,
+        K: AsRef<str>,
+        V: Into<Value<'a>> + Clone,
+    {
+        Map {
+            keys: keys.iter().map(|s| s.as_ref().to_string()).collect(),
+            values: values
+                .iter()
+                .map(|(k, v)| (literals::Key::Identifier(Cow::Borrowed(k.as_ref())), Into::into(v)))
+                .collect(),
+        }
+    }
+}
+
+impl<'a> From<MapValues<'a>> for Map<'a> {
+    fn from(values: MapValues<'a>) -> Self {
+        Map {
+            keys: vec![],
+            values,
+        }
+    }
 }
 
 // From https://github.com/Geal/nom/issues/14#issuecomment-158788226
@@ -118,11 +158,21 @@ named!(
 named!(
     pub key_value(CompleteStr) -> (literals::Key, Value),
     space_tab!(
-        do_parse!(
-            key: call!(literals::key)
-            >> char!('=')
-            >> value: call!(single_value)
-            >> (key, value)
+        alt!(
+                do_parse!(
+                    key: call!(literals::key)
+                    >> char!('=')
+                    >> value: call!(single_value)
+                    >> (key, value)
+                )
+                | do_parse!(
+                    identifier: call!(literals::identifier)
+                    >> complete!(opt!(char!('=')))
+                    >> whitespace!(char!('{'))
+                    >> values: whitespace!(call!(map_values))
+                    >> char!('}')
+                    >> (literals::Key::Identifier(Cow::Borrowed(identifier)), Value::from(values))
+                )
         )
     )
 );
@@ -285,6 +335,33 @@ EOF
     }
 
     #[test]
+    fn maps_are_parsed_correctly() {
+        let test_cases = [
+            (
+            r#"test {
+foo = "bar"
+}"#,
+            ("test", Value::from(Map::new::<&str, _, _>(&[], &[("foo", "bar")]))),
+        ),
+            (
+            r#"test = {
+foo = "bar"
+
+
+}"#,
+            ("test", Value::from(Map::new::<&str, _, _>(&[], &[("foo", "bar")]))),
+        ),
+        ];
+
+        for (input, (expected_key, expected_value)) in test_cases.into_iter() {
+            println!("Testing {}", input);
+            let (actual_key, actual_value) = key_value(CompleteStr(input)).unwrap_output();
+            assert_eq!(actual_key.unwrap(), *expected_key);
+            assert_eq!(actual_value, *expected_value);
+        }
+    }
+
+    #[test]
     fn empty_map_values_are_parsed_correctly() {
         let hcl = include_str!("../fixtures/empty.hcl");
         let parsed = map_values(CompleteStr(hcl)).unwrap_output();
@@ -381,34 +458,5 @@ EOF
             let actual_value = &parsed[expected_key];
             assert_eq!(*actual_value, expected_value);
         }
-    }
-
-    #[test]
-    fn map_map_values_are_parsed_correctly() {
-        let hcl = include_str!("../fixtures/map.hcl");
-        let parsed = map_values(CompleteStr(hcl)).unwrap_output();
-
-        let expected: HashMap<_, _> = vec![
-            ("test_unsigned_int", Value::from(123)),
-            ("test_signed_int", Value::from(-123)),
-            ("test_float", Value::from(-1.23)),
-            ("bool_true", Value::from(true)),
-            ("bool_false", Value::from(false)),
-            ("comma_separed", Value::from("oh my, a rebel!")),
-            ("string", Value::from("Hello World!")),
-            ("long_string", Value::from("hihi\nanother line!")),
-            ("string_escaped", Value::from("\" Hello World!")),
-        ]
-        .into_iter()
-        .collect();
-
-        println!("{}", hcl);
-        println!("{:#?}", parsed);
-        assert_eq!(expected.iter().len(), parsed.iter().len());
-        // for (expected_key, expected_value) in expected {
-        //     println!("Checking {}", expected_key);
-        //     let actual_value = &parsed[expected_key];
-        //     assert_eq!(*actual_value, expected_value);
-        // }
     }
 }
