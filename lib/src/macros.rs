@@ -6,7 +6,7 @@ use nom::{eat_separator, named};
 named!(pub(crate) space(CompleteStr) -> CompleteStr, eat_separator!(" \t"));
 
 #[macro_export]
-macro_rules! whitespace (
+macro_rules! space_tab (
   ($i:expr, $($args:tt)*) => (
     {
       use nom::{Convert, Err};
@@ -25,4 +25,14 @@ macro_rules! whitespace (
       }
     }
   )
+);
+
+// TODO: Handle comments
+macro_rules! whitespace (
+    ($($args:tt)*) => (
+        {
+            use nom::ws;
+            ws!($($args)*)
+        }
+    )
 );

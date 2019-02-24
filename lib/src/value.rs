@@ -89,7 +89,7 @@ pub struct Stanza<'a> {
 // From https://github.com/Geal/nom/issues/14#issuecomment-158788226
 named!(
     pub list(CompleteStr) -> Vec<Value>,
-    ws!(
+    whitespace!(
         preceded!(
             char!('['),
             terminated!(
@@ -120,7 +120,7 @@ named!(
 named!(
     pub key_value(CompleteStr) -> (literals::Key, Value),
     terminated!(
-        whitespace!(
+        space_tab!(
             do_parse!(
                 key: call!(literals::key)
                 >> char!('=')

@@ -1,7 +1,5 @@
 use std::fmt::Debug;
 
-use nom::types::CompleteStr;
-use nom::verbose_errors::Context;
 use nom::IResult;
 
 pub(crate) trait ResultUtils<O> {
