@@ -1,0 +1,10 @@
+{
+    "bool_false": false,
+    "bool_true": true,
+    "comma_separed": "oh my, a rebel!",
+    "long_string": "hiihi\nanother line!\n",
+    "string": "Hello World!",
+    "string_escaped": "\" Hello World!",
+    "test_signed_int": -123,
+    "test_unsigned_int": 123
+  }

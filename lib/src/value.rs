@@ -3,13 +3,11 @@ use std::collections::HashMap;
 use crate::literals;
 
 use nom::{
-    alt, alt_complete, call, char, delimited, do_parse, many0, map, named, opt, preceded,
+    alt, alt_complete, call, char, delimited, do_parse, many0, many1, map, named, opt, preceded,
     separated_list, tag, terminated, ws,
 };
 
 use nom::types::CompleteStr;
-
-use nom::dbg;
 
 pub type Map<'a> = HashMap<literals::Key<'a>, Value<'a>>;
 
@@ -87,7 +85,7 @@ pub struct Stanza<'a> {
 }
 
 // From https://github.com/Geal/nom/issues/14#issuecomment-158788226
- // whitespace! Must not be captured after `]`!
+// whitespace! Must not be captured after `]`!
 named!(
     pub list(CompleteStr) -> Vec<Value>,
     preceded!(
@@ -108,6 +106,22 @@ named!(
 );
 
 named!(
+    pub map_values(CompleteStr) -> Map,
+    do_parse!(
+        values: many0!(
+                    terminated!(
+                        call!(key_value),
+                        alt!(
+                            tag!(",")
+                            | map!(many1!(nom::eol), |_| CompleteStr(""))
+                        )
+                    )
+                )
+        >> (values.into_iter().collect())
+    )
+);
+
+named!(
     pub value(CompleteStr) -> Value,
     alt_complete!(
         call!(literals::number) => { |v| From::from(v) }
@@ -120,16 +134,13 @@ named!(
 /// Parse values of the form "key" = ... | ["..."] | {...}
 named!(
     pub key_value(CompleteStr) -> (literals::Key, Value),
-    terminated!(
-        space_tab!(
-            do_parse!(
-                key: call!(literals::key)
-                >> char!('=')
-                >> value: call!(value)
-                >> (key, value)
-            )
-        ),
-        opt!(tag!(","))
+    space_tab!(
+        do_parse!(
+            key: call!(literals::key)
+            >> char!('=')
+            >> value: call!(value)
+            >> (key, value)
+        )
     )
 );
 
@@ -137,6 +148,7 @@ named!(
 mod tests {
     use super::*;
 
+    use std::ops::Deref;
     use crate::utils::ResultUtilsString;
 
     #[test]
@@ -227,7 +239,6 @@ EOF
     #[test]
     fn key_value_pairs_are_parsed_successfully() {
         let test_cases = [
-            (r#"test = 123,"#, ("test", Value::Integer(123))), // (Optional) Comma
             ("test = 123", ("test", Value::Integer(123))),
             ("test = 123", ("test", Value::Integer(123))),
             ("test = true", ("test", Value::Boolean(true))),
@@ -271,6 +282,31 @@ EOF
             println!("Testing {}", input);
             let (actual_key, actual_value) = key_value(CompleteStr(input)).unwrap_output();
             assert_eq!(actual_key.unwrap(), *expected_key);
+            assert_eq!(actual_value, *expected_value);
+        }
+    }
+
+    #[test]
+    fn scalar_map_values_are_parsed_correctly() {
+        let hcl = include_str!("../fixtures/scalar.hcl");
+        let parsed = map_values(CompleteStr(hcl)).unwrap_output();
+
+        let expected: HashMap<_, _> = vec![
+            ("test_unsigned_int", Value::from(123)),
+            ("test_signed_int", Value::from(-123)),
+            ("test_float", Value::from(-1.23)),
+            ("bool_true", Value::from(true)),
+            ("bool_false", Value::from(false)),
+            ("comma_separed", Value::from("oh my, a rebel!")),
+            ("string", Value::from("Hello World!")),
+            ("long_string", Value::from("hihi\nanother line!")),
+            ("string_escaped", Value::from("\" Hello World!")),
+        ]
+        .into_iter()
+        .collect();
+
+        for (actual_key, actual_value) in parsed {
+            let expected_value = &expected[actual_key.deref()];
             assert_eq!(actual_value, *expected_value);
         }
     }

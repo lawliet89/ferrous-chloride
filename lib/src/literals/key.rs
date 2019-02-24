@@ -31,6 +31,15 @@ impl<'a> Deref for Key<'a> {
     }
 }
 
+impl<'a, T> From<T> for Key<'a>
+where
+    T: AsRef<str>,
+{
+    fn from(s: T) -> Self {
+        Key::String(Cow::Owned(s.as_ref().to_string()))
+    }
+}
+
 /// Parse a "key" for a map
 named!(
     pub key(CompleteStr) -> Key,
