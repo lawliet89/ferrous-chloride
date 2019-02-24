@@ -87,21 +87,20 @@ pub struct Stanza<'a> {
 }
 
 // From https://github.com/Geal/nom/issues/14#issuecomment-158788226
-// ws! Must not be captured after `]`!
 named!(
     pub list(CompleteStr) -> Vec<Value>,
-    preceded!(
-        ws!(char!('[')),
-        terminated!(
-            ws!(
+    ws!(
+        preceded!(
+            char!('['),
+            terminated!(
                 separated_list!(
                     char!(','),
                     value
+                ),
+                terminated!(
+                    opt!(char!(',')),
+                    char!(']')
                 )
-            ),
-            terminated!(
-                ws!(opt!(char!(','))),
-                char!(']')
             )
         )
     )
@@ -129,10 +128,7 @@ named!(
                 >> (key, value)
             )
         ),
-        alt!(
-            tag!(",")
-            | call!(nom::eol)
-        )
+        opt!(tag!(","))
     )
 );
 
@@ -231,12 +227,12 @@ EOF
     #[test]
     fn key_value_pairs_are_parsed_successfully() {
         let test_cases = [
-            (r#"test = 123,"#, ("test", Value::Integer(123))), // Comma separated
-            ("test = 123\n", ("test", Value::Integer(123))),   // New line
-            ("test = 123\r\n", ("test", Value::Integer(123))), // Windows New line
-            ("test = true\n", ("test", Value::Boolean(true))),
-            ("test = 123.456\n", ("test", Value::Float(123.456))),
-            ("   test   =   123  \n", ("test", Value::Integer(123))), // Random spaces
+            (r#"test = 123,"#, ("test", Value::Integer(123))), // (Optional) Comma
+            ("test = 123", ("test", Value::Integer(123))),
+            ("test = 123", ("test", Value::Integer(123))),
+            ("test = true", ("test", Value::Boolean(true))),
+            ("test = 123.456", ("test", Value::Float(123.456))),
+            ("   test   =   123  ", ("test", Value::Integer(123))), // Random spaces
             (
                 r#""a/b/c" = "foobar","#,
                 ("a/b/c", Value::String("foobar".to_string())),
@@ -251,8 +247,7 @@ EOF
             ),
             (r#"test = [],"#, ("test", Value::List(vec![]))),
             (
-                r#"test = [1,]
-"#,
+                r#"test = [1,]"#,
                 ("test", [Value::from(1)].into_iter().collect()),
             ),
             (
