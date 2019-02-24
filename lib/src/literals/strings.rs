@@ -10,7 +10,7 @@ use nom::types::CompleteStr;
 use nom::ErrorKind;
 use nom::{
     alt, call, complete, delimited, do_parse, escaped_transform, many_till, map, map_res, named,
-    named_args, opt, preceded, return_error, tag, take_while1, take_while_m_n,
+    named_args, opt, peek, preceded, return_error, tag, take_while1, take_while_m_n,
 };
 
 fn is_hex_digit(c: char) -> bool {
@@ -127,7 +127,7 @@ named_args!(
         call!(nom::eol)
         >> call!(nom::multispace0)
         >> tag!(identifier.identifier)
-        >> call!(nom::eol)
+        >> peek!(call!(nom::eol))
         >> ()
     )
 );
