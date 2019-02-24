@@ -9,6 +9,8 @@ use nom::ErrorKind;
 pub enum Error {
     #[fail(display = "Invalid Unicode Code Points \\{}", _0)]
     InvalidUnicodeCodePoint(String),
+    #[fail(display = "Invalid Number {}", _0)]
+    InvalidNumber(String),
     #[fail(display = "Bytes contain invalid unicode: {:#?}", _0)]
     InvalidUnicode(Vec<u8>),
     #[fail(display = "Generic Parse Error {}", _0)]
@@ -82,7 +84,9 @@ impl Error {
                     convert_fn(input).unwrap_or_else(|| "UNKNOWN".to_string()),
                 )),
                 InternalKind::InvalidUnicode => None, // TODO!
-                InternalKind::InvalidInteger => None, // TODO!
+                InternalKind::InvalidNumber => Some(Error::InvalidNumber(
+                    convert_fn(input).unwrap_or_else(|| "UNKNOWN".to_string()),
+                )),
             }
         } else {
             None
@@ -122,7 +126,7 @@ macro_rules! enum_number {
 enum_number!(InternalKind {
     InvalidUnicodeCodePoint = 0,
     InvalidUnicode = 1,
-    InvalidInteger = 2,
+    InvalidNumber = 2,
 });
 
 impl From<std::str::Utf8Error> for InternalKind {
@@ -133,6 +137,12 @@ impl From<std::str::Utf8Error> for InternalKind {
 
 impl From<std::num::ParseIntError> for InternalKind {
     fn from(_: std::num::ParseIntError) -> Self {
-        InternalKind::InvalidInteger
+        InternalKind::InvalidNumber
+    }
+}
+
+impl From<std::num::ParseFloatError> for InternalKind {
+    fn from(_: std::num::ParseFloatError) -> Self {
+        InternalKind::InvalidNumber
     }
 }

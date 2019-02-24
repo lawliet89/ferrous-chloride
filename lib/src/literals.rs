@@ -8,44 +8,60 @@ use std::borrow::Cow;
 use std::ops::Deref;
 use std::str::FromStr;
 
+use nom::recognize_float;
 use nom::types::CompleteStr;
-use nom::{
-    alt, alt_complete, call, complete, do_parse, map, map_res, named, one_of, opt, recognize, tag,
-    verify,
-};
+use nom::{alt, alt_complete, call, do_parse, flat_map, map, named, parse_to, tag, verify};
 
-/// Parsed Integer Literal
-struct Integer<'a> {
-    pub sign: Option<char>,
-    pub digits: CompleteStr<'a>,
+/// Parsed Number
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub enum Number {
+    Integer(i64),
+    Float(f64),
 }
 
-impl<'a> Integer<'a> {
-    pub(crate) fn to_integer<T>(&self) -> Result<T, std::num::ParseIntError>
-    where
-        T: FromStr<Err = std::num::ParseIntError>,
-    {
-        match self.sign {
-            Some(sign) => T::from_str(format!("{}{}", sign, &self.digits).as_str()),
-            None => T::from_str(&self.digits),
+impl<'a> From<Number> for crate::Value<'a> {
+    fn from(number: Number) -> Self {
+        use crate::Value;
+
+        match number {
+            Number::Integer(i) => Value::Integer(i),
+            Number::Float(f) => Value::Float(f),
         }
     }
 }
 
-/// Parse an interger literal
-named!(pub integer(CompleteStr) -> i64,
-    map_res!(
-        do_parse!(
-            sign: opt!(complete!(one_of!("+-")))
-            >> digits: recognize!(nom::digit)
-            >> (Integer { sign, digits })
-        ),
-        |integer: Integer| integer.to_integer::<i64>()
-    )
-);
+impl FromStr for Number {
+    type Err = crate::errors::InternalKind;
 
-/// Parse a float literal
-named!(pub float(CompleteStr) -> f64, complete!(nom::double));
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // XXX: Can we do better?
+        // Try to parse integer, failing that float, failing that we give up
+        match s.parse() {
+            Ok(i) => Ok(Number::Integer(i)),
+            Err(_) => match s.parse() {
+                Ok(f) => Ok(Number::Float(f)),
+                Err(e) => Err(e)?,
+            },
+        }
+    }
+}
+
+impl From<i64> for Number {
+    fn from(i: i64) -> Self {
+        Number::Integer(i)
+    }
+}
+
+impl From<f64> for Number {
+    fn from(f: f64) -> Self {
+        Number::Float(f)
+    }
+}
+
+/// Parse Number
+named!(pub number(CompleteStr) -> Number,
+    flat_map!(call!(recognize_float), parse_to!(Number))
+);
 
 /// Parse a boolean literal
 named!(pub boolean(CompleteStr) -> bool,
@@ -119,16 +135,34 @@ mod tests {
 
     #[test]
     fn integers_are_parsed_correctly() {
-        assert_eq!(integer(CompleteStr("12345")).unwrap_output(), 12345);
-        assert_eq!(integer(CompleteStr("+12345")).unwrap_output(), 12345);
-        assert_eq!(integer(CompleteStr("-12345")).unwrap_output(), -12345);
+        assert_eq!(
+            number(CompleteStr("12345")).unwrap_output(),
+            From::from(12345)
+        );
+        assert_eq!(
+            number(CompleteStr("+12345")).unwrap_output(),
+            From::from(12345)
+        );
+        assert_eq!(
+            number(CompleteStr("-12345")).unwrap_output(),
+            From::from(-12345)
+        );
     }
 
     #[test]
     fn floats_are_parsed_correctly() {
-        assert_eq!(float(CompleteStr("12.34")).unwrap_output(), 12.34);
-        assert_eq!(float(CompleteStr("+12.34")).unwrap_output(), 12.34);
-        assert_eq!(float(CompleteStr("-12.34")).unwrap_output(), -12.34);
+        assert_eq!(
+            number(CompleteStr("12.34")).unwrap_output(),
+            From::from(12.34)
+        );
+        assert_eq!(
+            number(CompleteStr("+12.34")).unwrap_output(),
+            From::from(12.34)
+        );
+        assert_eq!(
+            number(CompleteStr("-12.34")).unwrap_output(),
+            From::from(-12.34)
+        );
     }
 
     #[test]

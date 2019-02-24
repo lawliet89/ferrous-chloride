@@ -1,9 +1,11 @@
+mod macros;
+
 mod errors;
 pub mod literals;
 mod utils;
 
 pub use errors::Error;
-use nom::{alt_complete, call, char, named, separated_pair, ws};
+use nom::{alt, call, char, do_parse, named, tag, terminated};
 
 use std::collections::HashMap;
 
@@ -28,21 +30,28 @@ pub struct Stanza<'a> {
     pub values: Map<'a>,
 }
 
-/// Parse values of the form "key" = "..." | ["..."] | {...}
+/// Parse values of the form "key" = ... | ["..."] | {...}
 named!(
     pub key_value(&str) -> (literals::Key, Value),
-    ws!(
-        separated_pair!(
-            literals::key,
-            char!('='),
-            alt_complete!(
-                call!(crate::utils::wrap_str(literals::integer)) => { |v| Value::Integer(v) }
-                | call!(crate::utils::wrap_str(literals::float)) => { |v| Value::Float(v) }
+    terminated!(
+        whitespace!(
+            do_parse!(
+                key: call!(literals::key)
+                >> char!('=')
+                >> value: alt!(
+                    call!(crate::utils::wrap_str(literals::number)) => { |v| From::from(v) }
+                    | call!(crate::utils::wrap_str(literals::boolean)) => { |v| Value::Boolean(v) }
+                    | literals::string => { |v| Value::String(v) }
+                )
+                >> (key, value)
             )
+        ),
+        alt!(
+            tag!(",")
+            | call!(nom::eol)
         )
     )
 );
-
 
 #[cfg(test)]
 mod tests {
@@ -53,7 +62,24 @@ mod tests {
     #[test]
     fn key_value_pairs_are_parsed_successfully() {
         let test_cases = [
-            (r#"test = 123"#, ("test", Value::Integer(123))),
+            (r#"test = 123,"#, ("test", Value::Integer(123))), // Comma separated
+            ("test = 123\n", ("test", Value::Integer(123))),   // New line
+            ("test = 123\r\n", ("test", Value::Integer(123))), // Windows New line
+            ("test = true\n", ("test", Value::Boolean(true))),
+            ("test = 123.456\n", ("test", Value::Float(123.456))),
+            ("   test   =   123  \n", ("test", Value::Integer(123))), // Random spaces
+            (
+                r#""a/b/c" = "foobar","#,
+                ("a/b/c", Value::String("foobar".to_string())),
+            ),
+            (
+                r#"test = <<EOF
+new
+line
+EOF
+"#,
+                ("test", Value::String("new\nline".to_string())),
+            ),
         ];
 
         for (input, (expected_key, expected_value)) in test_cases.into_iter() {
