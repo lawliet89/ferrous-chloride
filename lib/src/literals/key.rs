@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::ops::Deref;
 
+use nom::types::CompleteStr;
 use nom::{alt_complete, call, named};
 
 /// A "key" in a map
@@ -32,9 +33,9 @@ impl<'a> Deref for Key<'a> {
 
 /// Parse a "key" for a map
 named!(
-    pub key(&str) -> Key,
+    pub key(CompleteStr) -> Key,
     alt_complete!(
-        call!(crate::utils::wrap_str(super::identifier)) => { |s| Key::Identifier(Cow::Borrowed(s)) }
+        call!(super::identifier) => { |s| Key::Identifier(Cow::Borrowed(s)) }
         | super::string => { |s| Key::String(Cow::Owned(s)) }
     )
 );
@@ -57,7 +58,7 @@ mod tests {
 
         for (input, expected) in test_cases.into_iter() {
             println!("Testing {}", input);
-            assert_eq!(key(input).unwrap_output(), *expected);
+            assert_eq!(key(CompleteStr(input)).unwrap_output(), *expected);
         }
     }
 }

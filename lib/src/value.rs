@@ -7,6 +7,8 @@ use nom::{
     separated_list, tag, terminated, ws,
 };
 
+use nom::types::CompleteStr;
+
 use nom::dbg;
 
 pub type Map<'a> = HashMap<literals::Key<'a>, Value<'a>>;
@@ -85,53 +87,31 @@ pub struct Stanza<'a> {
 }
 
 // From https://github.com/Geal/nom/issues/14#issuecomment-158788226
+// ws! Must not be captured after `]`!
 named!(
-    pub list(&str) -> Vec<Value>,
-    ws!(
-        preceded!(
-            char!('['),
-            terminated!(
+    pub list(CompleteStr) -> Vec<Value>,
+    preceded!(
+        ws!(char!('[')),
+        terminated!(
+            ws!(
                 separated_list!(
-                    dbg!(char!(',')),
+                    char!(','),
                     value
-                ),
-                terminated!(
-                    opt!(char!(',')),
-                    char!(']')
                 )
+            ),
+            terminated!(
+                ws!(opt!(char!(','))),
+                char!(']')
             )
         )
     )
 );
 
-// named!(
-//     pub list(&str) -> Vec<Value>,
-//     ws!(
-//         do_parse!(
-//             char!('[')
-//             >> first: call!(value)
-//             >> rest: opt!(many0!(
-//                 ws!(
-//                     do_parse!(
-//                         dbg!(char!(','))
-//                         >> value: call!(value)
-//                         >> (value)
-//                     )
-//                 )
-//             ))
-//             >> opt!(char!(','))
-//             >> char!(']')
-//             // >> (first, rest)
-//             >> (rest.unwrap())
-//         )
-//     )
-// );
-
 named!(
-    pub value(&str) -> Value,
+    pub value(CompleteStr) -> Value,
     alt_complete!(
-        call!(crate::utils::wrap_str(literals::number)) => { |v| From::from(v) }
-        | call!(crate::utils::wrap_str(literals::boolean)) => { |v| Value::Boolean(v) }
+        call!(literals::number) => { |v| From::from(v) }
+        | call!(literals::boolean) => { |v| Value::Boolean(v) }
         | literals::string => { |v| Value::String(v) }
         | list => { |v| Value::List(v) }
     )
@@ -139,7 +119,7 @@ named!(
 
 /// Parse values of the form "key" = ... | ["..."] | {...}
 named!(
-    pub key_value(&str) -> (literals::Key, Value),
+    pub key_value(CompleteStr) -> (literals::Key, Value),
     terminated!(
         whitespace!(
             do_parse!(
@@ -163,7 +143,54 @@ mod tests {
     use crate::utils::ResultUtilsString;
 
     #[test]
-    fn scalar_values_are_parsed_successfully() {
+    fn list_values_are_parsed_successfully() {
+        let test_cases = [
+            (r#"[]"#, vec![]),
+            (r#"[1,]"#, vec![Value::from(1)]),
+            (
+                r#"[true, false, 123, -123.456, "foobar"]"#,
+                vec![
+                    Value::from(true),
+                    Value::from(false),
+                    Value::from(123),
+                    Value::from(-123.456),
+                    Value::from("foobar"),
+                ],
+            ),
+            (
+                r#"[
+                        true,
+                        false,
+                        123,
+                        -123.456,
+                        "testing",
+                        [
+                            "inside voice!",
+                            "lol"
+                        ],
+                    ]"#,
+                vec![
+                    Value::from(true),
+                    Value::from(false),
+                    Value::from(123),
+                    Value::from(-123.456),
+                    Value::from("testing"),
+                    [Value::from("inside voice!"), Value::from("lol")]
+                        .into_iter()
+                        .collect(),
+                ],
+            ),
+        ];
+
+        for (input, expected_value) in test_cases.into_iter() {
+            println!("Testing {}", input);
+            let actual_value = list(CompleteStr(input)).unwrap_output();
+            assert_eq!(actual_value, *expected_value);
+        }
+    }
+
+    #[test]
+    fn values_are_parsed_successfully() {
         let test_cases = [
             (r#"123"#, Value::Integer(123)), // Comma separated
             ("123", Value::Integer(123)),    // New line
@@ -180,68 +207,29 @@ EOF
 "#,
                 Value::String("new\nline".to_string()),
             ),
-        ];
-
-        for (input, expected_value) in test_cases.into_iter() {
-            println!("Testing {}", input);
-            let actual_value = value(input).unwrap_output();
-            assert_eq!(actual_value, *expected_value);
-        }
-    }
-
-    #[test]
-    fn list_values_are_parsed_successfully() {
-        let test_cases = [
-            // (r#"[]"#, vec![]),
             (
                 r#"[true, false, 123, -123.456, "foobar"]"#,
-                vec![
+                [
                     Value::from(true),
                     Value::from(false),
                     Value::from(123),
                     Value::from(-123.456),
                     Value::from("foobar"),
-                ],
+                ]
+                .into_iter()
+                .collect(),
             ),
         ];
 
         for (input, expected_value) in test_cases.into_iter() {
             println!("Testing {}", input);
-            let actual_value = list(input).unwrap_output();
-
-            println!("{:#?}", actual_value);
-
-            // assert_eq!(actual_value, *expected_value);
+            let actual_value = value(CompleteStr(input)).unwrap_output();
+            assert_eq!(actual_value, *expected_value);
         }
-
-        //         let input = r#"[
-        // true,
-        // false,
-        // 123,
-        // -123.456,
-        // "testing",
-        // [
-        //     "inside voice!",
-        //     "lol"
-        // ]
-        // ]"#;
-        //         let expected = [
-        //             Value::from(true),
-        //             Value::from(false),
-        //             Value::from(123),
-        //             Value::from(-123.456),
-        //             Value::from("test"),
-        //             [Value::from("inside voice!"), Value::from("lol")]
-        //                 .into_iter()
-        //                 .collect(),
-        //         ];
-
-        //         let parsed = list(input).unwrap_output();
-        //         assert_eq!(parsed, expected);
     }
 
     #[test]
-    fn scalar_key_value_pairs_are_parsed_successfully() {
+    fn key_value_pairs_are_parsed_successfully() {
         let test_cases = [
             (r#"test = 123,"#, ("test", Value::Integer(123))), // Comma separated
             ("test = 123\n", ("test", Value::Integer(123))),   // New line
@@ -261,8 +249,14 @@ EOF
 "#,
                 ("test", Value::String("new\nline".to_string())),
             ),
+            (r#"test = [],"#, ("test", Value::List(vec![]))),
             (
-                r#"[true, false, 123, -123.456, "foobar"]"#,
+                r#"test = [1,]
+"#,
+                ("test", [Value::from(1)].into_iter().collect()),
+            ),
+            (
+                r#"test = [true, false, 123, -123.456, "foobar"],"#,
                 (
                     "test",
                     [
@@ -280,7 +274,7 @@ EOF
 
         for (input, (expected_key, expected_value)) in test_cases.into_iter() {
             println!("Testing {}", input);
-            let (actual_key, actual_value) = key_value(input).unwrap_output();
+            let (actual_key, actual_value) = key_value(CompleteStr(input)).unwrap_output();
             assert_eq!(actual_key.unwrap(), *expected_key);
             assert_eq!(actual_value, *expected_value);
         }

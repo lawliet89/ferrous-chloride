@@ -93,10 +93,10 @@ named!(
 );
 
 named!(
-    single_line_string(&str) -> String,
+    single_line_string(CompleteStr) -> String,
     delimited!(
         tag!("\""),
-        call!(crate::utils::wrap_str(single_line_string_content)),
+        call!(single_line_string_content),
         tag!("\"")
     )
 );
@@ -104,11 +104,11 @@ named!(
 /// Heredoc marker
 #[derive(Debug, Eq, PartialEq)]
 struct HereDoc<'a> {
-    identifier: &'a str,
+    identifier: CompleteStr<'a>,
     indented: bool,
 }
 
-named!(heredoc_begin(&str) -> HereDoc,
+named!(heredoc_begin(CompleteStr) -> HereDoc,
     do_parse!(
         tag!("<<")
         >> indented: opt!(complete!(tag!("-")))
@@ -116,24 +116,24 @@ named!(heredoc_begin(&str) -> HereDoc,
         >> call!(nom::eol)
         >> (HereDoc {
                 identifier,
-                indented: indented == Some("-")
+                indented: indented == Some(CompleteStr("-"))
            })
     )
 );
 
 named_args!(
-    heredoc_end<'a>(identifier: &'_ HereDoc<'_>)<&'a str, ()>,
+    heredoc_end<'a>(identifier: &'_ HereDoc<'_>)<CompleteStr<'a>, ()>,
     do_parse!(
         call!(nom::eol)
         >> call!(nom::multispace0)
-        >> tag!(identifier.identifier)
+        >> tag!(identifier.identifier.0)
         >> peek!(call!(nom::eol))
         >> ()
     )
 );
 
 named!(
-    heredoc_string(&str) -> String,
+    heredoc_string(CompleteStr) -> String,
     do_parse!(
         identifier: call!(heredoc_begin)
         >> strings: opt!(complete!(many_till!(call!(nom::anychar), call!(heredoc_end, &identifier))))
@@ -142,7 +142,7 @@ named!(
 );
 
 named!(
-    pub string(&str) -> String,
+    pub string(CompleteStr) -> String,
     alt!(
         single_line_string
         | heredoc_string
@@ -235,7 +235,7 @@ mod tests {
         for (input, expected) in test_cases.iter() {
             println!("Testing {}", input);
             assert_eq!(
-                ResultUtilsString::unwrap_output(single_line_string(input)),
+                ResultUtilsString::unwrap_output(single_line_string(CompleteStr(input))),
                 *expected
             );
         }
@@ -247,21 +247,21 @@ mod tests {
             (
                 "<<EOF\n",
                 HereDoc {
-                    identifier: "EOF",
+                    identifier: CompleteStr("EOF"),
                     indented: false,
                 },
             ),
             (
                 "<<-EOH\n",
                 HereDoc {
-                    identifier: "EOH",
+                    identifier: CompleteStr("EOH"),
                     indented: true,
                 },
             ),
             (
                 "<<藏_\n",
                 HereDoc {
-                    identifier: "藏_",
+                    identifier: CompleteStr("藏_"),
                     indented: false,
                 },
             ),
@@ -269,7 +269,7 @@ mod tests {
 
         for (input, expected) in test_cases.iter() {
             println!("Testing {}", input);
-            let (_, actual) = heredoc_begin(input).unwrap();
+            let (_, actual) = heredoc_begin(CompleteStr(input)).unwrap();
             assert_eq!(&actual, expected);
         }
     }
@@ -280,14 +280,14 @@ mod tests {
             (
                 "\nEOF\n",
                 HereDoc {
-                    identifier: "EOF",
+                    identifier: CompleteStr("EOF"),
                     indented: false,
                 },
             ),
             (
                 "\n    EOH\n",
                 HereDoc {
-                    identifier: "EOH",
+                    identifier: CompleteStr("EOH"),
                     indented: true,
                 },
             ),
@@ -295,7 +295,7 @@ mod tests {
 
         for (input, identifier) in test_cases.iter() {
             println!("Testing {}", input);
-            let _ = heredoc_end(input, &identifier).unwrap();
+            let _ = heredoc_end(CompleteStr(input), &identifier).unwrap();
         }
     }
 
@@ -331,7 +331,10 @@ and quotes ""#,
 
         for (input, expected) in test_cases.iter() {
             println!("Testing {}", input);
-            assert_eq!(heredoc_string(input).unwrap().1, expected.to_string());
+            assert_eq!(
+                heredoc_string(CompleteStr(input)).unwrap().1,
+                expected.to_string()
+            );
         }
     }
 
@@ -377,7 +380,7 @@ and quotes ""#,
 
         for (input, expected) in test_cases.iter() {
             println!("Testing {}", input);
-            let actual = ResultUtilsString::unwrap_output(string(input));
+            let actual = ResultUtilsString::unwrap_output(string(CompleteStr(input)));
             assert_eq!(&actual, expected);
         }
     }
