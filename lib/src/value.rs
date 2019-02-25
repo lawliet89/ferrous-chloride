@@ -4,7 +4,6 @@ use std::iter::FromIterator;
 
 use crate::literals;
 
-use nom::dbg;
 use nom::{
     alt, alt_complete, call, char, complete, do_parse, many0, many1, map, named, opt, preceded,
     separated_list, tag, terminated, ws,
@@ -27,6 +26,44 @@ pub enum Value<'a> {
     Stanza(Stanza<'a>),
 }
 
+impl<'a> Value<'a> {
+    pub fn new_single_map_from_iterator<K, V>(iterator: &'a [(K, V)]) -> Self
+    where
+        K: Eq + std::hash::Hash + AsRef<str>,
+        V: Into<Value<'a>> + Clone,
+    {
+        Value::Map(vec![iterator
+            .into_iter()
+            .map(|(k, v)| {
+                (
+                    literals::Key::Identifier(Cow::Borrowed(k.as_ref())),
+                    Value::from(v),
+                )
+            })
+            .collect()])
+    }
+
+    pub fn new_stanza_from_iterator<S, K, V>(keys: &'a [S], iterator: &'a [(K, V)]) -> Self
+    where
+        S: AsRef<str>,
+        K: Eq + std::hash::Hash + AsRef<str>,
+        V: Into<Value<'a>> + Clone,
+    {
+        let keys: Vec<String> = keys.into_iter().map(|s| s.as_ref().to_string()).collect();
+        let map: MapValues = iterator
+            .into_iter()
+            .map(|(k, v)| {
+                (
+                    literals::Key::Identifier(Cow::Borrowed(k.as_ref())),
+                    Value::from(v),
+                )
+            })
+            .collect();
+        let stanza: Stanza = [(keys, map)].into_iter().cloned().collect();
+        Value::Stanza(stanza)
+    }
+}
+
 macro_rules! impl_from_value (
     ($variant: ident, $type: ty) => (
         impl<'a> From<$type> for Value<'a> {
@@ -46,13 +83,13 @@ where
     }
 }
 
-impl<'a, A> std::iter::FromIterator<A> for Value<'a>
+impl<'a, A> FromIterator<A> for Value<'a>
 where
     A: Into<Value<'a>>,
 {
     fn from_iter<T>(iter: T) -> Self
     where
-        T: std::iter::IntoIterator<Item = A>,
+        T: IntoIterator<Item = A>,
     {
         Value::List(iter.into_iter().map(|v| Into::into(v)).collect())
     }
@@ -315,7 +352,7 @@ foo = "bar"
 }"#,
                 (
                     "test",
-                    Value::from(Map::new::<&str, _, _>(&[], &[("foo", "bar")])),
+                    Value::new_single_map_from_iterator(&[("foo", "bar")]),
                 ),
             ),
             (
@@ -326,16 +363,16 @@ foo = "bar"
 }"#,
                 (
                     "test",
-                    Value::from(Map::new::<&str, _, _>(&[], &[("foo", "bar")])),
+                    Value::new_single_map_from_iterator(&[("foo", "bar")]),
                 ),
             ),
             (
                 r#"test "one" "two" {
-foo = "bar"
-}"#,
+            foo = "bar"
+            }"#,
                 (
                     "test",
-                    Value::from(Map::new(&["one", "two"], &[("foo", "bar")])),
+                    Value::new_stanza_from_iterator(&["one", "two"], &[("foo", "bar")]),
                 ),
             ),
         ];
