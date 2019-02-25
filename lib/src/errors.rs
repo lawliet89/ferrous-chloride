@@ -15,6 +15,20 @@ pub enum Error {
     InvalidUnicode(Vec<u8>),
     #[fail(display = "Generic Parse Error {}", _0)]
     ParseError(String),
+    #[fail(
+        display = "Variant {} does not allow multiple values with the same key {}",
+        variant, key
+    )]
+    IllegalMultipleEntries { key: String, variant: &'static str },
+    #[fail(
+        display = "Error merging key {} into `Value`: existing value of type {} cannot be merged with type {}",
+        key, existing_variant, incoming_variant
+    )]
+    ErrorMergingKeys {
+        key: String,
+        existing_variant: &'static str,
+        incoming_variant: &'static str,
+    },
 }
 
 impl Error {

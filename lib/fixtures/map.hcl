@@ -24,3 +24,10 @@ resource "security/group" "foobar" {
     cidrs = ["0.0.0.0/0"]
   }
 }
+
+resource "security/group" "second" {
+  allow {
+    name = "all"
+    cidrs = ["0.0.0.0/0"]
+  }
+}

@@ -1,8 +1,11 @@
-use std::borrow::Cow;
+use std::borrow::{Borrow, Cow};
 use std::collections::HashMap;
+use std::hash::Hash;
 use std::iter::FromIterator;
+use std::ops::Deref;
 
 use crate::literals;
+use crate::Error;
 
 use nom::{
     alt, alt_complete, call, char, complete, do_parse, many0, many1, map, named, opt, preceded,
@@ -11,7 +14,6 @@ use nom::{
 
 use nom::types::CompleteStr;
 
-pub type MapValues<'a> = HashMap<literals::Key<'a>, Value<'a>>;
 pub type Stanza<'a> = HashMap<Vec<String>, MapValues<'a>>;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -26,22 +28,28 @@ pub enum Value<'a> {
     Stanza(Stanza<'a>),
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct MapValues<'a>(pub HashMap<literals::Key<'a>, Value<'a>>);
+
+impl<'a> Deref for MapValues<'a> {
+    type Target = HashMap<literals::Key<'a>, Value<'a>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 impl<'a> Value<'a> {
     pub fn new_list_from_iterator<T>(iterator: &[T]) -> Self
     where
         T: Into<Value<'a>> + Clone,
     {
-        Value::List(
-            iterator
-                .into_iter()
-                .map(|v| Into::into(v))
-                .collect(),
-        )
+        Value::List(iterator.into_iter().map(|v| Into::into(v)).collect())
     }
 
     pub fn new_single_map_from_iterator<K, V>(iterator: &'a [(K, V)]) -> Self
     where
-        K: Eq + std::hash::Hash + AsRef<str>,
+        K: Eq + Hash + AsRef<str>,
         V: Into<Value<'a>> + Clone,
     {
         Value::Map(vec![iterator
@@ -58,7 +66,7 @@ impl<'a> Value<'a> {
     pub fn new_stanza_from_iterator<S, K, V>(keys: &'a [S], iterator: &'a [(K, V)]) -> Self
     where
         S: AsRef<str>,
-        K: Eq + std::hash::Hash + AsRef<str>,
+        K: Eq + Hash + AsRef<str>,
         V: Into<Value<'a>> + Clone,
     {
         let keys: Vec<String> = keys.into_iter().map(|s| s.as_ref().to_string()).collect();
@@ -73,6 +81,18 @@ impl<'a> Value<'a> {
             .collect();
         let stanza: Stanza = [(keys, map)].into_iter().cloned().collect();
         Value::Stanza(stanza)
+    }
+
+    pub fn variant_name(&self) -> &'static str {
+        match self {
+            Value::Integer(_) => "Integer",
+            Value::Float(_) => "Float",
+            Value::Boolean(_) => "Boolean",
+            Value::String(_) => "String",
+            Value::List(_) => "List",
+            Value::Map(_) => "Map",
+            Value::Stanza(_) => "Stanza",
+        }
     }
 }
 
@@ -121,6 +141,78 @@ impl<'a> From<Option<Vec<Value<'a>>>> for Value<'a> {
 impl<'a> From<MapValues<'a>> for Value<'a> {
     fn from(values: MapValues<'a>) -> Self {
         Value::from(vec![values])
+    }
+}
+
+impl<'a> MapValues<'a> {
+    pub fn new_from_key_value_pairs<K, V, T>(iter: T) -> Result<Self, Error>
+    where
+        K: Borrow<str>,
+        V: Into<Value<'a>>,
+        T: IntoIterator<Item = (K, V)>,
+    {
+        use std::collections::hash_map::Entry;
+
+        let mut map = HashMap::new();
+        for (key, value) in iter {
+            let key: literals::Key = key.borrow().into();
+            match map.entry(key) {
+                Entry::Vacant(vacant) => {
+                    vacant.insert(value.into());
+                }
+                Entry::Occupied(mut occupied) => {
+                    let key = occupied.key().to_string();
+                    match occupied.get_mut() {
+                        illegal @ Value::Integer(_)
+                        | illegal @ Value::Float(_)
+                        | illegal @ Value::Boolean(_)
+                        | illegal @ Value::String(_)
+                        | illegal @ Value::List(_) => Err(Error::IllegalMultipleEntries {
+                            key,
+                            variant: illegal.variant_name(),
+                        })?,
+                        Value::Map(ref mut map) => {
+                            let mut value = value.into();
+                            // Check that the incoming value is also a Map
+                            if let Value::Map(ref mut incoming) = value {
+                                map.append(incoming);
+                            } else {
+                                Err(Error::ErrorMergingKeys {
+                                    key,
+                                    existing_variant: "Map",
+                                    incoming_variant: value.variant_name(),
+                                })?;
+                            }
+                        }
+                        Value::Stanza(ref mut stanza) => {
+                            let value = value.into();
+                            // Check that the incoming value is also a Stanza
+                            if let Value::Stanza(incoming) = value {
+                                stanza.extend(incoming);
+                            } else {
+                                Err(Error::ErrorMergingKeys {
+                                    key,
+                                    existing_variant: "Stanza",
+                                    incoming_variant: value.variant_name(),
+                                })?;
+                            }
+                        }
+                    };
+                }
+            };
+        }
+        Ok(MapValues(map))
+    }
+}
+
+impl<'a, K, V> FromIterator<(K, V)> for MapValues<'a>
+where
+    K: Borrow<str>,
+    V: Into<Value<'a>>,
+{
+    /// Can panic if merging fails
+    fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
+        Self::new_from_key_value_pairs(iter).unwrap()
     }
 }
 
@@ -198,7 +290,7 @@ named!(
                         )
                     )
                 )
-        >> (values.into_iter().collect())
+        >> (values.into_iter().collect()) // FIXME: This can panic!
     )
 );
 
@@ -473,8 +565,157 @@ foo = "bar"
         }
     }
 
+// MapValues(
+//     {
+//         String(
+//             "resource"
+//         ): Stanza(
+//             {
+//                 [
+//                     "security/group",
+//                     "foobar"
+//                 ]: MapValues(
+//                     {
+//                         String(
+//                             "deny"
+//                         ): Map(
+//                             [
+//                                 MapValues(
+//                                     {
+//                                         String(
+//                                             "name"
+//                                         ): String(
+//                                             "internet"
+//                                         ),
+//                                         String(
+//                                             "cidrs"
+//                                         ): List(
+//                                             [
+//                                                 String(
+//                                                     "0.0.0.0/0"
+//                                                 )
+//                                             ]
+//                                         )
+//                                     }
+//                                 )
+//                             ]
+//                         ),
+//                         String(
+//                             "allow"
+//                         ): Map(
+//                             [
+//                                 MapValues(
+//                                     {
+//                                         String(
+//                                             "cidrs"
+//                                         ): List(
+//                                             [
+//                                                 String(
+//                                                     "127.0.0.1/32"
+//                                                 )
+//                                             ]
+//                                         ),
+//                                         String(
+//                                             "name"
+//                                         ): String(
+//                                             "localhost"
+//                                         )
+//                                     }
+//                                 ),
+//                                 MapValues(
+//                                     {
+//                                         String(
+//                                             "name"
+//                                         ): String(
+//                                             "lan"
+//                                         ),
+//                                         String(
+//                                             "cidrs"
+//                                         ): List(
+//                                             [
+//                                                 String(
+//                                                     "192.168.0.0/16"
+//                                                 )
+//                                             ]
+//                                         )
+//                                     }
+//                                 )
+//                             ]
+//                         )
+//                     }
+//                 ),
+//                 [
+//                     "security/group",
+//                     "second"
+//                 ]: MapValues(
+//                     {
+//                         String(
+//                             "allow"
+//                         ): Map(
+//                             [
+//                                 MapValues(
+//                                     {
+//                                         String(
+//                                             "cidrs"
+//                                         ): List(
+//                                             [
+//                                                 String(
+//                                                     "0.0.0.0/0"
+//                                                 )
+//                                             ]
+//                                         ),
+//                                         String(
+//                                             "name"
+//                                         ): String(
+//                                             "all"
+//                                         )
+//                                     }
+//                                 )
+//                             ]
+//                         )
+//                     }
+//                 )
+//             }
+//         ),
+//         String(
+//             "simple_map"
+//         ): Map(
+//             [
+//                 MapValues(
+//                     {
+//                         String(
+//                             "bar"
+//                         ): String(
+//                             "baz"
+//                         ),
+//                         String(
+//                             "foo"
+//                         ): String(
+//                             "bar"
+//                         )
+//                     }
+//                 ),
+//                 MapValues(
+//                     {
+//                         String(
+//                             "foo"
+//                         ): String(
+//                             "bar"
+//                         ),
+//                         String(
+//                             "bar"
+//                         ): String(
+//                             "baz"
+//                         )
+//                     }
+//                 )
+//             ]
+//         )
+//     }
+// )
+
     #[test]
-    fn maps_are_pared_correctly() {
+    fn multiple_maps_are_parsed_correctly() {
         let hcl = include_str!("../fixtures/map.hcl");
         let parsed = map_values(CompleteStr(hcl)).unwrap_output();
 
