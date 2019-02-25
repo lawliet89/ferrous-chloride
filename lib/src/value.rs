@@ -27,6 +27,18 @@ pub enum Value<'a> {
 }
 
 impl<'a> Value<'a> {
+    pub fn new_list_from_iterator<T>(iterator: &[T]) -> Self
+    where
+        T: Into<Value<'a>> + Clone,
+    {
+        Value::List(
+            iterator
+                .into_iter()
+                .map(|v| Into::into(v))
+                .collect(),
+        )
+    }
+
     pub fn new_single_map_from_iterator<K, V>(iterator: &'a [(K, V)]) -> Self
     where
         K: Eq + std::hash::Hash + AsRef<str>,
@@ -80,18 +92,6 @@ where
 {
     fn from(v: &'b T) -> Value<'a> {
         Into::into(v.clone())
-    }
-}
-
-impl<'a, A> FromIterator<A> for Value<'a>
-where
-    A: Into<Value<'a>>,
-{
-    fn from_iter<T>(iter: T) -> Self
-    where
-        T: IntoIterator<Item = A>,
-    {
-        Value::List(iter.into_iter().map(|v| Into::into(v)).collect())
     }
 }
 
@@ -240,9 +240,10 @@ mod tests {
                     Value::from(123),
                     Value::from(-123.456),
                     Value::from("testing"),
-                    [Value::from("inside voice!"), Value::from("lol")]
-                        .into_iter()
-                        .collect(),
+                    Value::new_list_from_iterator(&[
+                        Value::from("inside voice!"),
+                        Value::from("lol"),
+                    ]),
                 ],
             ),
         ];
@@ -274,15 +275,13 @@ EOF
             ),
             (
                 r#"[true, false, 123, -123.456, "foobar"]"#,
-                [
+                Value::new_list_from_iterator(&[
                     Value::from(true),
                     Value::from(false),
                     Value::from(123),
                     Value::from(-123.456),
                     Value::from("foobar"),
-                ]
-                .into_iter()
-                .collect(),
+                ]),
             ),
         ];
 
@@ -316,21 +315,19 @@ EOF
             (r#"test = [],"#, ("test", Value::List(vec![]))),
             (
                 r#"test = [1,]"#,
-                ("test", [Value::from(1)].into_iter().collect()),
+                ("test", Value::new_list_from_iterator(&[Value::from(1)])),
             ),
             (
                 r#"test = [true, false, 123, -123.456, "foobar"],"#,
                 (
                     "test",
-                    [
+                    Value::new_list_from_iterator(&[
                         Value::from(true),
                         Value::from(false),
                         Value::from(123),
                         Value::from(-123.456),
                         Value::from("foobar"),
-                    ]
-                    .into_iter()
-                    .collect(),
+                    ]),
                 ),
             ),
         ];
@@ -437,46 +434,60 @@ foo = "bar"
         let expected: HashMap<_, _> = vec![
             (
                 "list",
-                [
+                Value::new_list_from_iterator(&[
                     Value::from(true),
                     Value::from(false),
                     Value::from(123),
                     Value::from(-123.456),
                     Value::from("foobar"),
-                ]
-                .into_iter()
-                .collect(),
+                ]),
             ),
             (
                 "list_multi",
-                [
+                Value::new_list_from_iterator(&[
                     Value::from(true),
                     Value::from(false),
                     Value::from(123),
                     Value::from(-123.456),
                     Value::from("foobar"),
-                ]
-                .into_iter()
-                .collect(),
+                ]),
             ),
             (
                 "list_in_list",
-                [
-                    [Value::from("test"), Value::from("foobar")]
-                        .into_iter()
-                        .collect(),
+                Value::new_list_from_iterator(&[
+                    Value::new_list_from_iterator(&[Value::from("test"), Value::from("foobar")]),
                     Value::from(1),
                     Value::from(2),
                     Value::from(-3),
-                ]
-                .into_iter()
-                .collect(),
+                ]),
             ),
         ]
         .into_iter()
         .collect();
 
         assert_eq!(expected.iter().len(), parsed.iter().len());
+        for (expected_key, expected_value) in expected {
+            println!("Checking {}", expected_key);
+            let actual_value = &parsed[expected_key];
+            assert_eq!(*actual_value, expected_value);
+        }
+    }
+
+    #[test]
+    fn maps_are_pared_correctly() {
+        let hcl = include_str!("../fixtures/map.hcl");
+        let parsed = map_values(CompleteStr(hcl)).unwrap_output();
+
+        println!("{:#?}", parsed);
+
+        let expected: HashMap<_, _> = vec![(
+            "simple_map",
+            Value::new_single_map_from_iterator(&[("foo", "bar"), ("bar", "baz")]),
+        )]
+        .into_iter()
+        .collect();
+
+        // assert_eq!(expected.iter().len(), parsed.iter().len());
         for (expected_key, expected_value) in expected {
             println!("Checking {}", expected_key);
             let actual_value = &parsed[expected_key];
