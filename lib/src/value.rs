@@ -145,17 +145,14 @@ impl<'a> From<MapValues<'a>> for Value<'a> {
 }
 
 impl<'a> MapValues<'a> {
-    pub fn new_from_key_value_pairs<K, V, T>(iter: T) -> Result<Self, Error>
+    pub fn new_from_key_value_pairs<T>(iter: T) -> Result<Self, Error>
     where
-        K: Borrow<str>,
-        V: Into<Value<'a>>,
-        T: IntoIterator<Item = (K, V)>,
+        T: IntoIterator<Item = (literals::Key<'a>, Value<'a>)>,
     {
         use std::collections::hash_map::Entry;
 
         let mut map = HashMap::new();
-        for (key, value) in iter {
-            let key: literals::Key = key.borrow().into();
+        for (key, mut value) in iter {
             match map.entry(key) {
                 Entry::Vacant(vacant) => {
                     vacant.insert(value.into());
@@ -172,7 +169,6 @@ impl<'a> MapValues<'a> {
                             variant: illegal.variant_name(),
                         })?,
                         Value::Map(ref mut map) => {
-                            let mut value = value.into();
                             // Check that the incoming value is also a Map
                             if let Value::Map(ref mut incoming) = value {
                                 map.append(incoming);
@@ -205,13 +201,10 @@ impl<'a> MapValues<'a> {
     }
 }
 
-impl<'a, K, V> FromIterator<(K, V)> for MapValues<'a>
-where
-    K: Borrow<str>,
-    V: Into<Value<'a>>,
+impl<'a> FromIterator<(literals::Key<'a>, Value<'a>)> for MapValues<'a>
 {
     /// Can panic if merging fails
-    fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
+    fn from_iter<T: IntoIterator<Item = (literals::Key<'a>, Value<'a>)>>(iter: T) -> Self {
         Self::new_from_key_value_pairs(iter).unwrap()
     }
 }
@@ -567,27 +560,92 @@ foo = "bar"
 
 // MapValues(
 //     {
-//         String(
+//         Identifier(
+//             "simple_map"
+//         ): Map(
+//             [
+//                 MapValues(
+//                     {
+//                         Identifier(
+//                             "bar"
+//                         ): String(
+//                             "baz"
+//                         ),
+//                         Identifier(
+//                             "foo"
+//                         ): String(
+//                             "bar"
+//                         )
+//                     }
+//                 ),
+//                 MapValues(
+//                     {
+//                         Identifier(
+//                             "bar"
+//                         ): String(
+//                             "baz"
+//                         ),
+//                         Identifier(
+//                             "foo"
+//                         ): String(
+//                             "bar"
+//                         )
+//                     }
+//                 )
+//             ]
+//         ),
+//         Identifier(
 //             "resource"
 //         ): Stanza(
 //             {
 //                 [
 //                     "security/group",
+//                     "second"
+//                 ]: MapValues(
+//                     {
+//                         Identifier(
+//                             "allow"
+//                         ): Map(
+//                             [
+//                                 MapValues(
+//                                     {
+//                                         Identifier(
+//                                             "name"
+//                                         ): String(
+//                                             "all"
+//                                         ),
+//                                         Identifier(
+//                                             "cidrs"
+//                                         ): List(
+//                                             [
+//                                                 String(
+//                                                     "0.0.0.0/0"
+//                                                 )
+//                                             ]
+//                                         )
+//                                     }
+//                                 )
+//                             ]
+//                         )
+//                     }
+//                 ),
+//                 [
+//                     "security/group",
 //                     "foobar"
 //                 ]: MapValues(
 //                     {
-//                         String(
+//                         Identifier(
 //                             "deny"
 //                         ): Map(
 //                             [
 //                                 MapValues(
 //                                     {
-//                                         String(
+//                                         Identifier(
 //                                             "name"
 //                                         ): String(
 //                                             "internet"
 //                                         ),
-//                                         String(
+//                                         Identifier(
 //                                             "cidrs"
 //                                         ): List(
 //                                             [
@@ -600,13 +658,18 @@ foo = "bar"
 //                                 )
 //                             ]
 //                         ),
-//                         String(
+//                         Identifier(
 //                             "allow"
 //                         ): Map(
 //                             [
 //                                 MapValues(
 //                                     {
-//                                         String(
+//                                         Identifier(
+//                                             "name"
+//                                         ): String(
+//                                             "localhost"
+//                                         ),
+//                                         Identifier(
 //                                             "cidrs"
 //                                         ): List(
 //                                             [
@@ -614,22 +677,12 @@ foo = "bar"
 //                                                     "127.0.0.1/32"
 //                                                 )
 //                                             ]
-//                                         ),
-//                                         String(
-//                                             "name"
-//                                         ): String(
-//                                             "localhost"
 //                                         )
 //                                     }
 //                                 ),
 //                                 MapValues(
 //                                     {
-//                                         String(
-//                                             "name"
-//                                         ): String(
-//                                             "lan"
-//                                         ),
-//                                         String(
+//                                         Identifier(
 //                                             "cidrs"
 //                                         ): List(
 //                                             [
@@ -637,37 +690,11 @@ foo = "bar"
 //                                                     "192.168.0.0/16"
 //                                                 )
 //                                             ]
-//                                         )
-//                                     }
-//                                 )
-//                             ]
-//                         )
-//                     }
-//                 ),
-//                 [
-//                     "security/group",
-//                     "second"
-//                 ]: MapValues(
-//                     {
-//                         String(
-//                             "allow"
-//                         ): Map(
-//                             [
-//                                 MapValues(
-//                                     {
-//                                         String(
-//                                             "cidrs"
-//                                         ): List(
-//                                             [
-//                                                 String(
-//                                                     "0.0.0.0/0"
-//                                                 )
-//                                             ]
 //                                         ),
-//                                         String(
+//                                         Identifier(
 //                                             "name"
 //                                         ): String(
-//                                             "all"
+//                                             "lan"
 //                                         )
 //                                     }
 //                                 )
@@ -676,44 +703,9 @@ foo = "bar"
 //                     }
 //                 )
 //             }
-//         ),
-//         String(
-//             "simple_map"
-//         ): Map(
-//             [
-//                 MapValues(
-//                     {
-//                         String(
-//                             "bar"
-//                         ): String(
-//                             "baz"
-//                         ),
-//                         String(
-//                             "foo"
-//                         ): String(
-//                             "bar"
-//                         )
-//                     }
-//                 ),
-//                 MapValues(
-//                     {
-//                         String(
-//                             "foo"
-//                         ): String(
-//                             "bar"
-//                         ),
-//                         String(
-//                             "bar"
-//                         ): String(
-//                             "baz"
-//                         )
-//                     }
-//                 )
-//             ]
 //         )
 //     }
 // )
-
     #[test]
     fn multiple_maps_are_parsed_correctly() {
         let hcl = include_str!("../fixtures/map.hcl");
