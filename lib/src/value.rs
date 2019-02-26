@@ -4,7 +4,7 @@ use std::hash::Hash;
 use std::iter::FromIterator;
 use std::ops::Deref;
 
-use crate::literals;
+use crate::literals::{self, Key};
 use crate::Error;
 
 use nom::{
@@ -29,56 +29,43 @@ pub enum Value<'a> {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct MapValues<'a>(pub HashMap<literals::Key<'a>, Value<'a>>);
-
-impl<'a> Deref for MapValues<'a> {
-    type Target = HashMap<literals::Key<'a>, Value<'a>>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+pub struct MapValues<'a>(pub HashMap<Key<'a>, Value<'a>>);
 
 impl<'a> Value<'a> {
-    pub fn new_list_from_iterator<T>(iterator: &[T]) -> Self
+    pub fn new_list<T>(iterator: T) -> Self
     where
-        T: Into<Value<'a>> + Clone,
+        T: IntoIterator<Item = Value<'a>>,
     {
-        Value::List(iterator.into_iter().map(|v| Into::into(v)).collect())
+        Value::List(iterator.into_iter().collect())
     }
 
-    pub fn new_single_map_from_iterator<K, V>(iterator: &'a [(K, V)]) -> Self
+    pub fn new_map<I, T>(iterator: I) -> Self
     where
-        K: Eq + Hash + AsRef<str>,
-        V: Into<Value<'a>> + Clone,
+        I: IntoIterator<Item = T>,
+        T: IntoIterator<Item = (Key<'a>, Value<'a>)>,
     {
-        Value::Map(vec![iterator
-            .into_iter()
-            .map(|(k, v)| {
-                (
-                    literals::Key::Identifier(Cow::Borrowed(k.as_ref())),
-                    Value::from(v),
-                )
-            })
-            .collect()])
+        Value::Map(
+            iterator
+                .into_iter()
+                .map(|iter| iter.into_iter().collect())
+                .collect(),
+        )
     }
 
-    pub fn new_stanza_from_iterator<S, K, V>(keys: &'a [S], iterator: &'a [(K, V)]) -> Self
+    pub fn new_single_map<T>(iterator: T) -> Self
+    where
+        T: IntoIterator<Item = (Key<'a>, Value<'a>)>,
+    {
+        Value::Map(vec![iterator.into_iter().collect()])
+    }
+
+    pub fn new_stanza<S, T>(keys: &'a [S], iterator: T) -> Self
     where
         S: AsRef<str>,
-        K: Eq + Hash + AsRef<str>,
-        V: Into<Value<'a>> + Clone,
+        T: IntoIterator<Item = (Key<'a>, Value<'a>)>,
     {
         let keys: Vec<String> = keys.into_iter().map(|s| s.as_ref().to_string()).collect();
-        let map: MapValues = iterator
-            .into_iter()
-            .map(|(k, v)| {
-                (
-                    literals::Key::Identifier(Cow::Borrowed(k.as_ref())),
-                    Value::from(v),
-                )
-            })
-            .collect();
+        let map: MapValues = iterator.into_iter().collect();
         let stanza: Stanza = [(keys, map)].into_iter().cloned().collect();
         Value::Stanza(stanza)
     }
@@ -147,7 +134,7 @@ impl<'a> From<MapValues<'a>> for Value<'a> {
 impl<'a> MapValues<'a> {
     pub fn new_from_key_value_pairs<T>(iter: T) -> Result<Self, Error>
     where
-        T: IntoIterator<Item = (literals::Key<'a>, Value<'a>)>,
+        T: IntoIterator<Item = (Key<'a>, Value<'a>)>,
     {
         use std::collections::hash_map::Entry;
 
@@ -201,10 +188,17 @@ impl<'a> MapValues<'a> {
     }
 }
 
-impl<'a> FromIterator<(literals::Key<'a>, Value<'a>)> for MapValues<'a>
-{
+impl<'a> Deref for MapValues<'a> {
+    type Target = HashMap<Key<'a>, Value<'a>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'a> FromIterator<(Key<'a>, Value<'a>)> for MapValues<'a> {
     /// Can panic if merging fails
-    fn from_iter<T: IntoIterator<Item = (literals::Key<'a>, Value<'a>)>>(iter: T) -> Self {
+    fn from_iter<T: IntoIterator<Item = (Key<'a>, Value<'a>)>>(iter: T) -> Self {
         Self::new_from_key_value_pairs(iter).unwrap()
     }
 }
@@ -242,7 +236,7 @@ named!(
 
 /// Parse values of the form "key" = ... | ["..."] | {...}
 named!(
-    pub key_value(CompleteStr) -> (literals::Key, Value),
+    pub key_value(CompleteStr) -> (Key, Value),
     space_tab!(
         alt!(
                 do_parse!(
@@ -257,7 +251,7 @@ named!(
                     >> whitespace!(char!('{'))
                     >> values: whitespace!(call!(map_values))
                     >> char!('}')
-                    >> (literals::Key::Identifier(Cow::Borrowed(identifier)), Value::from(values))
+                    >> (Key::Identifier(Cow::Borrowed(identifier)), Value::from(values))
                 )
                 | do_parse!(
                     identifier: call!(literals::identifier)
@@ -265,7 +259,7 @@ named!(
                     >> whitespace!(char!('{'))
                     >> values: whitespace!(call!(map_values))
                     >> char!('}')
-                    >> (literals::Key::Identifier(Cow::Borrowed(identifier)), Value::Stanza(vec![(keys, values)].into_iter().collect()))
+                    >> (Key::Identifier(Cow::Borrowed(identifier)), Value::Stanza(vec![(keys, values)].into_iter().collect()))
                 )
         )
     )
@@ -325,10 +319,7 @@ mod tests {
                     Value::from(123),
                     Value::from(-123.456),
                     Value::from("testing"),
-                    Value::new_list_from_iterator(&[
-                        Value::from("inside voice!"),
-                        Value::from("lol"),
-                    ]),
+                    Value::new_list(vec![Value::from("inside voice!"), Value::from("lol")]),
                 ],
             ),
         ];
@@ -360,7 +351,7 @@ EOF
             ),
             (
                 r#"[true, false, 123, -123.456, "foobar"]"#,
-                Value::new_list_from_iterator(&[
+                Value::new_list(vec![
                     Value::from(true),
                     Value::from(false),
                     Value::from(123),
@@ -400,13 +391,13 @@ EOF
             (r#"test = [],"#, ("test", Value::List(vec![]))),
             (
                 r#"test = [1,]"#,
-                ("test", Value::new_list_from_iterator(&[Value::from(1)])),
+                ("test", Value::new_list(vec![Value::from(1)])),
             ),
             (
                 r#"test = [true, false, 123, -123.456, "foobar"],"#,
                 (
                     "test",
-                    Value::new_list_from_iterator(&[
+                    Value::new_list(vec![
                         Value::from(true),
                         Value::from(false),
                         Value::from(123),
@@ -434,7 +425,7 @@ foo = "bar"
 }"#,
                 (
                     "test",
-                    Value::new_single_map_from_iterator(&[("foo", "bar")]),
+                    Value::new_single_map(vec![(From::from("foo"), Value::from("bar"))]),
                 ),
             ),
             (
@@ -445,7 +436,7 @@ foo = "bar"
 }"#,
                 (
                     "test",
-                    Value::new_single_map_from_iterator(&[("foo", "bar")]),
+                    Value::new_single_map(vec![(From::from("foo"), Value::from("bar"))]),
                 ),
             ),
             (
@@ -454,7 +445,10 @@ foo = "bar"
             }"#,
                 (
                     "test",
-                    Value::new_stanza_from_iterator(&["one", "two"], &[("foo", "bar")]),
+                    Value::new_stanza(
+                        &["one", "two"],
+                        vec![(From::from("foo"), Value::from("bar"))],
+                    ),
                 ),
             ),
         ];
@@ -519,7 +513,7 @@ foo = "bar"
         let expected: HashMap<_, _> = vec![
             (
                 "list",
-                Value::new_list_from_iterator(&[
+                Value::new_list(vec![
                     Value::from(true),
                     Value::from(false),
                     Value::from(123),
@@ -529,7 +523,7 @@ foo = "bar"
             ),
             (
                 "list_multi",
-                Value::new_list_from_iterator(&[
+                Value::new_list(vec![
                     Value::from(true),
                     Value::from(false),
                     Value::from(123),
@@ -539,8 +533,8 @@ foo = "bar"
             ),
             (
                 "list_in_list",
-                Value::new_list_from_iterator(&[
-                    Value::new_list_from_iterator(&[Value::from("test"), Value::from("foobar")]),
+                Value::new_list(vec![
+                    Value::new_list(vec![Value::from("test"), Value::from("foobar")]),
                     Value::from(1),
                     Value::from(2),
                     Value::from(-3),
@@ -558,154 +552,154 @@ foo = "bar"
         }
     }
 
-// MapValues(
-//     {
-//         Identifier(
-//             "simple_map"
-//         ): Map(
-//             [
-//                 MapValues(
-//                     {
-//                         Identifier(
-//                             "bar"
-//                         ): String(
-//                             "baz"
-//                         ),
-//                         Identifier(
-//                             "foo"
-//                         ): String(
-//                             "bar"
-//                         )
-//                     }
-//                 ),
-//                 MapValues(
-//                     {
-//                         Identifier(
-//                             "bar"
-//                         ): String(
-//                             "baz"
-//                         ),
-//                         Identifier(
-//                             "foo"
-//                         ): String(
-//                             "bar"
-//                         )
-//                     }
-//                 )
-//             ]
-//         ),
-//         Identifier(
-//             "resource"
-//         ): Stanza(
-//             {
-//                 [
-//                     "security/group",
-//                     "second"
-//                 ]: MapValues(
-//                     {
-//                         Identifier(
-//                             "allow"
-//                         ): Map(
-//                             [
-//                                 MapValues(
-//                                     {
-//                                         Identifier(
-//                                             "name"
-//                                         ): String(
-//                                             "all"
-//                                         ),
-//                                         Identifier(
-//                                             "cidrs"
-//                                         ): List(
-//                                             [
-//                                                 String(
-//                                                     "0.0.0.0/0"
-//                                                 )
-//                                             ]
-//                                         )
-//                                     }
-//                                 )
-//                             ]
-//                         )
-//                     }
-//                 ),
-//                 [
-//                     "security/group",
-//                     "foobar"
-//                 ]: MapValues(
-//                     {
-//                         Identifier(
-//                             "deny"
-//                         ): Map(
-//                             [
-//                                 MapValues(
-//                                     {
-//                                         Identifier(
-//                                             "name"
-//                                         ): String(
-//                                             "internet"
-//                                         ),
-//                                         Identifier(
-//                                             "cidrs"
-//                                         ): List(
-//                                             [
-//                                                 String(
-//                                                     "0.0.0.0/0"
-//                                                 )
-//                                             ]
-//                                         )
-//                                     }
-//                                 )
-//                             ]
-//                         ),
-//                         Identifier(
-//                             "allow"
-//                         ): Map(
-//                             [
-//                                 MapValues(
-//                                     {
-//                                         Identifier(
-//                                             "name"
-//                                         ): String(
-//                                             "localhost"
-//                                         ),
-//                                         Identifier(
-//                                             "cidrs"
-//                                         ): List(
-//                                             [
-//                                                 String(
-//                                                     "127.0.0.1/32"
-//                                                 )
-//                                             ]
-//                                         )
-//                                     }
-//                                 ),
-//                                 MapValues(
-//                                     {
-//                                         Identifier(
-//                                             "cidrs"
-//                                         ): List(
-//                                             [
-//                                                 String(
-//                                                     "192.168.0.0/16"
-//                                                 )
-//                                             ]
-//                                         ),
-//                                         Identifier(
-//                                             "name"
-//                                         ): String(
-//                                             "lan"
-//                                         )
-//                                     }
-//                                 )
-//                             ]
-//                         )
-//                     }
-//                 )
-//             }
-//         )
-//     }
-// )
+    // MapValues(
+    //     {
+    //         Identifier(
+    //             "simple_map"
+    //         ): Map(
+    //             [
+    //                 MapValues(
+    //                     {
+    //                         Identifier(
+    //                             "bar"
+    //                         ): String(
+    //                             "baz"
+    //                         ),
+    //                         Identifier(
+    //                             "foo"
+    //                         ): String(
+    //                             "bar"
+    //                         )
+    //                     }
+    //                 ),
+    //                 MapValues(
+    //                     {
+    //                         Identifier(
+    //                             "bar"
+    //                         ): String(
+    //                             "baz"
+    //                         ),
+    //                         Identifier(
+    //                             "foo"
+    //                         ): String(
+    //                             "bar"
+    //                         )
+    //                     }
+    //                 )
+    //             ]
+    //         ),
+    //         Identifier(
+    //             "resource"
+    //         ): Stanza(
+    //             {
+    //                 [
+    //                     "security/group",
+    //                     "second"
+    //                 ]: MapValues(
+    //                     {
+    //                         Identifier(
+    //                             "allow"
+    //                         ): Map(
+    //                             [
+    //                                 MapValues(
+    //                                     {
+    //                                         Identifier(
+    //                                             "name"
+    //                                         ): String(
+    //                                             "all"
+    //                                         ),
+    //                                         Identifier(
+    //                                             "cidrs"
+    //                                         ): List(
+    //                                             [
+    //                                                 String(
+    //                                                     "0.0.0.0/0"
+    //                                                 )
+    //                                             ]
+    //                                         )
+    //                                     }
+    //                                 )
+    //                             ]
+    //                         )
+    //                     }
+    //                 ),
+    //                 [
+    //                     "security/group",
+    //                     "foobar"
+    //                 ]: MapValues(
+    //                     {
+    //                         Identifier(
+    //                             "deny"
+    //                         ): Map(
+    //                             [
+    //                                 MapValues(
+    //                                     {
+    //                                         Identifier(
+    //                                             "name"
+    //                                         ): String(
+    //                                             "internet"
+    //                                         ),
+    //                                         Identifier(
+    //                                             "cidrs"
+    //                                         ): List(
+    //                                             [
+    //                                                 String(
+    //                                                     "0.0.0.0/0"
+    //                                                 )
+    //                                             ]
+    //                                         )
+    //                                     }
+    //                                 )
+    //                             ]
+    //                         ),
+    //                         Identifier(
+    //                             "allow"
+    //                         ): Map(
+    //                             [
+    //                                 MapValues(
+    //                                     {
+    //                                         Identifier(
+    //                                             "name"
+    //                                         ): String(
+    //                                             "localhost"
+    //                                         ),
+    //                                         Identifier(
+    //                                             "cidrs"
+    //                                         ): List(
+    //                                             [
+    //                                                 String(
+    //                                                     "127.0.0.1/32"
+    //                                                 )
+    //                                             ]
+    //                                         )
+    //                                     }
+    //                                 ),
+    //                                 MapValues(
+    //                                     {
+    //                                         Identifier(
+    //                                             "cidrs"
+    //                                         ): List(
+    //                                             [
+    //                                                 String(
+    //                                                     "192.168.0.0/16"
+    //                                                 )
+    //                                             ]
+    //                                         ),
+    //                                         Identifier(
+    //                                             "name"
+    //                                         ): String(
+    //                                             "lan"
+    //                                         )
+    //                                     }
+    //                                 )
+    //                             ]
+    //                         )
+    //                     }
+    //                 )
+    //             }
+    //         )
+    //     }
+    // )
     #[test]
     fn multiple_maps_are_parsed_correctly() {
         let hcl = include_str!("../fixtures/map.hcl");
@@ -715,7 +709,10 @@ foo = "bar"
 
         let expected: HashMap<_, _> = vec![(
             "simple_map",
-            Value::new_single_map_from_iterator(&[("foo", "bar"), ("bar", "baz")]),
+            Value::new_single_map(vec![
+                (From::from("foo"), Value::from("bar")),
+                (From::from("bar"), Value::from("baz")),
+            ]),
         )]
         .into_iter()
         .collect();

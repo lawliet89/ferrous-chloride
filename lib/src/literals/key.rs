@@ -13,6 +13,22 @@ pub enum Key<'a> {
 }
 
 impl<'a> Key<'a> {
+    pub fn new_identifier(s: &'a str) -> Self {
+        Key::Identifier(Cow::Borrowed(s))
+    }
+
+    pub fn new_identifier_owned(s: String) -> Self {
+        Key::Identifier(Cow::Owned(s))
+    }
+
+    pub fn new_string(s: &'a str) -> Self {
+        Key::String(Cow::Borrowed(s))
+    }
+
+    pub fn new_string_owned(s: String) -> Self {
+        Key::String(Cow::Owned(s))
+    }
+
     pub fn unwrap(self) -> Cow<'a, str> {
         match self {
             Key::Identifier(s) => s,
@@ -32,12 +48,15 @@ impl<'a> Deref for Key<'a> {
     }
 }
 
-impl<'a, T> From<T> for Key<'a>
-where
-    T: AsRef<str>,
-{
-    fn from(s: T) -> Self {
-        Key::String(Cow::Owned(s.as_ref().to_string()))
+impl<'a> From<&'a str> for Key<'a> {
+    fn from(s: &'a str) -> Self {
+        Key::Identifier(Cow::Borrowed(s))
+    }
+}
+
+impl<'a> From<String> for Key<'a> {
+    fn from(s: String) -> Self {
+        Key::Identifier(Cow::Owned(s))
     }
 }
 
