@@ -81,6 +81,45 @@ impl<'a> Value<'a> {
             Value::Stanza(_) => "Stanza",
         }
     }
+
+    pub fn is_scalar(&self) -> bool {
+        match self {
+            Value::Integer(_) | Value::Float(_) | Value::Boolean(_) | Value::String(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_aggregate(&self) -> bool {
+        !self.is_scalar()
+    }
+
+    /// "Top" level length
+    pub fn len(&self) -> usize {
+        if self.is_scalar() {
+            1
+        } else {
+            match self {
+                Value::List(vector) => vector.len(),
+                Value::Map(vectors) => vectors.len(),
+                Value::Stanza(stanza) => stanza.len(),
+                _ => unreachable!("Impossible"),
+            }
+        }
+    }
+
+    /// Recursively count the number of scalars
+    pub fn len_scalar(&self) -> usize {
+        if self.is_scalar() {
+            1
+        } else {
+            match self {
+                Value::List(vector) => vector.iter().fold(0, |acc, v| acc + v.len_scalar()),
+                Value::Map(vectors) => vectors.iter().fold(0, |acc, v| acc + v.len_scalar()),
+                Value::Stanza(stanza) => stanza.iter().fold(0, |acc, (_, v)| acc + v.len_scalar()),
+                _ => unreachable!("Impossible"),
+            }
+        }
+    }
 }
 
 macro_rules! impl_from_value (
@@ -185,6 +224,10 @@ impl<'a> MapValues<'a> {
             };
         }
         Ok(MapValues(map))
+    }
+
+    pub fn len_scalar(&self) -> usize {
+        self.iter().fold(0, |acc, (_, v)| acc + v.len_scalar())
     }
 }
 
@@ -559,21 +602,9 @@ foo = "bar"
 
         println!("{:#?}", parsed);
 
-        let expected: HashMap<_, _> = vec![(
-            "simple_map",
-            Value::new_single_map(vec![
-                (From::from("foo"), Value::from("bar")),
-                (From::from("bar"), Value::from("baz")),
-            ]),
-        )]
-        .into_iter()
-        .collect();
+        assert_eq!(parsed.len(), 2);
+        assert_eq!(parsed.len_scalar(), 12);
 
-        // assert_eq!(expected.iter().len(), parsed.iter().len());
-        for (expected_key, expected_value) in expected {
-            println!("Checking {}", expected_key);
-            let actual_value = &parsed[expected_key];
-            assert_eq!(*actual_value, expected_value);
-        }
+        // simple_map
     }
 }
