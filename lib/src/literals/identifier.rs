@@ -1,5 +1,5 @@
 use nom::types::CompleteStr;
-use nom::{call, delimited, do_parse, named, tag, verify};
+use nom::{call, do_parse, named, verify};
 
 /// Parse an identifier
 named!(pub identifier(CompleteStr) -> &str,

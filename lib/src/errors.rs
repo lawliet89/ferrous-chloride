@@ -21,13 +21,21 @@ pub enum Error {
     )]
     IllegalMultipleEntries { key: String, variant: &'static str },
     #[fail(
-        display = "Error merging key {} into `Value`: existing value of type {} cannot be merged with type {}",
+        display = "Error merging key {} into `Value`: existing value of variant {} cannot be merged with variant {}",
         key, existing_variant, incoming_variant
     )]
     ErrorMergingKeys {
         key: String,
         existing_variant: &'static str,
         incoming_variant: &'static str,
+    },
+    #[fail(
+        display = "Expected value to be of variant {} but got {} instead",
+        expected, actual
+    )]
+    UnexpectedValueVariant {
+        expected: &'static str,
+        actual: &'static str,
     },
 }
 

@@ -1,20 +1,24 @@
-use std::borrow::{Borrow, Cow};
+use std::borrow::Cow;
 use std::collections::HashMap;
-use std::hash::Hash;
 use std::iter::FromIterator;
 use std::ops::Deref;
 
 use crate::literals::{self, Key};
 use crate::Error;
 
+use nom::types::CompleteStr;
 use nom::{
     alt, alt_complete, call, char, complete, do_parse, many0, many1, map, named, opt, preceded,
-    separated_list, tag, terminated, ws,
+    tag, terminated, ws,
 };
 
-use nom::types::CompleteStr;
-
-pub type Stanza<'a> = HashMap<Vec<String>, MapValues<'a>>;
+pub static INTEGER: &str = "INTEGER";
+pub static FLOAT: &str = "FLOAT";
+pub static BOOLEAN: &str = "BOOLEAN";
+pub static STRING: &str = "STRING";
+pub static LIST: &str = "LIST";
+pub static MAP: &str = "Map";
+pub static STANZA: &str = "STANZA";
 
 #[derive(Debug, PartialEq, Clone)]
 /// Value in HCL
@@ -23,13 +27,19 @@ pub enum Value<'a> {
     Float(f64),
     Boolean(bool),
     String(String),
-    List(Vec<Value<'a>>),
-    Map(Vec<MapValues<'a>>),
+    List(List<'a>),
+    Map(Map<'a>),
     Stanza(Stanza<'a>),
 }
 
+pub type Stanza<'a> = HashMap<Vec<String>, MapValues<'a>>;
+
+pub type Map<'a> = Vec<MapValues<'a>>;
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct MapValues<'a>(pub HashMap<Key<'a>, Value<'a>>);
+
+pub type List<'a> = Vec<Value<'a>>;
 
 impl<'a> Value<'a> {
     pub fn new_list<T>(iterator: T) -> Self
@@ -72,13 +82,13 @@ impl<'a> Value<'a> {
 
     pub fn variant_name(&self) -> &'static str {
         match self {
-            Value::Integer(_) => "Integer",
-            Value::Float(_) => "Float",
-            Value::Boolean(_) => "Boolean",
-            Value::String(_) => "String",
-            Value::List(_) => "List",
-            Value::Map(_) => "Map",
-            Value::Stanza(_) => "Stanza",
+            Value::Integer(_) => INTEGER,
+            Value::Float(_) => FLOAT,
+            Value::Boolean(_) => BOOLEAN,
+            Value::String(_) => STRING,
+            Value::List(_) => LIST,
+            Value::Map(_) => MAP,
+            Value::Stanza(_) => STANZA,
         }
     }
 
@@ -102,7 +112,7 @@ impl<'a> Value<'a> {
                 Value::List(vector) => vector.len(),
                 Value::Map(vectors) => vectors.len(),
                 Value::Stanza(stanza) => stanza.len(),
-                _ => unreachable!("Impossible"),
+                _ => unreachable!("Impossible to reach this. This is a bug."),
             }
         }
     }
@@ -116,9 +126,276 @@ impl<'a> Value<'a> {
                 Value::List(vector) => vector.iter().fold(0, |acc, v| acc + v.len_scalar()),
                 Value::Map(vectors) => vectors.iter().fold(0, |acc, v| acc + v.len_scalar()),
                 Value::Stanza(stanza) => stanza.iter().fold(0, |acc, (_, v)| acc + v.len_scalar()),
-                _ => unreachable!("Impossible"),
+                _ => unreachable!("Impossible to reach this. This is a bug."),
             }
         }
+    }
+
+    pub fn integer(&self) -> Result<i64, Error> {
+        if let Value::Integer(i) = self {
+            Ok(*i)
+        } else {
+            Err(Error::UnexpectedValueVariant {
+                expected: INTEGER,
+                actual: self.variant_name(),
+            })
+        }
+    }
+
+    /// # Panics
+    /// Panics if the variant is not an integer
+    pub fn unwrap_integer(&self) -> i64 {
+        self.integer().unwrap()
+    }
+
+    pub fn float(&self) -> Result<f64, Error> {
+        if let Value::Float(f) = self {
+            Ok(*f)
+        } else {
+            Err(Error::UnexpectedValueVariant {
+                expected: FLOAT,
+                actual: self.variant_name(),
+            })
+        }
+    }
+
+    /// # Panics
+    /// Panics if the variant is not a float
+    pub fn unwrap_float(&self) -> f64 {
+        self.float().unwrap()
+    }
+
+    pub fn boolean(&self) -> Result<bool, Error> {
+        if let Value::Boolean(v) = self {
+            Ok(*v)
+        } else {
+            Err(Error::UnexpectedValueVariant {
+                expected: BOOLEAN,
+                actual: self.variant_name(),
+            })
+        }
+    }
+
+    /// # Panics
+    /// Panics if the variant is not a boolean
+    pub fn unwrap_boolean(&self) -> bool {
+        self.boolean().unwrap()
+    }
+
+    pub fn borrow_str(&self) -> Result<&str, Error> {
+        if let Value::String(v) = self {
+            Ok(v)
+        } else {
+            Err(Error::UnexpectedValueVariant {
+                expected: STRING,
+                actual: self.variant_name(),
+            })
+        }
+    }
+
+    /// # Panics
+    /// Panics if the variant is not a string
+    pub fn unwrap_borrow_str(&self) -> &str {
+        self.borrow_str().unwrap()
+    }
+
+    pub fn borrow_string_mut(&mut self) -> Result<&mut String, Error> {
+        if let Value::String(ref mut v) = self {
+            Ok(v)
+        } else {
+            Err(Error::UnexpectedValueVariant {
+                expected: STRING,
+                actual: self.variant_name(),
+            })
+        }
+    }
+
+    /// # Panics
+    /// Panics if the variant is not a string
+    pub fn unwrap_borrow_string_mut(&mut self) -> &mut String {
+        self.borrow_string_mut().unwrap()
+    }
+
+    pub fn string(self) -> Result<String, (Error, Self)> {
+        if let Value::String(v) = self {
+            Ok(v)
+        } else {
+            Err((
+                Error::UnexpectedValueVariant {
+                    expected: STRING,
+                    actual: self.variant_name(),
+                },
+                self,
+            ))
+        }
+    }
+
+    /// # Panics
+    /// Panics if the variant is not a string
+    pub fn unwrap_string(self) -> String {
+        self.string().unwrap()
+    }
+
+    pub fn borrow_list(&self) -> Result<&List<'a>, Error> {
+        if let Value::List(v) = self {
+            Ok(v)
+        } else {
+            Err(Error::UnexpectedValueVariant {
+                expected: LIST,
+                actual: self.variant_name(),
+            })
+        }
+    }
+
+    /// # Panics
+    /// Panics if the variant is not a string
+    pub fn unwrap_borrow_list(&self) -> &List<'_> {
+        self.borrow_list().unwrap()
+    }
+
+    pub fn borrow_list_mut(&mut self) -> Result<&mut List<'a>, Error> {
+        if let Value::List(ref mut v) = self {
+            Ok(v)
+        } else {
+            Err(Error::UnexpectedValueVariant {
+                expected: LIST,
+                actual: self.variant_name(),
+            })
+        }
+    }
+
+    /// # Panics
+    /// Panics if the variant is not a list
+    pub fn unwrap_borrow_list_mut(&mut self) -> &mut List<'a> {
+        self.borrow_list_mut().unwrap()
+    }
+
+    pub fn list(self) -> Result<List<'a>, (Error, Self)> {
+        if let Value::List(v) = self {
+            Ok(v)
+        } else {
+            Err((
+                Error::UnexpectedValueVariant {
+                    expected: LIST,
+                    actual: self.variant_name(),
+                },
+                self,
+            ))
+        }
+    }
+
+    /// # Panics
+    /// Panics if the variant is not a list
+    pub fn unwrap_list(self) -> List<'a> {
+        self.list().unwrap()
+    }
+
+    pub fn borrow_map(&self) -> Result<&Map<'a>, Error> {
+        if let Value::Map(v) = self {
+            Ok(v)
+        } else {
+            Err(Error::UnexpectedValueVariant {
+                expected: MAP,
+                actual: self.variant_name(),
+            })
+        }
+    }
+
+    /// # Panics
+    /// Panics if the variant is not a string
+    pub fn unwrap_borrow_map(&self) -> &Map<'_> {
+        self.borrow_map().unwrap()
+    }
+
+    pub fn borrow_map_mut(&mut self) -> Result<&mut Map<'a>, Error> {
+        if let Value::Map(ref mut v) = self {
+            Ok(v)
+        } else {
+            Err(Error::UnexpectedValueVariant {
+                expected: MAP,
+                actual: self.variant_name(),
+            })
+        }
+    }
+
+    /// # Panics
+    /// Panics if the variant is not a map
+    pub fn unwrap_borrow_map_mut(&mut self) -> &mut Map<'a> {
+        self.borrow_map_mut().unwrap()
+    }
+
+    pub fn map(self) -> Result<Map<'a>, (Error, Self)> {
+        if let Value::Map(v) = self {
+            Ok(v)
+        } else {
+            Err((
+                Error::UnexpectedValueVariant {
+                    expected: MAP,
+                    actual: self.variant_name(),
+                },
+                self,
+            ))
+        }
+    }
+
+    /// # Panics
+    /// Panics if the variant is not a map
+    pub fn unwrap_map(self) -> Map<'a> {
+        self.map().unwrap()
+    }
+
+    pub fn borrow_stanza(&self) -> Result<&Stanza<'a>, Error> {
+        if let Value::Stanza(v) = self {
+            Ok(v)
+        } else {
+            Err(Error::UnexpectedValueVariant {
+                expected: STANZA,
+                actual: self.variant_name(),
+            })
+        }
+    }
+
+    /// # Panics
+    /// Panics if the variant is not a string
+    pub fn unwrap_borrow_stanza(&self) -> &Stanza<'_> {
+        self.borrow_stanza().unwrap()
+    }
+
+    pub fn borrow_stanza_mut(&mut self) -> Result<&mut Stanza<'a>, Error> {
+        if let Value::Stanza(ref mut v) = self {
+            Ok(v)
+        } else {
+            Err(Error::UnexpectedValueVariant {
+                expected: STANZA,
+                actual: self.variant_name(),
+            })
+        }
+    }
+
+    /// # Panics
+    /// Panics if the variant is not a stanza
+    pub fn unwrap_borrow_stanza_mut(&mut self) -> &mut Stanza<'a> {
+        self.borrow_stanza_mut().unwrap()
+    }
+
+    pub fn stanza(self) -> Result<Stanza<'a>, (Error, Self)> {
+        if let Value::Stanza(v) = self {
+            Ok(v)
+        } else {
+            Err((
+                Error::UnexpectedValueVariant {
+                    expected: STANZA,
+                    actual: self.variant_name(),
+                },
+                self,
+            ))
+        }
+    }
+
+    /// # Panics
+    /// Panics if the variant is not a stanza
+    pub fn unwrap_stanza(self) -> Stanza<'a> {
+        self.stanza().unwrap()
     }
 }
 
@@ -201,7 +478,7 @@ impl<'a> MapValues<'a> {
                             } else {
                                 Err(Error::ErrorMergingKeys {
                                     key,
-                                    existing_variant: "Map",
+                                    existing_variant: MAP,
                                     incoming_variant: value.variant_name(),
                                 })?;
                             }
@@ -214,7 +491,7 @@ impl<'a> MapValues<'a> {
                             } else {
                                 Err(Error::ErrorMergingKeys {
                                     key,
-                                    existing_variant: "Stanza",
+                                    existing_variant: STANZA,
                                     incoming_variant: value.variant_name(),
                                 })?;
                             }
@@ -603,8 +880,12 @@ foo = "bar"
         println!("{:#?}", parsed);
 
         assert_eq!(parsed.len(), 2);
-        assert_eq!(parsed.len_scalar(), 12);
+        assert_eq!(parsed.len_scalar(), 14);
 
         // simple_map
+        let simple_map = &parsed["simple_map"];
+        assert_eq!(simple_map.len(), 2);
+
+        let simple_maps = simple_map.unwrap_borrow_map();
     }
 }

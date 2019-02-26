@@ -1,11 +1,13 @@
 simple_map {
-  foo = "bar"
-  bar = "baz"
+  foo   = "bar"
+  bar   = "baz"
+  index = 1
 }
 
 simple_map {
-  foo = "bar"
-  bar = "baz"
+  foo   = "bar"
+  bar   = "baz"
+  index = 0
 }
 
 resource "security/group" "foobar" {
