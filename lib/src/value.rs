@@ -448,7 +448,7 @@ impl<'a> From<MapValues<'a>> for Value<'a> {
 }
 
 impl<'a> MapValues<'a> {
-    pub fn new_from_key_value_pairs<T>(iter: T) -> Result<Self, Error>
+    pub fn new<T>(iter: T) -> Result<Self, Error>
     where
         T: IntoIterator<Item = (Key<'a>, Value<'a>)>,
     {
@@ -519,7 +519,7 @@ impl<'a> Deref for MapValues<'a> {
 impl<'a> FromIterator<(Key<'a>, Value<'a>)> for MapValues<'a> {
     /// Can panic if merging fails
     fn from_iter<T: IntoIterator<Item = (Key<'a>, Value<'a>)>>(iter: T) -> Self {
-        Self::new_from_key_value_pairs(iter).unwrap()
+        Self::new(iter).unwrap()
     }
 }
 
@@ -886,6 +886,27 @@ foo = "bar"
         let simple_map = &parsed["simple_map"];
         assert_eq!(simple_map.len(), 2);
 
+        let expected_simple_maps = vec![
+            MapValues::new(vec![
+                (Key::new_identifier("foo"), Value::from("bar")),
+                (Key::new_identifier("bar"), Value::from("baz")),
+                (Key::new_identifier("index"), Value::from(1)),
+            ])
+            .unwrap(),
+            MapValues::new(vec![
+                (Key::new_identifier("foo"), Value::from("bar")),
+                (Key::new_identifier("bar"), Value::from("baz")),
+                (Key::new_identifier("index"), Value::from(0)),
+            ])
+            .unwrap(),
+        ];
         let simple_maps = simple_map.unwrap_borrow_map();
+        assert!(simple_maps.iter().eq(&expected_simple_maps));
+
+        // resource
+        let resource = &parsed["resource"];
+        assert_eq!(resource.len(), 2);
+        let resource = resource.unwrap_borrow_stanza();
+        // let sg_foobar = resource[&["security/group", "foobar"][..]];
     }
 }
