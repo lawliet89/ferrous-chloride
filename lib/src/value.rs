@@ -18,7 +18,7 @@ pub static BOOLEAN: &str = "BOOLEAN";
 pub static STRING: &str = "STRING";
 pub static LIST: &str = "LIST";
 pub static MAP: &str = "Map";
-pub static STANZA: &str = "STANZA";
+pub static BLOCK: &str = "BLOCK";
 
 #[derive(Debug, PartialEq, Clone)]
 /// Value in HCL
@@ -29,10 +29,10 @@ pub enum Value<'a> {
     String(String),
     List(List<'a>),
     Map(Map<'a>),
-    Stanza(Stanza<'a>),
+    Block(Block<'a>),
 }
 
-pub type Stanza<'a> = HashMap<Vec<String>, MapValues<'a>>;
+pub type Block<'a> = HashMap<Vec<String>, MapValues<'a>>;
 
 pub type Map<'a> = Vec<MapValues<'a>>;
 
@@ -69,15 +69,15 @@ impl<'a> Value<'a> {
         Value::Map(vec![iterator.into_iter().collect()])
     }
 
-    pub fn new_stanza<S, T>(keys: &'a [S], iterator: T) -> Self
+    pub fn new_block<S, T>(keys: &'a [S], iterator: T) -> Self
     where
         S: AsRef<str>,
         T: IntoIterator<Item = (Key<'a>, Value<'a>)>,
     {
         let keys: Vec<String> = keys.into_iter().map(|s| s.as_ref().to_string()).collect();
         let map: MapValues = iterator.into_iter().collect();
-        let stanza: Stanza = [(keys, map)].into_iter().cloned().collect();
-        Value::Stanza(stanza)
+        let block: Block = [(keys, map)].into_iter().cloned().collect();
+        Value::Block(block)
     }
 
     pub fn variant_name(&self) -> &'static str {
@@ -88,7 +88,7 @@ impl<'a> Value<'a> {
             Value::String(_) => STRING,
             Value::List(_) => LIST,
             Value::Map(_) => MAP,
-            Value::Stanza(_) => STANZA,
+            Value::Block(_) => BLOCK,
         }
     }
 
@@ -111,7 +111,7 @@ impl<'a> Value<'a> {
             match self {
                 Value::List(vector) => vector.len(),
                 Value::Map(vectors) => vectors.len(),
-                Value::Stanza(stanza) => stanza.len(),
+                Value::Block(block) => block.len(),
                 _ => unreachable!("Impossible to reach this. This is a bug."),
             }
         }
@@ -125,7 +125,7 @@ impl<'a> Value<'a> {
             match self {
                 Value::List(vector) => vector.iter().fold(0, |acc, v| acc + v.len_scalar()),
                 Value::Map(vectors) => vectors.iter().fold(0, |acc, v| acc + v.len_scalar()),
-                Value::Stanza(stanza) => stanza.iter().fold(0, |acc, (_, v)| acc + v.len_scalar()),
+                Value::Block(block) => block.iter().fold(0, |acc, (_, v)| acc + v.len_scalar()),
                 _ => unreachable!("Impossible to reach this. This is a bug."),
             }
         }
@@ -344,12 +344,12 @@ impl<'a> Value<'a> {
         self.map().unwrap()
     }
 
-    pub fn borrow_stanza(&self) -> Result<&Stanza<'a>, Error> {
-        if let Value::Stanza(v) = self {
+    pub fn borrow_block(&self) -> Result<&Block<'a>, Error> {
+        if let Value::Block(v) = self {
             Ok(v)
         } else {
             Err(Error::UnexpectedValueVariant {
-                expected: STANZA,
+                expected: BLOCK,
                 actual: self.variant_name(),
             })
         }
@@ -357,34 +357,34 @@ impl<'a> Value<'a> {
 
     /// # Panics
     /// Panics if the variant is not a string
-    pub fn unwrap_borrow_stanza(&self) -> &Stanza<'_> {
-        self.borrow_stanza().unwrap()
+    pub fn unwrap_borrow_block(&self) -> &Block<'_> {
+        self.borrow_block().unwrap()
     }
 
-    pub fn borrow_stanza_mut(&mut self) -> Result<&mut Stanza<'a>, Error> {
-        if let Value::Stanza(ref mut v) = self {
+    pub fn borrow_block_mut(&mut self) -> Result<&mut Block<'a>, Error> {
+        if let Value::Block(ref mut v) = self {
             Ok(v)
         } else {
             Err(Error::UnexpectedValueVariant {
-                expected: STANZA,
+                expected: BLOCK,
                 actual: self.variant_name(),
             })
         }
     }
 
     /// # Panics
-    /// Panics if the variant is not a stanza
-    pub fn unwrap_borrow_stanza_mut(&mut self) -> &mut Stanza<'a> {
-        self.borrow_stanza_mut().unwrap()
+    /// Panics if the variant is not a block
+    pub fn unwrap_borrow_block_mut(&mut self) -> &mut Block<'a> {
+        self.borrow_block_mut().unwrap()
     }
 
-    pub fn stanza(self) -> Result<Stanza<'a>, (Error, Self)> {
-        if let Value::Stanza(v) = self {
+    pub fn block(self) -> Result<Block<'a>, (Error, Self)> {
+        if let Value::Block(v) = self {
             Ok(v)
         } else {
             Err((
                 Error::UnexpectedValueVariant {
-                    expected: STANZA,
+                    expected: BLOCK,
                     actual: self.variant_name(),
                 },
                 self,
@@ -393,9 +393,9 @@ impl<'a> Value<'a> {
     }
 
     /// # Panics
-    /// Panics if the variant is not a stanza
-    pub fn unwrap_stanza(self) -> Stanza<'a> {
-        self.stanza().unwrap()
+    /// Panics if the variant is not a block
+    pub fn unwrap_block(self) -> Block<'a> {
+        self.block().unwrap()
     }
 }
 
@@ -423,7 +423,7 @@ impl_from_value!(Float, f64);
 impl_from_value!(Boolean, bool);
 impl_from_value!(String, String);
 impl_from_value!(Map, Vec<MapValues<'a>>);
-impl_from_value!(Stanza, Stanza<'a>);
+impl_from_value!(Block, Block<'a>);
 
 /// Special Snowflake treatment for &str and friends
 impl<'a, 'b> From<&'b str> for Value<'a> {
@@ -483,15 +483,15 @@ impl<'a> MapValues<'a> {
                                 })?;
                             }
                         }
-                        Value::Stanza(ref mut stanza) => {
+                        Value::Block(ref mut block) => {
                             let value = value.into();
-                            // Check that the incoming value is also a Stanza
-                            if let Value::Stanza(incoming) = value {
-                                stanza.extend(incoming);
+                            // Check that the incoming value is also a Block
+                            if let Value::Block(incoming) = value {
+                                block.extend(incoming);
                             } else {
                                 Err(Error::ErrorMergingKeys {
                                     key,
-                                    existing_variant: STANZA,
+                                    existing_variant: BLOCK,
                                     incoming_variant: value.variant_name(),
                                 })?;
                             }
@@ -579,7 +579,7 @@ named!(
                     >> whitespace!(char!('{'))
                     >> values: whitespace!(call!(map_values))
                     >> char!('}')
-                    >> (Key::Identifier(Cow::Borrowed(identifier)), Value::Stanza(vec![(keys, values)].into_iter().collect()))
+                    >> (Key::Identifier(Cow::Borrowed(identifier)), Value::Block(vec![(keys, values)].into_iter().collect()))
                 )
         )
     )
@@ -765,7 +765,7 @@ foo = "bar"
             }"#,
                 (
                     "test",
-                    Value::new_stanza(
+                    Value::new_block(
                         &["one", "two"],
                         vec![(From::from("foo"), Value::from("bar"))],
                     ),
@@ -906,7 +906,7 @@ foo = "bar"
         // resource
         let resource = &parsed["resource"];
         assert_eq!(resource.len(), 2);
-        let resource = resource.unwrap_borrow_stanza();
+        let resource = resource.unwrap_borrow_block();
         // let sg_foobar = resource[&["security/group", "foobar"][..]];
     }
 }
