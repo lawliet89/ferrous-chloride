@@ -618,10 +618,14 @@ named!(
     )
 );
 
+// pub fn map_values_err(i: CompleteStr) -> nom::IResult<CompleteStr, Vec<(Key, Value)>, Error> {
+
+// }
+
 /// Parse a document's body
-pub fn body<'a>(input: &'a str) -> Result<MapValues<'a>, Error>
-{
-    let (remaining_inpuit, pairs) = map_values_vec(CompleteStr(input)).map_err(Error::from_err_str)?;
+pub fn body<'a>(input: &'a str) -> Result<MapValues<'a>, Error> {
+    let (remaining_inpuit, pairs) =
+        map_values_vec(CompleteStr(input)).map_err(Error::from_err_str)?;
     MapValues::new(pairs.into_iter())
 }
 

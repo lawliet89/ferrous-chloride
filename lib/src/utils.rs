@@ -38,7 +38,7 @@ where
 
 impl<I, O> ResultUtilsString<O> for IResult<I, O>
 where
-    I: AsRef<str> + std::fmt::Debug,
+    I: nom::AsBytes + AsRef<str> + std::fmt::Debug,
 {
     fn unwrap_output(self) -> O {
         match self {

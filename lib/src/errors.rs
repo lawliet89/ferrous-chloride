@@ -55,7 +55,7 @@ impl Error {
     /// Convert a Nom Err into something useful
     pub fn from_err_str<I>(err: nom::Err<I>) -> Self
     where
-        I: AsRef<str> + Debug,
+        I: nom::AsBytes + AsRef<str> + Debug,
     {
         Self::from_err(err, |s| Some(s.as_ref().to_string()))
     }
@@ -63,7 +63,7 @@ impl Error {
     /// Convert a Nom Err into something useful
     fn from_err<I, F>(err: nom::Err<I>, convert_fn: F) -> Self
     where
-        I: std::fmt::Debug,
+        I: nom::AsBytes + std::fmt::Debug,
         F: Fn(&I) -> Option<String>,
     {
         match err {
@@ -79,6 +79,7 @@ impl Error {
     fn from_context<I, F>(context: &Context<I>, convert_fn: F) -> Option<Self>
     where
         F: Fn(&I) -> Option<String>,
+        I: nom::AsBytes,
     {
         match context {
             Context::Code(input, ErrorKind::Custom(code)) => {
@@ -98,6 +99,7 @@ impl Error {
     fn from_input_and_code<I, F>(input: &I, code: u32, convert_fn: F) -> Option<Self>
     where
         F: Fn(&I) -> Option<String>,
+        I: nom::AsBytes,
     {
         let kind = InternalKind::from_u32(code);
         if let Some(kind) = kind {
@@ -105,7 +107,9 @@ impl Error {
                 InternalKind::InvalidUnicodeCodePoint => Some(Error::InvalidUnicodeCodePoint(
                     convert_fn(input).unwrap_or_else(|| "UNKNOWN".to_string()),
                 )),
-                InternalKind::InvalidUnicode => None, // TODO!
+                InternalKind::InvalidUnicode => {
+                    Some(Error::InvalidUnicode(input.as_bytes().to_vec()))
+                }
                 InternalKind::InvalidNumber => Some(Error::InvalidNumber(
                     convert_fn(input).unwrap_or_else(|| "UNKNOWN".to_string()),
                 )),
