@@ -1,5 +1,5 @@
 // Eat whitespace without "\r" or "\n"
-// See https://docs.rs/nom/4.2.0/nom/whitespace/index.html
+// See https://docs.rs/nom/4.2.2/nom/whitespace/index.html
 use nom::types::CompleteStr;
 use nom::{eat_separator, named};
 

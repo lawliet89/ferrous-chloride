@@ -463,6 +463,7 @@ impl<'a> MapValues<'a> {
                 Entry::Occupied(mut occupied) => {
                     let key = occupied.key().to_string();
                     match occupied.get_mut() {
+                        // TODO: Make this behaviour be customizable
                         illegal @ Value::Integer(_)
                         | illegal @ Value::Float(_)
                         | illegal @ Value::Boolean(_)
