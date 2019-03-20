@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::iter::FromIterator;
 use std::ops::Deref;
 
@@ -555,7 +556,8 @@ named!(
     )
 );
 
-/// Parse values of the form "key" = ... | ["..."] | {...}
+/// Parse single key value pair in the form of
+/// `"key" = ... | ["..."] | {...}`
 named!(
     pub key_value(CompleteStr) -> (Key, Value),
     space_tab!(
@@ -601,6 +603,27 @@ named!(
         >> (values.into_iter().collect()) // FIXME: This can panic!
     )
 );
+
+/// Collect a bunch of `(Key, Value)` pairs into a vector
+named!(
+    pub map_values_vec(CompleteStr) -> Vec<(Key, Value)>,
+    many0!(
+        terminated!(
+            call!(key_value),
+            alt!(
+                whitespace!(tag!(","))
+                | map!(many1!(nom::eol), |_| CompleteStr(""))
+            )
+        )
+    )
+);
+
+/// Parse a document's body
+pub fn body<'a>(input: &'a str) -> Result<MapValues<'a>, Error>
+{
+    let (remaining_inpuit, pairs) = map_values_vec(CompleteStr(input)).map_err(Error::from_err_str)?;
+    MapValues::new(pairs.into_iter())
+}
 
 #[cfg(test)]
 mod tests {
