@@ -97,7 +97,7 @@ mod tests {
             (r#""a/b/c""#, Key::String(From::from("a/b/c"))),
         ];
 
-        for (input, expected) in test_cases.into_iter() {
+        for (input, expected) in test_cases.iter() {
             println!("Testing {}", input);
             assert_eq!(key(CompleteStr(input)).unwrap_output(), *expected);
         }

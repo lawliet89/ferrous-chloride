@@ -1,8 +1,8 @@
 use nom::types::CompleteStr;
-use nom::{call, do_parse, named, verify};
+use nom::{call, do_parse, named_attr, verify};
 
 /// Parse an identifier
-named!(pub identifier(CompleteStr) -> &str,
+named_attr!(#[allow(clippy::block_in_if_condition_stmt)], pub identifier(CompleteStr) -> &str,
     do_parse!(
         identifier: verify!(
             call!(crate::utils::while_predicate1, |c| c.is_alphanumeric() || c == '_' || c == '-' || c == '.'),
@@ -32,7 +32,7 @@ mod tests {
             ("藏_①", "藏_①"),
         ];
 
-        for (input, expected) in test_cases.into_iter() {
+        for (input, expected) in test_cases.iter() {
             println!("Testing {}", input);
             assert_eq!(identifier(CompleteStr(input)).unwrap_output(), *expected);
         }
@@ -42,7 +42,7 @@ mod tests {
     fn incorrect_identifiers_are_not_accepted() {
         let test_cases = ["1abc", "①_is_some_number"];
 
-        for input in test_cases.into_iter() {
+        for input in test_cases.iter() {
             println!("Testing {}", input);
             assert!(identifier(CompleteStr(input)).is_err());
         }

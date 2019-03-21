@@ -66,7 +66,7 @@ named!(unescape(CompleteStr) -> Cow<str>,
             | tag!("\\") => { |_| Cow::Borrowed("\\") }
             | tag!("\"") => { |_| Cow::Borrowed("\"") }
             | tag!("?") => { |_| Cow::Borrowed("?") }
-            | map!(map_res!(complete!(take_while_m_n!(1, 3, is_oct_digit)), |s: CompleteStr| octal_to_string(s.0)), |s| Cow::Owned(s))
+            | map!(map_res!(complete!(take_while_m_n!(1, 3, is_oct_digit)), |s: CompleteStr| octal_to_string(s.0)), Cow::Owned)
             | hex_to_unicode
         )
 );
@@ -83,7 +83,7 @@ named!(hex_to_unicode(CompleteStr) -> Cow<str>,
                 // The official unicode code points only go up to 6 digits
                 | map_res!(preceded!(tag!("U"), take_while_m_n!(1, 8, is_hex_digit)), |s: CompleteStr| hex_to_string(s.0))
             ),
-            |s| Cow::Owned(s)
+            Cow::Owned
         )
     )
 );

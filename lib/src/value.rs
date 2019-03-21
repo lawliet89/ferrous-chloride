@@ -75,9 +75,9 @@ impl<'a> Value<'a> {
         S: AsRef<str>,
         T: IntoIterator<Item = (Key<'a>, Value<'a>)>,
     {
-        let keys: Vec<String> = keys.into_iter().map(|s| s.as_ref().to_string()).collect();
+        let keys: Vec<String> = keys.iter().map(|s| s.as_ref().to_string()).collect();
         let map: MapValues = iterator.into_iter().collect();
-        let block: Block = [(keys, map)].into_iter().cloned().collect();
+        let block: Block = [(keys, map)].iter().cloned().collect();
         Value::Block(block)
     }
 
@@ -118,6 +118,11 @@ impl<'a> Value<'a> {
         }
     }
 
+    /// Whether Value is empty
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     /// Recursively count the number of scalars
     pub fn len_scalar(&self) -> usize {
         if self.is_scalar() {
@@ -130,6 +135,10 @@ impl<'a> Value<'a> {
                 _ => unreachable!("Impossible to reach this. This is a bug."),
             }
         }
+    }
+
+    pub fn is_empty_scalar(&self) -> bool {
+        self.len_scalar() == 0
     }
 
     pub fn integer(&self) -> Result<i64, Error> {
@@ -459,7 +468,7 @@ impl<'a> MapValues<'a> {
         for (key, mut value) in iter {
             match map.entry(key) {
                 Entry::Vacant(vacant) => {
-                    vacant.insert(value.into());
+                    vacant.insert(value);
                 }
                 Entry::Occupied(mut occupied) => {
                     let key = occupied.key().to_string();
@@ -486,7 +495,7 @@ impl<'a> MapValues<'a> {
                             }
                         }
                         Value::Block(ref mut block) => {
-                            let value = value.into();
+                            let value = value;
                             // Check that the incoming value is also a Block
                             if let Value::Block(incoming) = value {
                                 block.extend(incoming);
@@ -672,7 +681,7 @@ mod tests {
             ),
         ];
 
-        for (input, expected_value) in test_cases.into_iter() {
+        for (input, expected_value) in test_cases.iter() {
             println!("Testing {}", input);
             let actual_value = list(CompleteStr(input)).unwrap_output();
             assert_eq!(actual_value, *expected_value);
@@ -709,7 +718,7 @@ EOF
             ),
         ];
 
-        for (input, expected_value) in test_cases.into_iter() {
+        for (input, expected_value) in test_cases.iter() {
             println!("Testing {}", input);
             let actual_value = single_value(CompleteStr(input)).unwrap_output();
             assert_eq!(actual_value, *expected_value);
@@ -756,7 +765,7 @@ EOF
             ),
         ];
 
-        for (input, (expected_key, expected_value)) in test_cases.into_iter() {
+        for (input, (expected_key, expected_value)) in test_cases.iter() {
             println!("Testing {}", input);
             let (actual_key, actual_value) = key_value(CompleteStr(input)).unwrap_output();
             assert_eq!(actual_key.unwrap(), *expected_key);
@@ -801,7 +810,7 @@ foo = "bar"
             ),
         ];
 
-        for (input, (expected_key, expected_value)) in test_cases.into_iter() {
+        for (input, (expected_key, expected_value)) in test_cases.iter() {
             println!("Testing {}", input);
             let (actual_key, actual_value) = key_value(CompleteStr(input)).unwrap_output();
             assert_eq!(actual_key.unwrap(), *expected_key);
