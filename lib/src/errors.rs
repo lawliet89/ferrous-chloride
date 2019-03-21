@@ -83,7 +83,7 @@ impl Error {
     }
 
     /// Convert to a Custom Nom Error
-    pub fn make_custom_errorr<I, F>(err: nom::Err<I>, convert_fn: F) -> nom::Err<I, Error>
+    pub fn make_custom_error<I, F>(err: nom::Err<I>, convert_fn: F) -> nom::Err<I, Error>
     where
         I: nom::AsBytes + std::fmt::Debug,
         F: Fn(&I) -> Option<String>,
@@ -97,6 +97,24 @@ impl Error {
                 nom::Err::Failure(Self::convert_context(context, convert_fn))
             }
         }
+    }
+
+    pub fn make_custom_err_str<I>(err: nom::Err<I>) -> nom::Err<I, Error>
+    where
+        I: nom::AsBytes + AsRef<str> + Debug,
+    {
+        Self::make_custom_error(err, |s| Some(s.as_ref().to_string()))
+    }
+
+    pub fn make_custom_err_bytes<I>(err: nom::Err<I>) -> nom::Err<I, Error>
+    where
+        I: nom::AsBytes + Debug,
+    {
+        Self::make_custom_error(err, |s| {
+            std::str::from_utf8(s.as_bytes())
+                .ok()
+                .map(|s| s.to_string())
+        })
     }
 
     /// Convert a Nom context into something more useful
@@ -136,7 +154,7 @@ impl Error {
             }
             Context::List(list) => OneOrMany::Many(
                 list.into_iter()
-                    .map(move|(input, error_kind)| {
+                    .map(|(input, error_kind)| {
                         let error = match error_kind {
                             ErrorKind::Custom(code) => {
                                 Self::from_input_and_code(&input, code, &convert_fn)

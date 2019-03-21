@@ -36,3 +36,35 @@ macro_rules! whitespace (
         }
     )
 );
+
+/// `map_err_str(IResult<I, O, u32>) -> IResult<I, O, Error>`
+///
+/// Converts a standard [`IResult<I, O, u32>`](nom::IResult) to
+/// `IResult<I, O, `[`Error`](crate::Error)`>`
+///
+/// `I` __must__ implement [`nom::AsBytes`] `+` [`AsRef`]`<`[`str`]`> + `[`Debug`](std::fmt::Debug)
+#[macro_export]
+macro_rules! map_err_str (
+  ($i:expr, $submac:ident!( $($args:tt)* )) => (
+    {
+      use crate::Error;
+      ($submac!($i, $($args)*)).map_err(Error::make_custom_err_str)
+    }
+  )
+);
+
+/// `map_err_str(IResult<I, O, u32>) -> IResult<I, O, Error>`
+///
+/// Converts a standard [`IResult<I, O, u32>`](nom::IResult) to
+/// `IResult<I, O, `[`Error`](crate::Error)`>`
+///
+/// `I` __must__ implement [`nom::AsBytes`] ` + `[`Debug`](std::fmt::Debug)
+#[macro_export]
+macro_rules! map_err (
+  ($i:expr, $submac:ident!( $($args:tt)* )) => (
+    {
+      use crate::Error;
+      ($submac!($i, $($args)*)).map_err(Error::make_custom_err_bytes)
+    }
+  )
+);

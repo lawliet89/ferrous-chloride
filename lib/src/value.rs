@@ -627,8 +627,41 @@ named!(
     )
 );
 
-// pub fn map_values_err(i: CompleteStr) -> nom::IResult<CompleteStr, Vec<(Key, Value)>, Error> {
+named!(
+    pub map_values_err<CompleteStr, Vec<(Key, Value)>, Error>,
+    map_err_str!(
+        many0!(
+            terminated!(
+                call!(key_value),
+                alt!(
+                    whitespace!(tag!(","))
+                    | map!(many1!(nom::eol), |_| CompleteStr(""))
+                )
+            )
+        )
+    )
+);
 
+// named!(
+//     pub map_values_err2<CompleteStr, MapValues, Error>,
+//     do_parse!(
+//         values: map_err_str!(
+//                     many0!(
+//                         terminated!(
+//                             call!(key_value),
+//                             alt!(
+//                                 whitespace!(tag!(","))
+//                                 | map!(many1!(nom::eol), |_| CompleteStr(""))
+//                             )
+//                         )
+//                     )
+//                 )
+//         >> (MapValues::new(values))
+//     )
+// );
+
+// pub fn map_values_err(i: CompleteStr) -> nom::IResult<CompleteStr, Vec<(Key, Value)>, Error> {
+//     map_values_vec(i).map_err(Error::make_custom_err_str)
 // }
 
 /// Parse a document's body
