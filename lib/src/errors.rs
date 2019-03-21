@@ -41,7 +41,7 @@ pub enum Error {
 
 impl Error {
     /// Convert a Nom Err into something useful
-    pub fn from_err_bytes<I>(err: nom::Err<I>) -> Self
+    pub fn from_err_bytes<I>(err: &nom::Err<I>) -> Self
     where
         I: nom::AsBytes + Debug,
     {
@@ -53,7 +53,7 @@ impl Error {
     }
 
     /// Convert a Nom Err into something useful
-    pub fn from_err_str<I>(err: nom::Err<I>) -> Self
+    pub fn from_err_str<I>(err: &nom::Err<I>) -> Self
     where
         I: nom::AsBytes + AsRef<str> + Debug,
     {
@@ -61,7 +61,7 @@ impl Error {
     }
 
     /// Convert a Nom Err into something useful
-    fn from_err<I, F>(err: nom::Err<I>, convert_fn: F) -> Self
+    fn from_err<I, F>(err: &nom::Err<I>, convert_fn: F) -> Self
     where
         I: nom::AsBytes + std::fmt::Debug,
         F: Fn(&I) -> Option<String>,

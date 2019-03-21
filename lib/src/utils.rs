@@ -28,7 +28,7 @@ where
     fn unwrap_output(self) -> O {
         match self {
             Err(e) => {
-                let e = crate::Error::from_err_bytes(e);
+                let e = crate::Error::from_err_bytes(&e);
                 panic!("{:#}", e)
             }
             Ok((_, output)) => output,
@@ -43,7 +43,7 @@ where
     fn unwrap_output(self) -> O {
         match self {
             Err(e) => {
-                let e = crate::Error::from_err_str(e);
+                let e = crate::Error::from_err_str(&e);
                 panic!("{:#}", e)
             }
             Ok((_, output)) => output,

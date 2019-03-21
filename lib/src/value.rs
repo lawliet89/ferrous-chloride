@@ -623,11 +623,11 @@ named!(
 // }
 
 /// Parse a document's body
-pub fn body<'a>(input: &'a str) -> Result<MapValues<'a>, Error> {
-    let (remaining_inpuit, pairs) =
-        map_values_vec(CompleteStr(input)).map_err(Error::from_err_str)?;
-    MapValues::new(pairs.into_iter())
-}
+// pub fn body<'a>(input: &'a str) -> Result<MapValues<'a>, Error> {
+//     let (remaining_inpuit, pairs) =
+//         map_values_vec(CompleteStr(input)).map_err(Error::from_err_str)?;
+//     MapValues::new(pairs.into_iter())
+// }
 
 #[cfg(test)]
 mod tests {
