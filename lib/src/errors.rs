@@ -15,11 +15,33 @@ pub enum Error {
     InvalidUnicode(Vec<u8>),
     #[fail(display = "Generic Parse Error {}", _0)]
     ParseError(String),
+    #[fail(
+        display = "Variant {} does not allow multiple values with the same key {}",
+        variant, key
+    )]
+    IllegalMultipleEntries { key: String, variant: &'static str },
+    #[fail(
+        display = "Error merging key {} into `Value`: existing value of variant {} cannot be merged with variant {}",
+        key, existing_variant, incoming_variant
+    )]
+    ErrorMergingKeys {
+        key: String,
+        existing_variant: &'static str,
+        incoming_variant: &'static str,
+    },
+    #[fail(
+        display = "Expected value to be of variant {} but got {} instead",
+        expected, actual
+    )]
+    UnexpectedValueVariant {
+        expected: &'static str,
+        actual: &'static str,
+    },
 }
 
 impl Error {
     /// Convert a Nom Err into something useful
-    pub fn from_err_bytes<I>(err: nom::Err<I>) -> Self
+    pub fn from_err_bytes<I>(err: &nom::Err<I>) -> Self
     where
         I: nom::AsBytes + Debug,
     {
@@ -31,17 +53,17 @@ impl Error {
     }
 
     /// Convert a Nom Err into something useful
-    pub fn from_err_str<I>(err: nom::Err<I>) -> Self
+    pub fn from_err_str<I>(err: &nom::Err<I>) -> Self
     where
-        I: AsRef<str> + Debug,
+        I: nom::AsBytes + AsRef<str> + Debug,
     {
         Self::from_err(err, |s| Some(s.as_ref().to_string()))
     }
 
     /// Convert a Nom Err into something useful
-    fn from_err<I, F>(err: nom::Err<I>, convert_fn: F) -> Self
+    fn from_err<I, F>(err: &nom::Err<I>, convert_fn: F) -> Self
     where
-        I: std::fmt::Debug,
+        I: nom::AsBytes + std::fmt::Debug,
         F: Fn(&I) -> Option<String>,
     {
         match err {
@@ -57,6 +79,7 @@ impl Error {
     fn from_context<I, F>(context: &Context<I>, convert_fn: F) -> Option<Self>
     where
         F: Fn(&I) -> Option<String>,
+        I: nom::AsBytes,
     {
         match context {
             Context::Code(input, ErrorKind::Custom(code)) => {
@@ -76,6 +99,7 @@ impl Error {
     fn from_input_and_code<I, F>(input: &I, code: u32, convert_fn: F) -> Option<Self>
     where
         F: Fn(&I) -> Option<String>,
+        I: nom::AsBytes,
     {
         let kind = InternalKind::from_u32(code);
         if let Some(kind) = kind {
@@ -83,7 +107,9 @@ impl Error {
                 InternalKind::InvalidUnicodeCodePoint => Some(Error::InvalidUnicodeCodePoint(
                     convert_fn(input).unwrap_or_else(|| "UNKNOWN".to_string()),
                 )),
-                InternalKind::InvalidUnicode => None, // TODO!
+                InternalKind::InvalidUnicode => {
+                    Some(Error::InvalidUnicode(input.as_bytes().to_vec()))
+                }
                 InternalKind::InvalidNumber => Some(Error::InvalidNumber(
                     convert_fn(input).unwrap_or_else(|| "UNKNOWN".to_string()),
                 )),

@@ -1,11 +1,12 @@
 // Eat whitespace without "\r" or "\n"
-// See https://docs.rs/nom/4.2.0/nom/whitespace/index.html
+// See https://docs.rs/nom/4.2.2/nom/whitespace/index.html
+use nom::types::CompleteStr;
 use nom::{eat_separator, named};
 
-named!(pub(crate) space(&str) -> &str, eat_separator!(" \t"));
+named!(pub(crate) space(CompleteStr) -> CompleteStr, eat_separator!(" \t"));
 
 #[macro_export]
-macro_rules! whitespace (
+macro_rules! space_tab (
   ($i:expr, $($args:tt)*) => (
     {
       use nom::{Convert, Err};
@@ -24,4 +25,14 @@ macro_rules! whitespace (
       }
     }
   )
+);
+
+// TODO: Handle comments
+macro_rules! whitespace (
+    ($($args:tt)*) => (
+        {
+            use nom::ws;
+            ws!($($args)*)
+        }
+    )
 );
