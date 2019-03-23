@@ -3,6 +3,8 @@
 //!
 //! This module also containts the Iterator related trait implementations
 
+use std::hash::Hash;
+
 use crate::KeyValuePairs;
 
 pub enum OneOrManyIterator<'a, T> {
@@ -75,7 +77,7 @@ impl<T> ExactSizeIterator for OneOrManyIntoIterator<T> {}
 
 impl<K, V> std::iter::Extend<(K, V)> for KeyValuePairs<K, V>
 where
-    K: std::hash::Hash + Eq,
+    K: Hash + Eq,
 {
     fn extend<T>(&mut self, iter: T)
     where
@@ -90,7 +92,7 @@ where
 
 impl<'a, K: 'a, V: 'a> std::iter::IntoIterator for &'a KeyValuePairs<K, V>
 where
-    K: std::hash::Hash + Eq,
+    K: Hash + Eq,
 {
     type Item = (&'a K, &'a V);
     type IntoIter = KeyValuePairsIterator<'a, K, V>;
@@ -102,7 +104,7 @@ where
 
 impl<K, V> std::iter::IntoIterator for KeyValuePairs<K, V>
 where
-    K: std::hash::Hash + Eq,
+    K: Hash + Eq,
 {
     type Item = (K, V);
     type IntoIter = KeyValuePairsIntoIterator<K, V>;
@@ -114,8 +116,8 @@ where
 
 impl<'a, K: 'a, V: 'a, Q> std::ops::Index<&'a Q> for KeyValuePairs<K, V>
 where
-    K: std::hash::Hash + Eq + std::borrow::Borrow<Q>,
-    Q: Eq + std::hash::Hash + ?Sized,
+    K: Hash + Eq + std::borrow::Borrow<Q>,
+    Q: Eq + Hash + ?Sized,
 {
     type Output = V;
 

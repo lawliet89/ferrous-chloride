@@ -13,6 +13,17 @@ pub use errors::Error;
 pub use value::Value;
 
 use std::collections::HashMap;
+use std::hash::Hash;
+
+/// Has scalar length
+pub trait ScalarLength {
+    /// Recursively count the number of scalars
+    fn len_scalar(&self) -> usize;
+
+    fn is_empty_scalar(&self) -> bool {
+        self.len_scalar() == 0
+    }
+}
 
 /// Either a single value, or many values
 ///
@@ -68,7 +79,7 @@ impl<T> OneOrMany<T> {
 #[derive(Debug, PartialEq, Clone)]
 pub enum KeyValuePairs<K, V>
 where
-    K: std::hash::Hash + Eq,
+    K: Hash + Eq,
 {
     Merged(HashMap<K, V>),
     Unmerged(Vec<(K, V)>),
@@ -76,7 +87,7 @@ where
 
 impl<K, V> KeyValuePairs<K, V>
 where
-    K: std::hash::Hash + Eq,
+    K: Hash + Eq,
 {
     pub fn is_merged(&self) -> bool {
         if let KeyValuePairs::Merged(_) = self {
@@ -141,7 +152,7 @@ where
     pub fn get_single<Q: ?Sized>(&self, key: &Q) -> Option<&V>
     where
         K: std::borrow::Borrow<Q>,
-        Q: Eq + std::hash::Hash,
+        Q: Eq + Hash,
     {
         match self {
             KeyValuePairs::Merged(hashmap) => hashmap.get(key),
@@ -154,7 +165,7 @@ where
     pub fn get<Q: ?Sized>(&self, key: &Q) -> Option<OneOrMany<&V>>
     where
         K: std::borrow::Borrow<Q>,
-        Q: Eq + std::hash::Hash,
+        Q: Eq + Hash,
     {
         match self {
             KeyValuePairs::Merged(hashmap) => hashmap.get(key).map(|v| OneOrMany::One(v)),
@@ -173,4 +184,70 @@ where
             }
         }
     }
+}
+
+impl<K, V> ScalarLength for KeyValuePairs<K, V>
+where
+    K: Hash + Eq,
+    V: ScalarLength,
+{
+    fn len_scalar(&self) -> usize {
+        match self {
+            KeyValuePairs::Unmerged(vector) => {
+                vector.iter().fold(0, |acc, (_, v)| acc + v.len_scalar())
+            }
+            KeyValuePairs::Merged(hashmap) => {
+                hashmap.iter().fold(0, |acc, (_, v)| acc + v.len_scalar())
+            }
+        }
+    }
+}
+
+impl<T> ScalarLength for &T
+where
+    T: ScalarLength,
+{
+    fn len_scalar(&self) -> usize {
+        T::len_scalar(self)
+    }
+}
+
+impl<T> ScalarLength for Vec<T>
+where
+    T: ScalarLength,
+{
+    fn len_scalar(&self) -> usize {
+        self.iter().fold(0, |acc, v| acc + v.len_scalar())
+    }
+}
+
+impl<K, V> ScalarLength for HashMap<K, V>
+where
+    K: Eq + Hash,
+    V: ScalarLength,
+{
+    fn len_scalar(&self) -> usize {
+        self.iter().fold(0, |acc, (_, v)| acc + v.len_scalar())
+    }
+}
+
+macro_rules! array_impls {
+    ($($N:expr)+) => {
+        $(
+            impl<T> ScalarLength for [T; $N]
+                where T: ScalarLength
+            {
+                fn len_scalar(&self) -> usize {
+                    self.iter().fold(0, |acc, v| acc + v.len_scalar())
+                }
+            }
+        )+
+    }
+}
+
+array_impls! {
+     0  1  2  3  4  5  6  7  8  9
+    10 11 12 13 14 15 16 17 18 19
+    20 21 22 23 24 25 26 27 28 29
+    30 31 32
 }

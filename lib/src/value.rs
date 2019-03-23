@@ -5,7 +5,7 @@ use std::string::ToString;
 
 use crate::constants::*;
 use crate::literals::{self, Key};
-use crate::{Error, KeyValuePairs};
+use crate::{Error, KeyValuePairs, ScalarLength};
 
 use nom::types::CompleteStr;
 use nom::{
@@ -112,24 +112,6 @@ impl<'a> Value<'a> {
     /// Whether Value is empty
     pub fn is_empty(&self) -> bool {
         self.len() == 0
-    }
-
-    /// Recursively count the number of scalars
-    pub fn len_scalar(&self) -> usize {
-        if self.is_scalar() {
-            1
-        } else {
-            match self {
-                Value::List(vector) => vector.iter().fold(0, |acc, v| acc + v.len_scalar()),
-                Value::Map(vectors) => vectors.iter().fold(0, |acc, v| acc + v.len_scalar()),
-                Value::Block(block) => block.iter().fold(0, |acc, (_, v)| acc + v.len_scalar()),
-                _ => unreachable!("Impossible to reach this. This is a bug."),
-            }
-        }
-    }
-
-    pub fn is_empty_scalar(&self) -> bool {
-        self.len_scalar() == 0
     }
 
     pub fn integer(&self) -> Result<i64, Error> {
@@ -441,6 +423,21 @@ impl<'a> Value<'a> {
     }
 }
 
+impl<'a> ScalarLength for Value<'a> {
+    fn len_scalar(&self) -> usize {
+        if self.is_scalar() {
+            1
+        } else {
+            match self {
+                Value::List(vector) => vector.len_scalar(),
+                Value::Map(vectors) => vectors.len_scalar(),
+                Value::Block(block) => block.len_scalar(),
+                _ => unreachable!("Impossible to reach this. This is a bug."),
+            }
+        }
+    }
+}
+
 macro_rules! impl_from_value (
     ($variant: ident, $type: ty) => (
         impl<'a> From<$type> for Value<'a> {
@@ -519,15 +516,6 @@ impl<'a> Block<'a> {
                 .collect(),
         )
     }
-
-    pub fn len_scalar(&self) -> usize {
-        match self {
-            KeyValuePairs::Merged(hashmap) => {
-                hashmap.iter().fold(0, |acc, (_, v)| acc + v.len_scalar())
-            }
-            KeyValuePairs::Unmerged(vec) => vec.iter().fold(0, |acc, (_, v)| acc + v.len_scalar()),
-        }
-    }
 }
 
 impl<'a, K, S> FromIterator<(K, MapValues<'a>)> for Block<'a>
@@ -603,15 +591,6 @@ impl<'a> MapValues<'a> {
         T: IntoIterator<Item = (Key<'a>, Value<'a>)>,
     {
         KeyValuePairs::Unmerged(iter.into_iter().collect())
-    }
-
-    pub fn len_scalar(&self) -> usize {
-        match self {
-            KeyValuePairs::Merged(hashmap) => {
-                hashmap.iter().fold(0, |acc, (_, v)| acc + v.len_scalar())
-            }
-            KeyValuePairs::Unmerged(vec) => vec.iter().fold(0, |acc, (_, v)| acc + v.len_scalar()),
-        }
     }
 
     pub fn merge(self) -> Result<Self, Error> {
