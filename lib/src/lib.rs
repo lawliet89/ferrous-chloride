@@ -74,7 +74,6 @@ impl<'a, T> Iterator for OneOrManyIterator<'a, T> {
         }
     }
 
-
     fn size_hint(&self) -> (usize, Option<usize>) {
         match self {
             OneOrManyIterator::One(iter) => iter.size_hint(),
@@ -162,10 +161,19 @@ where
 {
     type Output = V;
 
+    /// # Warning:
+    /// If the variant is unmerged, this operation will __only__ return the first matching key it
+    /// sees. A `Vec`'s order might not be stable.
     fn index(&self, key: &Q) -> &V {
         match self {
             KeyValuePairs::Merged(hashmap) => hashmap.index(key),
-            KeyValuePairs::Unmerged(_vec) => panic!("Indexing is not supported on unmerged")
+            KeyValuePairs::Unmerged(vec) => {
+                let (_, v) = vec
+                    .iter()
+                    .find(|(k, _)| key.eq(k.borrow()))
+                    .expect("no entry found for key");
+                v
+            }
         }
     }
 }

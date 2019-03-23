@@ -137,7 +137,8 @@ impl<'a> Value<'a> {
         if let Value::Integer(i) = self {
             Ok(*i)
         } else {
-            Err(Error::UnexpectedValueVariant {
+            Err(Error::UnexpectedVariant {
+                enum_type: VALUE,
                 expected: INTEGER,
                 actual: self.variant_name(),
             })
@@ -154,7 +155,8 @@ impl<'a> Value<'a> {
         if let Value::Float(f) = self {
             Ok(*f)
         } else {
-            Err(Error::UnexpectedValueVariant {
+            Err(Error::UnexpectedVariant {
+                enum_type: VALUE,
                 expected: FLOAT,
                 actual: self.variant_name(),
             })
@@ -171,7 +173,8 @@ impl<'a> Value<'a> {
         if let Value::Boolean(v) = self {
             Ok(*v)
         } else {
-            Err(Error::UnexpectedValueVariant {
+            Err(Error::UnexpectedVariant {
+                enum_type: VALUE,
                 expected: BOOLEAN,
                 actual: self.variant_name(),
             })
@@ -188,7 +191,8 @@ impl<'a> Value<'a> {
         if let Value::String(v) = self {
             Ok(v)
         } else {
-            Err(Error::UnexpectedValueVariant {
+            Err(Error::UnexpectedVariant {
+                enum_type: VALUE,
                 expected: STRING,
                 actual: self.variant_name(),
             })
@@ -205,7 +209,8 @@ impl<'a> Value<'a> {
         if let Value::String(ref mut v) = self {
             Ok(v)
         } else {
-            Err(Error::UnexpectedValueVariant {
+            Err(Error::UnexpectedVariant {
+                enum_type: VALUE,
                 expected: STRING,
                 actual: self.variant_name(),
             })
@@ -223,7 +228,8 @@ impl<'a> Value<'a> {
             Ok(v)
         } else {
             Err((
-                Error::UnexpectedValueVariant {
+                Error::UnexpectedVariant {
+                    enum_type: VALUE,
                     expected: STRING,
                     actual: self.variant_name(),
                 },
@@ -242,7 +248,8 @@ impl<'a> Value<'a> {
         if let Value::List(v) = self {
             Ok(v)
         } else {
-            Err(Error::UnexpectedValueVariant {
+            Err(Error::UnexpectedVariant {
+                enum_type: VALUE,
                 expected: LIST,
                 actual: self.variant_name(),
             })
@@ -259,7 +266,8 @@ impl<'a> Value<'a> {
         if let Value::List(ref mut v) = self {
             Ok(v)
         } else {
-            Err(Error::UnexpectedValueVariant {
+            Err(Error::UnexpectedVariant {
+                enum_type: VALUE,
                 expected: LIST,
                 actual: self.variant_name(),
             })
@@ -277,7 +285,8 @@ impl<'a> Value<'a> {
             Ok(v)
         } else {
             Err((
-                Error::UnexpectedValueVariant {
+                Error::UnexpectedVariant {
+                    enum_type: VALUE,
                     expected: LIST,
                     actual: self.variant_name(),
                 },
@@ -296,7 +305,8 @@ impl<'a> Value<'a> {
         if let Value::Map(v) = self {
             Ok(v)
         } else {
-            Err(Error::UnexpectedValueVariant {
+            Err(Error::UnexpectedVariant {
+                enum_type: VALUE,
                 expected: MAP,
                 actual: self.variant_name(),
             })
@@ -313,7 +323,8 @@ impl<'a> Value<'a> {
         if let Value::Map(ref mut v) = self {
             Ok(v)
         } else {
-            Err(Error::UnexpectedValueVariant {
+            Err(Error::UnexpectedVariant {
+                enum_type: VALUE,
                 expected: MAP,
                 actual: self.variant_name(),
             })
@@ -331,7 +342,8 @@ impl<'a> Value<'a> {
             Ok(v)
         } else {
             Err((
-                Error::UnexpectedValueVariant {
+                Error::UnexpectedVariant {
+                    enum_type: VALUE,
                     expected: MAP,
                     actual: self.variant_name(),
                 },
@@ -350,7 +362,8 @@ impl<'a> Value<'a> {
         if let Value::Block(v) = self {
             Ok(v)
         } else {
-            Err(Error::UnexpectedValueVariant {
+            Err(Error::UnexpectedVariant {
+                enum_type: VALUE,
                 expected: BLOCK,
                 actual: self.variant_name(),
             })
@@ -367,7 +380,8 @@ impl<'a> Value<'a> {
         if let Value::Block(ref mut v) = self {
             Ok(v)
         } else {
-            Err(Error::UnexpectedValueVariant {
+            Err(Error::UnexpectedVariant {
+                enum_type: VALUE,
                 expected: BLOCK,
                 actual: self.variant_name(),
             })
@@ -385,7 +399,8 @@ impl<'a> Value<'a> {
             Ok(v)
         } else {
             Err((
-                Error::UnexpectedValueVariant {
+                Error::UnexpectedVariant {
+                    enum_type: VALUE,
                     expected: BLOCK,
                     actual: self.variant_name(),
                 },
@@ -506,12 +521,67 @@ impl<'a> MapValues<'a> {
         Ok(MapValues(KeyValuePairs::Merged(map)))
     }
 
+    pub fn new_unmerged<T>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = (Key<'a>, Value<'a>)>,
+    {
+        MapValues(KeyValuePairs::Unmerged(iter.into_iter().collect()))
+    }
+
     pub fn len_scalar(&self) -> usize {
         match &self.0 {
             KeyValuePairs::Merged(hashmap) => {
                 hashmap.iter().fold(0, |acc, (_, v)| acc + v.len_scalar())
             }
             KeyValuePairs::Unmerged(vec) => vec.iter().fold(0, |acc, (_, v)| acc + v.len_scalar()),
+        }
+    }
+
+    pub fn merge(self) -> Result<Self, Error> {
+        match self.0 {
+            KeyValuePairs::Merged(_) => Err(Error::UnexpectedVariant {
+                enum_type: MAP_VALUES,
+                expected: UNMERGED,
+                actual: MERGED,
+            }),
+            KeyValuePairs::Unmerged(vec) => Self::new_merged(vec.into_iter()),
+        }
+    }
+
+    pub fn as_merged(&self) -> Result<Self, Error> {
+        match &self.0 {
+            KeyValuePairs::Merged(_) => Err(Error::UnexpectedVariant {
+                enum_type: MAP_VALUES,
+                expected: UNMERGED,
+                actual: MERGED,
+            }),
+            KeyValuePairs::Unmerged(vec) => Self::new_merged(vec.iter().cloned()),
+        }
+    }
+
+    pub fn unmerge(self) -> Result<Self, Error> {
+        match self.0 {
+            KeyValuePairs::Unmerged(_) => Err(Error::UnexpectedVariant {
+                enum_type: MAP_VALUES,
+                expected: MERGED,
+                actual: UNMERGED,
+            }),
+            KeyValuePairs::Merged(hashmap) => Ok(Self::new_unmerged(hashmap.into_iter())),
+        }
+    }
+
+    pub fn as_unmerged(&self) -> Result<Self, Error> {
+        match &self.0 {
+            KeyValuePairs::Unmerged(_) => Err(Error::UnexpectedVariant {
+                enum_type: MAP_VALUES,
+                expected: MERGED,
+                actual: UNMERGED,
+            }),
+            KeyValuePairs::Merged(hashmap) => Ok(Self::new_unmerged(
+                hashmap
+                    .iter()
+                    .map(|(key, value)| (key.clone(), value.clone())),
+            )),
         }
     }
 }
@@ -525,9 +595,8 @@ impl<'a> Deref for MapValues<'a> {
 }
 
 impl<'a> FromIterator<(Key<'a>, Value<'a>)> for MapValues<'a> {
-    /// Can panic if merging fails
     fn from_iter<T: IntoIterator<Item = (Key<'a>, Value<'a>)>>(iter: T) -> Self {
-        Self::new_merged(iter).unwrap()
+        Self::new_unmerged(iter)
     }
 }
 
@@ -606,7 +675,7 @@ named!(
                         )
                     )
                 )
-        >> (values.into_iter().collect()) // FIXME: This can panic!
+        >> (values.into_iter().collect())
     )
 );
 
@@ -939,12 +1008,16 @@ foo = "bar"
         }
     }
 
+
+    // TODO: Tests for merging
+
     #[test]
-    fn multiple_maps_are_parsed_correctly() {
+    fn multiple_merged_maps_are_parsed_correctly() {
         let hcl = include_str!("../fixtures/map.hcl");
         let parsed = map_values(CompleteStr(hcl)).unwrap_output();
+        let parsed = parsed.merge().unwrap();
 
-        println!("{:#?}", parsed);
+        // println!("{:#?}", parsed);
 
         assert_eq!(parsed.len(), 2);
         assert_eq!(parsed.len_scalar(), 14);
@@ -968,6 +1041,7 @@ foo = "bar"
             .unwrap(),
         ];
         let simple_maps = simple_map.unwrap_borrow_map();
+        println!("{:#?}", simple_maps);
         assert!(simple_maps.iter().eq(&expected_simple_maps));
 
         // resource

@@ -32,10 +32,11 @@ pub enum Error {
         incoming_variant: &'static str,
     },
     #[fail(
-        display = "Expected value to be of variant {} but got {} instead",
-        expected, actual
+        display = "Expected type {} to be of variant {} but got {} instead",
+        enum_type, expected, actual
     )]
-    UnexpectedValueVariant {
+    UnexpectedVariant {
+        enum_type: &'static str,
         expected: &'static str,
         actual: &'static str,
     },
