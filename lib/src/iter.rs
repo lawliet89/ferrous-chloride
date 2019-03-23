@@ -112,27 +112,18 @@ where
     }
 }
 
-impl<'a, K: 'a, V: 'a, Q: ?Sized> std::ops::Index<&'a Q> for KeyValuePairs<K, V>
+impl<'a, K: 'a, V: 'a, Q> std::ops::Index<&'a Q> for KeyValuePairs<K, V>
 where
     K: std::hash::Hash + Eq + std::borrow::Borrow<Q>,
-    Q: Eq + std::hash::Hash,
+    Q: Eq + std::hash::Hash + ?Sized,
 {
     type Output = V;
 
-    /// # Warning:
+    /// # Warning
     /// If the variant is unmerged, this operation will __only__ return the first matching key it
     /// sees. A `Vec`'s order might not be stable.
     fn index(&self, key: &Q) -> &V {
-        match self {
-            KeyValuePairs::Merged(hashmap) => hashmap.index(key),
-            KeyValuePairs::Unmerged(vec) => {
-                let (_, v) = vec
-                    .iter()
-                    .find(|(k, _)| key.eq(k.borrow()))
-                    .expect("no entry found for key");
-                v
-            }
-        }
+        self.get_single(key).expect("no entry found for key")
     }
 }
 

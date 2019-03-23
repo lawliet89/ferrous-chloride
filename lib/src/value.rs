@@ -736,64 +736,6 @@ named!(
     )
 );
 
-/// Collect a bunch of `(Key, Value)` pairs into a vector
-named!(
-    pub map_values_vec(CompleteStr) -> Vec<(Key, Value)>,
-    many0!(
-        terminated!(
-            call!(key_value),
-            alt!(
-                whitespace!(tag!(","))
-                | map!(many1!(nom::eol), |_| CompleteStr(""))
-            )
-        )
-    )
-);
-
-named!(
-    pub map_values_err<CompleteStr, Vec<(Key, Value)>, Error>,
-    map_err_str!(
-        many0!(
-            terminated!(
-                call!(key_value),
-                alt!(
-                    whitespace!(tag!(","))
-                    | map!(many1!(nom::eol), |_| CompleteStr(""))
-                )
-            )
-        )
-    )
-);
-
-// named!(
-//     pub map_values_err2<CompleteStr, MapValues, Error>,
-//     do_parse!(
-//         values: map_err_str!(
-//                     many0!(
-//                         terminated!(
-//                             call!(key_value),
-//                             alt!(
-//                                 whitespace!(tag!(","))
-//                                 | map!(many1!(nom::eol), |_| CompleteStr(""))
-//                             )
-//                         )
-//                     )
-//                 )
-//         >> (MapValues::new_merged(values))
-//     )
-// );
-
-// pub fn map_values_err(i: CompleteStr) -> nom::IResult<CompleteStr, Vec<(Key, Value)>, Error> {
-//     map_values_vec(i).map_err(Error::make_custom_err_str)
-// }
-
-/// Parse a document's body
-// pub fn body<'a>(input: &'a str) -> Result<MapValues<'a>, Error> {
-//     let (remaining_inpuit, pairs) =
-//         map_values_vec(CompleteStr(input)).map_err(Error::from_err_str)?;
-//     MapValues::new_merged(pairs.into_iter())
-// }
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1065,10 +1007,50 @@ foo = "bar"
         }
     }
 
+    #[test]
+    fn multiple_maps_are_parsed_correctly() {
+        let hcl = include_str!("../fixtures/map.hcl");
+        let parsed = map_values(CompleteStr(hcl)).unwrap_output();
+
+        println!("{:#?}", parsed);
+
+        assert_eq!(parsed.len(), 4); // unmerged values
+        assert_eq!(parsed.len_scalar(), 14);
+
+        // simple_map
+        let simple_map = &parsed["simple_map"];
+        assert_eq!(simple_map.len(), 2);
+
+        let expected_simple_maps = vec![
+            MapValues::new_merged(vec![
+                (Key::new_identifier("foo"), Value::from("bar")),
+                (Key::new_identifier("bar"), Value::from("baz")),
+                (Key::new_identifier("index"), Value::from(1)),
+            ])
+            .unwrap(),
+            MapValues::new_merged(vec![
+                (Key::new_identifier("foo"), Value::from("bar")),
+                (Key::new_identifier("bar"), Value::from("baz")),
+                (Key::new_identifier("index"), Value::from(0)),
+            ])
+            .unwrap(),
+        ];
+        let simple_maps = simple_map.unwrap_borrow_map();
+        println!("{:#?}", simple_maps);
+        assert!(simple_maps.iter().eq(&expected_simple_maps));
+
+        // resource
+        let resource = &parsed["resource"];
+        assert_eq!(resource.len(), 2);
+        let resource = resource.unwrap_borrow_block();
+        println!("{:#?}", resource);
+        // let sg_foobar = resource[&["security/group", "foobar"][..]];
+    }
+
     // TODO: Tests for merging
 
     #[test]
-    fn multiple_merged_maps_are_parsed_correctly() {
+    fn maps_are_merged_correctly() {
         let hcl = include_str!("../fixtures/map.hcl");
         let parsed = map_values(CompleteStr(hcl)).unwrap_output();
         let parsed = parsed.merge().unwrap();

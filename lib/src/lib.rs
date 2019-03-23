@@ -127,7 +127,50 @@ where
             KeyValuePairs::Merged(hashmap) => {
                 iter::KeyValuePairsIntoIterator::Merged(hashmap.into_iter())
             }
-            KeyValuePairs::Unmerged(vec) => iter::KeyValuePairsIntoIterator::Unmerged(vec.into_iter()),
+            KeyValuePairs::Unmerged(vec) => {
+                iter::KeyValuePairsIntoIterator::Unmerged(vec.into_iter())
+            }
+        }
+    }
+
+    /// Get a single value with the specified key.
+    ///
+    /// # Warning
+    /// If the variant is unmerged, this operation will __only__ return the first matching key it
+    /// sees. A `Vec`'s order might not be stable.
+    pub fn get_single<Q: ?Sized>(&self, key: &Q) -> Option<&V>
+    where
+        K: std::borrow::Borrow<Q>,
+        Q: Eq + std::hash::Hash,
+    {
+        match self {
+            KeyValuePairs::Merged(hashmap) => hashmap.get(key),
+            KeyValuePairs::Unmerged(vec) => {
+                vec.iter().find(|(k, _)| key.eq(k.borrow())).map(|(_, v)| v)
+            }
+        }
+    }
+
+    pub fn get<Q: ?Sized>(&self, key: &Q) -> Option<OneOrMany<&V>>
+    where
+        K: std::borrow::Borrow<Q>,
+        Q: Eq + std::hash::Hash,
+    {
+        match self {
+            KeyValuePairs::Merged(hashmap) => hashmap.get(key).map(|v| OneOrMany::One(v)),
+            KeyValuePairs::Unmerged(vec) => {
+                let values: Vec<_> = vec
+                    .iter()
+                    .filter(|(k, _)| key.eq(k.borrow()))
+                    .map(|(_, v)| v)
+                    .collect();
+
+                if values.is_empty() {
+                    None
+                } else {
+                    Some(OneOrMany::Many(values))
+                }
+            }
         }
     }
 }
