@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::iter::FromIterator;
+use std::string::ToString;
 
 use crate::constants::*;
 use crate::literals::{self, Key};
@@ -24,7 +25,7 @@ pub enum Value<'a> {
     Block(Block<'a>),
 }
 
-pub type Block<'a> = HashMap<Vec<String>, MapValues<'a>>;
+pub type Block<'a> = KeyValuePairs<Vec<String>, MapValues<'a>>;
 
 pub type Map<'a> = Vec<MapValues<'a>>;
 
@@ -488,7 +489,59 @@ impl<'a> From<MapValues<'a>> for Value<'a> {
     }
 }
 
+impl<'a> Block<'a> {
+    // TODO: Customise behaviour wrt duplicate block keys
+    pub fn new_merged<T, K, S>(iter: T) -> Result<Self, Error>
+    where
+        T: IntoIterator<Item = (K, MapValues<'a>)>,
+        K: IntoIterator<Item = S>,
+        S: ToString,
+    {
+        let mut merged = HashMap::new();
+        for (key, value) in iter {
+            let _ = merged.insert(
+                key.into_iter().map(|s| s.to_string()).collect(),
+                value.merge()?,
+            );
+        }
+        Ok(KeyValuePairs::Merged(merged))
+    }
+
+    pub fn new_unmerged<T, K, S>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = (K, MapValues<'a>)>,
+        K: IntoIterator<Item = S>,
+        S: ToString,
+    {
+        KeyValuePairs::Unmerged(
+            iter.into_iter()
+                .map(|(keys, value)| (keys.into_iter().map(|s| s.to_string()).collect(), value))
+                .collect(),
+        )
+    }
+
+    pub fn len_scalar(&self) -> usize {
+        match self {
+            KeyValuePairs::Merged(hashmap) => {
+                hashmap.iter().fold(0, |acc, (_, v)| acc + v.len_scalar())
+            }
+            KeyValuePairs::Unmerged(vec) => vec.iter().fold(0, |acc, (_, v)| acc + v.len_scalar()),
+        }
+    }
+}
+
+impl<'a, K, S> FromIterator<(K, MapValues<'a>)> for Block<'a>
+where
+    K: IntoIterator<Item = S>,
+    S: ToString,
+{
+    fn from_iter<T: IntoIterator<Item = (K, MapValues<'a>)>>(iter: T) -> Self {
+        Self::new_unmerged(iter)
+    }
+}
+
 impl<'a> MapValues<'a> {
+    // TODO: Customise merging behaviour wrt duplicate keys
     pub fn new_merged<T>(iter: T) -> Result<Self, Error>
     where
         T: IntoIterator<Item = (Key<'a>, Value<'a>)>,
@@ -505,7 +558,6 @@ impl<'a> MapValues<'a> {
                 Entry::Occupied(mut occupied) => {
                     let key = occupied.key().to_string();
                     match occupied.get_mut() {
-                        // TODO: Make this behaviour be customizable
                         illegal @ Value::Integer(_)
                         | illegal @ Value::Float(_)
                         | illegal @ Value::Boolean(_)
