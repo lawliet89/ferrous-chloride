@@ -39,6 +39,40 @@ impl<'a, T> Iterator for OneOrManyIterator<'a, T> {
 
 impl<'a, T> ExactSizeIterator for OneOrManyIterator<'a, T> {}
 
+pub enum OneOrManyIntoIterator<T> {
+    One(std::iter::Once<T>),
+    Many(std::vec::IntoIter<T>),
+}
+
+impl<T> std::iter::IntoIterator for crate::OneOrMany<T> {
+    type Item = T;
+    type IntoIter = OneOrManyIntoIterator<T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.into_iter()
+    }
+}
+
+impl<T> Iterator for OneOrManyIntoIterator<T> {
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            OneOrManyIntoIterator::One(iter) => iter.next(),
+            OneOrManyIntoIterator::Many(iter) => iter.next(),
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        match self {
+            OneOrManyIntoIterator::One(iter) => iter.size_hint(),
+            OneOrManyIntoIterator::Many(iter) => iter.size_hint(),
+        }
+    }
+}
+
+impl<T> ExactSizeIterator for OneOrManyIntoIterator<T> {}
+
 impl<K, V> std::iter::Extend<(K, V)> for KeyValuePairs<K, V>
 where
     K: std::hash::Hash + Eq,

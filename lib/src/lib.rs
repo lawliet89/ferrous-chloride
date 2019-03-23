@@ -53,6 +53,13 @@ impl<T> OneOrMany<T> {
             OneOrMany::Many(vec) => iter::OneOrManyIterator::Many(vec.iter()),
         }
     }
+
+    pub fn into_iter(self) -> iter::OneOrManyIntoIterator<T> {
+        match self {
+            OneOrMany::One(value) => iter::OneOrManyIntoIterator::One(std::iter::once(value)),
+            OneOrMany::Many(vec) => iter::OneOrManyIntoIterator::Many(vec.into_iter()),
+        }
+    }
 }
 
 /// A set of `(Key, Value)` pairs which can exist in a merged or unmerged variant
