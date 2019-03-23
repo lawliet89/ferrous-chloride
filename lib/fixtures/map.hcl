@@ -33,3 +33,11 @@ resource "security/group" "second" {
     cidrs = ["0.0.0.0/0"]
   }
 }
+
+resource "instance" "an_instance" {
+  image = "ubuntu:18.04"
+
+  user "test" {
+    root = true
+  }
+}

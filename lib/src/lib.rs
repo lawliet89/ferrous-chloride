@@ -1,5 +1,6 @@
 #[macro_use]
 mod macros;
+
 mod errors;
 mod utils;
 
@@ -69,6 +70,22 @@ impl<T> OneOrMany<T> {
         match self {
             OneOrMany::One(value) => iter::OneOrManyIntoIterator::One(std::iter::once(value)),
             OneOrMany::Many(vec) => iter::OneOrManyIntoIterator::Many(vec.into_iter()),
+        }
+    }
+
+    pub fn unwrap_one(self) -> T {
+        if let OneOrMany::One(one) = self {
+            one
+        } else {
+            panic!("unwrapping a many")
+        }
+    }
+
+    pub fn unwrap_many(self) -> Vec<T> {
+        if let OneOrMany::Many(many) = self {
+            many
+        } else {
+            panic!("unwrapping a one")
         }
     }
 }

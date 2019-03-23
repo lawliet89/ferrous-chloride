@@ -991,39 +991,38 @@ foo = "bar"
         let hcl = include_str!("../fixtures/map.hcl");
         let parsed = map_values(CompleteStr(hcl)).unwrap_output();
 
-        println!("{:#?}", parsed);
-
-        assert_eq!(parsed.len(), 4); // unmerged values
-        assert_eq!(parsed.len_scalar(), 14);
+        assert_eq!(parsed.len(), 5); // unmerged values
+        assert_eq!(parsed.len_scalar(), 16);
 
         // simple_map
-        let simple_map = &parsed["simple_map"];
+        let simple_map = parsed.get("simple_map").unwrap().unwrap_many();
         assert_eq!(simple_map.len(), 2);
 
         let expected_simple_maps = vec![
-            MapValues::new_merged(vec![
+            vec![MapValues::new_unmerged(vec![
                 (Key::new_identifier("foo"), Value::from("bar")),
                 (Key::new_identifier("bar"), Value::from("baz")),
                 (Key::new_identifier("index"), Value::from(1)),
-            ])
-            .unwrap(),
-            MapValues::new_merged(vec![
+            ])],
+            vec![MapValues::new_unmerged(vec![
                 (Key::new_identifier("foo"), Value::from("bar")),
                 (Key::new_identifier("bar"), Value::from("baz")),
                 (Key::new_identifier("index"), Value::from(0)),
-            ])
-            .unwrap(),
+            ])],
         ];
-        let simple_maps = simple_map.unwrap_borrow_map();
-        println!("{:#?}", simple_maps);
-        assert!(simple_maps.iter().eq(&expected_simple_maps));
+        let actual_simple_map: Vec<_> = simple_map
+            .into_iter()
+            .map(|v| v.borrow_map().expect("to be a map"))
+            .collect();
+        assert_list_eq!(expected_simple_maps, actual_simple_map);
 
         // resource
-        let resource = &parsed["resource"];
-        assert_eq!(resource.len(), 2);
-        let resource = resource.unwrap_borrow_block();
-        println!("{:#?}", resource);
-        // let sg_foobar = resource[&["security/group", "foobar"][..]];
+        let resources = parsed.get("resource").unwrap().unwrap_many();
+        assert_eq!(resources.len(), 3);
+        let resources: Vec<_> = resources
+            .into_iter()
+            .map(|v| v.borrow_block().expect("to be a block"))
+            .collect();
     }
 
     // TODO: Tests for merging
@@ -1035,10 +1034,10 @@ foo = "bar"
         let parsed = parsed.merge().unwrap();
 
         assert_eq!(parsed.len(), 2);
-        assert_eq!(parsed.len_scalar(), 14);
+        assert_eq!(parsed.len_scalar(), 16);
 
         // simple_map
-        let simple_map = &parsed["simple_map"];
+        let simple_map = parsed.get("simple_map").unwrap().unwrap_one();
         assert_eq!(simple_map.len(), 2);
 
         let expected_simple_maps = vec![
@@ -1060,8 +1059,8 @@ foo = "bar"
         assert!(simple_maps.iter().eq(&expected_simple_maps));
 
         // resource
-        let resource = &parsed["resource"];
-        assert_eq!(resource.len(), 2);
+        let resource = parsed.get("resource").unwrap().unwrap_one();
+        assert_eq!(resource.len(), 3);
         let resource = resource.unwrap_borrow_block();
         println!("{:#?}", resource);
         // let sg_foobar = resource[&["security/group", "foobar"][..]];
