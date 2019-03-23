@@ -1008,7 +1008,6 @@ foo = "bar"
         }
     }
 
-
     // TODO: Tests for merging
 
     #[test]

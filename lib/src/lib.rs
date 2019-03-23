@@ -5,10 +5,11 @@ mod utils;
 
 mod constants;
 pub mod literals;
-pub mod parser;
+pub mod value;
 
 pub use constants::*;
 pub use errors::Error;
+pub use value::Value;
 
 use std::collections::HashMap;
 
