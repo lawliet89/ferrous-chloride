@@ -414,6 +414,32 @@ impl<'a> Value<'a> {
     pub fn unwrap_block(self) -> Block<'a> {
         self.block().unwrap()
     }
+
+    /// Recursively merge value
+    pub fn merge(self) -> Result<Self, Error> {
+        match self {
+            no_op @ Value::Integer(_)
+            | no_op @ Value::Float(_)
+            | no_op @ Value::Boolean(_)
+            | no_op @ Value::String(_) => Ok(no_op),
+            Value::List(list) => Ok(Value::List(
+                list.into_iter()
+                    .map(Value::merge)
+                    .collect::<Result<_, _>>()?,
+            )),
+            Value::Map(maps) => Ok(Value::Map(
+                maps.into_iter()
+                    .map(MapValues::merge)
+                    .collect::<Result<_, _>>()?,
+            )),
+            Value::Block(block) => Ok(Value::Block(
+                block
+                    .into_iter()
+                    .map(|(key, value)| Ok((key, value.merge()?)))
+                    .collect::<Result<_, _>>()?,
+            )),
+        }
+    }
 }
 
 macro_rules! impl_from_value (
@@ -473,6 +499,7 @@ impl<'a> MapValues<'a> {
 
         let mut map = HashMap::new();
         for (key, value) in iter {
+            let mut value = value.merge()?;
             match map.entry(key) {
                 Entry::Vacant(vacant) => {
                     vacant.insert(value);
@@ -491,10 +518,8 @@ impl<'a> MapValues<'a> {
                         })?,
                         Value::Map(ref mut map) => {
                             // Check that the incoming value is also a Map
-                            if let Value::Map(incoming) = value {
-                                for item in incoming {
-                                    map.push(item.merge()?);
-                                }
+                            if let Value::Map(ref mut incoming) = value {
+                                map.append(incoming);
                             } else {
                                 Err(Error::ErrorMergingKeys {
                                     key,
@@ -541,7 +566,7 @@ impl<'a> MapValues<'a> {
 
     pub fn merge(self) -> Result<Self, Error> {
         if let KeyValuePairs::Unmerged(vec) = self.0 {
-             Self::new_merged(vec.into_iter())
+            Self::new_merged(vec.into_iter())
         } else {
             Ok(self)
         }
@@ -549,7 +574,7 @@ impl<'a> MapValues<'a> {
 
     pub fn as_merged(&self) -> Result<Self, Error> {
         if let KeyValuePairs::Unmerged(vec) = &self.0 {
-             Self::new_merged(vec.iter().cloned())
+            Self::new_merged(vec.iter().cloned())
         } else {
             Ok(self.clone())
         }
@@ -1006,7 +1031,7 @@ foo = "bar"
         let parsed = map_values(CompleteStr(hcl)).unwrap_output();
         let parsed = parsed.merge().unwrap();
 
-        // println!("{:#?}", parsed);
+        println!("{:#?}", parsed);
 
         assert_eq!(parsed.len(), 2);
         assert_eq!(parsed.len_scalar(), 14);
