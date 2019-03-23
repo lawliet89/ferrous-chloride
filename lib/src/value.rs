@@ -472,7 +472,7 @@ impl<'a> MapValues<'a> {
         use std::collections::hash_map::Entry;
 
         let mut map = HashMap::new();
-        for (key, mut value) in iter {
+        for (key, value) in iter {
             match map.entry(key) {
                 Entry::Vacant(vacant) => {
                     vacant.insert(value);
@@ -491,8 +491,10 @@ impl<'a> MapValues<'a> {
                         })?,
                         Value::Map(ref mut map) => {
                             // Check that the incoming value is also a Map
-                            if let Value::Map(ref mut incoming) = value {
-                                map.append(incoming);
+                            if let Value::Map(incoming) = value {
+                                for item in incoming {
+                                    map.push(item.merge()?);
+                                }
                             } else {
                                 Err(Error::ErrorMergingKeys {
                                     key,
@@ -538,50 +540,38 @@ impl<'a> MapValues<'a> {
     }
 
     pub fn merge(self) -> Result<Self, Error> {
-        match self.0 {
-            KeyValuePairs::Merged(_) => Err(Error::UnexpectedVariant {
-                enum_type: MAP_VALUES,
-                expected: UNMERGED,
-                actual: MERGED,
-            }),
-            KeyValuePairs::Unmerged(vec) => Self::new_merged(vec.into_iter()),
+        if let KeyValuePairs::Unmerged(vec) = self.0 {
+             Self::new_merged(vec.into_iter())
+        } else {
+            Ok(self)
         }
     }
 
     pub fn as_merged(&self) -> Result<Self, Error> {
-        match &self.0 {
-            KeyValuePairs::Merged(_) => Err(Error::UnexpectedVariant {
-                enum_type: MAP_VALUES,
-                expected: UNMERGED,
-                actual: MERGED,
-            }),
-            KeyValuePairs::Unmerged(vec) => Self::new_merged(vec.iter().cloned()),
+        if let KeyValuePairs::Unmerged(vec) = &self.0 {
+             Self::new_merged(vec.iter().cloned())
+        } else {
+            Ok(self.clone())
         }
     }
 
-    pub fn unmerge(self) -> Result<Self, Error> {
-        match self.0 {
-            KeyValuePairs::Unmerged(_) => Err(Error::UnexpectedVariant {
-                enum_type: MAP_VALUES,
-                expected: MERGED,
-                actual: UNMERGED,
-            }),
-            KeyValuePairs::Merged(hashmap) => Ok(Self::new_unmerged(hashmap.into_iter())),
+    pub fn unmerge(self) -> Self {
+        if let KeyValuePairs::Merged(hashmap) = self.0 {
+            Self::new_unmerged(hashmap.into_iter())
+        } else {
+            self
         }
     }
 
-    pub fn as_unmerged(&self) -> Result<Self, Error> {
-        match &self.0 {
-            KeyValuePairs::Unmerged(_) => Err(Error::UnexpectedVariant {
-                enum_type: MAP_VALUES,
-                expected: MERGED,
-                actual: UNMERGED,
-            }),
-            KeyValuePairs::Merged(hashmap) => Ok(Self::new_unmerged(
+    pub fn as_unmerged(&self) -> Self {
+        if let KeyValuePairs::Merged(hashmap) = &self.0 {
+            Self::new_unmerged(
                 hashmap
                     .iter()
                     .map(|(key, value)| (key.clone(), value.clone())),
-            )),
+            )
+        } else {
+            self.clone()
         }
     }
 }
