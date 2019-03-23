@@ -2,11 +2,6 @@ use std::fmt::Debug;
 
 use nom::IResult;
 
-pub(crate) enum OneOrMany<T> {
-    One(T),
-    Many(Vec<T>),
-}
-
 pub(crate) trait ResultUtils<O> {
     /// Unwraps the Output from `IResult`
     ///

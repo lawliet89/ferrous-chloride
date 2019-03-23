@@ -1,25 +1,17 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::fmt::Debug;
 use std::iter::FromIterator;
 use std::ops::Deref;
 
+use crate::constants::*;
 use crate::literals::{self, Key};
-use crate::Error;
+use crate::{Error, KeyValuePairs};
 
 use nom::types::CompleteStr;
 use nom::{
     alt, alt_complete, call, char, complete, do_parse, many0, many1, map, named, opt, preceded,
     tag, terminated, ws,
 };
-
-pub static INTEGER: &str = "INTEGER";
-pub static FLOAT: &str = "FLOAT";
-pub static BOOLEAN: &str = "BOOLEAN";
-pub static STRING: &str = "STRING";
-pub static LIST: &str = "LIST";
-pub static MAP: &str = "Map";
-pub static BLOCK: &str = "BLOCK";
 
 #[derive(Debug, PartialEq, Clone)]
 /// Value in HCL
@@ -38,7 +30,7 @@ pub type Block<'a> = HashMap<Vec<String>, MapValues<'a>>;
 pub type Map<'a> = Vec<MapValues<'a>>;
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct MapValues<'a>(pub HashMap<Key<'a>, Value<'a>>);
+pub struct MapValues<'a>(pub KeyValuePairs<Key<'a>, Value<'a>>);
 
 pub type List<'a> = Vec<Value<'a>>;
 
@@ -458,7 +450,7 @@ impl<'a> From<MapValues<'a>> for Value<'a> {
 }
 
 impl<'a> MapValues<'a> {
-    pub fn new<T>(iter: T) -> Result<Self, Error>
+    pub fn new_merged<T>(iter: T) -> Result<Self, Error>
     where
         T: IntoIterator<Item = (Key<'a>, Value<'a>)>,
     {
@@ -511,16 +503,21 @@ impl<'a> MapValues<'a> {
                 }
             };
         }
-        Ok(MapValues(map))
+        Ok(MapValues(KeyValuePairs::Merged(map)))
     }
 
     pub fn len_scalar(&self) -> usize {
-        self.iter().fold(0, |acc, (_, v)| acc + v.len_scalar())
+        match &self.0 {
+            KeyValuePairs::Merged(hashmap) => {
+                hashmap.iter().fold(0, |acc, (_, v)| acc + v.len_scalar())
+            }
+            KeyValuePairs::Unmerged(vec) => vec.iter().fold(0, |acc, (_, v)| acc + v.len_scalar()),
+        }
     }
 }
 
 impl<'a> Deref for MapValues<'a> {
-    type Target = HashMap<Key<'a>, Value<'a>>;
+    type Target = KeyValuePairs<Key<'a>, Value<'a>>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -530,7 +527,7 @@ impl<'a> Deref for MapValues<'a> {
 impl<'a> FromIterator<(Key<'a>, Value<'a>)> for MapValues<'a> {
     /// Can panic if merging fails
     fn from_iter<T: IntoIterator<Item = (Key<'a>, Value<'a>)>>(iter: T) -> Self {
-        Self::new(iter).unwrap()
+        Self::new_merged(iter).unwrap()
     }
 }
 
@@ -656,7 +653,7 @@ named!(
 //                         )
 //                     )
 //                 )
-//         >> (MapValues::new(values))
+//         >> (MapValues::new_merged(values))
 //     )
 // );
 
@@ -668,7 +665,7 @@ named!(
 // pub fn body<'a>(input: &'a str) -> Result<MapValues<'a>, Error> {
 //     let (remaining_inpuit, pairs) =
 //         map_values_vec(CompleteStr(input)).map_err(Error::from_err_str)?;
-//     MapValues::new(pairs.into_iter())
+//     MapValues::new_merged(pairs.into_iter())
 // }
 
 #[cfg(test)]
@@ -887,7 +884,7 @@ foo = "bar"
         .into_iter()
         .collect();
 
-        assert_eq!(expected.iter().len(), parsed.iter().len());
+        assert_eq!(expected.len(), parsed.len());
         for (expected_key, expected_value) in expected {
             println!("Checking {}", expected_key);
             let actual_value = &parsed[expected_key];
@@ -934,7 +931,7 @@ foo = "bar"
         .into_iter()
         .collect();
 
-        assert_eq!(expected.iter().len(), parsed.iter().len());
+        assert_eq!(expected.len(), parsed.len());
         for (expected_key, expected_value) in expected {
             println!("Checking {}", expected_key);
             let actual_value = &parsed[expected_key];
@@ -957,13 +954,13 @@ foo = "bar"
         assert_eq!(simple_map.len(), 2);
 
         let expected_simple_maps = vec![
-            MapValues::new(vec![
+            MapValues::new_merged(vec![
                 (Key::new_identifier("foo"), Value::from("bar")),
                 (Key::new_identifier("bar"), Value::from("baz")),
                 (Key::new_identifier("index"), Value::from(1)),
             ])
             .unwrap(),
-            MapValues::new(vec![
+            MapValues::new_merged(vec![
                 (Key::new_identifier("foo"), Value::from("bar")),
                 (Key::new_identifier("bar"), Value::from("baz")),
                 (Key::new_identifier("index"), Value::from(0)),

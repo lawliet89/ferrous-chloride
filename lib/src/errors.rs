@@ -4,7 +4,7 @@ use failure_derive::Fail;
 use nom::verbose_errors::Context;
 use nom::ErrorKind;
 
-use crate::utils::OneOrMany;
+use crate::OneOrMany;
 
 /// Error type for this library
 #[derive(Debug, Fail)]
