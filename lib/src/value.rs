@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::iter::FromIterator;
-use std::ops::Deref;
 
 use crate::constants::*;
 use crate::literals::{self, Key};
@@ -29,8 +28,7 @@ pub type Block<'a> = HashMap<Vec<String>, MapValues<'a>>;
 
 pub type Map<'a> = Vec<MapValues<'a>>;
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct MapValues<'a>(pub KeyValuePairs<Key<'a>, Value<'a>>);
+pub type MapValues<'a> = KeyValuePairs<Key<'a>, Value<'a>>;
 
 pub type List<'a> = Vec<Value<'a>>;
 
@@ -545,18 +543,18 @@ impl<'a> MapValues<'a> {
                 }
             };
         }
-        Ok(MapValues(KeyValuePairs::Merged(map)))
+        Ok(KeyValuePairs::Merged(map))
     }
 
     pub fn new_unmerged<T>(iter: T) -> Self
     where
         T: IntoIterator<Item = (Key<'a>, Value<'a>)>,
     {
-        MapValues(KeyValuePairs::Unmerged(iter.into_iter().collect()))
+        KeyValuePairs::Unmerged(iter.into_iter().collect())
     }
 
     pub fn len_scalar(&self) -> usize {
-        match &self.0 {
+        match self {
             KeyValuePairs::Merged(hashmap) => {
                 hashmap.iter().fold(0, |acc, (_, v)| acc + v.len_scalar())
             }
@@ -565,7 +563,7 @@ impl<'a> MapValues<'a> {
     }
 
     pub fn merge(self) -> Result<Self, Error> {
-        if let KeyValuePairs::Unmerged(vec) = self.0 {
+        if let KeyValuePairs::Unmerged(vec) = self {
             Self::new_merged(vec.into_iter())
         } else {
             Ok(self)
@@ -573,7 +571,7 @@ impl<'a> MapValues<'a> {
     }
 
     pub fn as_merged(&self) -> Result<Self, Error> {
-        if let KeyValuePairs::Unmerged(vec) = &self.0 {
+        if let KeyValuePairs::Unmerged(vec) = self {
             Self::new_merged(vec.iter().cloned())
         } else {
             Ok(self.clone())
@@ -581,7 +579,7 @@ impl<'a> MapValues<'a> {
     }
 
     pub fn unmerge(self) -> Self {
-        if let KeyValuePairs::Merged(hashmap) = self.0 {
+        if let KeyValuePairs::Merged(hashmap) = self {
             Self::new_unmerged(hashmap.into_iter())
         } else {
             self
@@ -589,7 +587,7 @@ impl<'a> MapValues<'a> {
     }
 
     pub fn as_unmerged(&self) -> Self {
-        if let KeyValuePairs::Merged(hashmap) = &self.0 {
+        if let KeyValuePairs::Merged(hashmap) = self {
             Self::new_unmerged(
                 hashmap
                     .iter()
@@ -598,14 +596,6 @@ impl<'a> MapValues<'a> {
         } else {
             self.clone()
         }
-    }
-}
-
-impl<'a> Deref for MapValues<'a> {
-    type Target = KeyValuePairs<Key<'a>, Value<'a>>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
     }
 }
 
@@ -1031,8 +1021,6 @@ foo = "bar"
         let parsed = map_values(CompleteStr(hcl)).unwrap_output();
         let parsed = parsed.merge().unwrap();
 
-        println!("{:#?}", parsed);
-
         assert_eq!(parsed.len(), 2);
         assert_eq!(parsed.len_scalar(), 14);
 
@@ -1062,6 +1050,7 @@ foo = "bar"
         let resource = &parsed["resource"];
         assert_eq!(resource.len(), 2);
         let resource = resource.unwrap_borrow_block();
+        println!("{:#?}", resource);
         // let sg_foobar = resource[&["security/group", "foobar"][..]];
     }
 }
