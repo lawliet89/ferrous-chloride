@@ -11,9 +11,9 @@ pub enum Number {
     Float(f64),
 }
 
-impl<'a> From<Number> for crate::Value<'a> {
+impl<'a> From<Number> for crate::parser::Value<'a> {
     fn from(number: Number) -> Self {
-        use crate::Value;
+        use crate::parser::Value;
 
         match number {
             Number::Integer(i) => Value::Integer(i),
