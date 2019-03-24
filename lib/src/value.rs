@@ -1050,46 +1050,78 @@ foo = "bar"
             .map(|v| v.borrow_block().expect("to be a block"))
             .collect();
 
-        let expected_resources = vec![Block::new_unmerged(vec![(
-            vec!["security/group", "foobar"],
-            MapValues::new_unmerged(vec![
-                (Key::new_identifier("name"), Value::from("foobar")),
-                (
-                    Key::new_identifier("allow"),
-                    Value::Map(vec![MapValues::new_unmerged(vec![
-                        (Key::new_identifier("name"), Value::from("localhost")),
-                        (
-                            Key::new_identifier("cidrs"),
-                            vec![Value::from("127.0.0.1/32")].into_iter().collect(),
-                        ),
-                    ])]),
-                ),
-                (
-                    Key::new_identifier("allow"),
-                    Value::Map(vec![MapValues::new_unmerged(vec![
-                        (Key::new_identifier("name"), Value::from("lan")),
-                        (
-                            Key::new_identifier("cidrs"),
-                            vec![Value::from("192.168.0.0/16")].into_iter().collect(),
-                        ),
-                    ])]),
-                ),
-                (
-                    Key::new_identifier("deny"),
-                    Value::Map(vec![MapValues::new_unmerged(vec![
-                        (Key::new_identifier("name"), Value::from("internet")),
-                        (
-                            Key::new_identifier("cidrs"),
-                            vec![Value::from("0.0.0.0/0")].into_iter().collect(),
-                        ),
-                    ])]),
-                ),
-            ]),
-        )])];
-        assert_list_eq(
-            expected_resources,
-            resources.into_iter().take(2).collect::<Vec<_>>(),
-        );
+        let expected_resources = vec![
+            Block::new_unmerged(vec![(
+                vec!["security/group", "foobar"],
+                MapValues::new_unmerged(vec![
+                    (Key::new_identifier("name"), Value::from("foobar")),
+                    (
+                        Key::new_identifier("allow"),
+                        Value::Map(vec![MapValues::new_unmerged(vec![
+                            (Key::new_identifier("name"), Value::from("localhost")),
+                            (
+                                Key::new_identifier("cidrs"),
+                                vec![Value::from("127.0.0.1/32")].into_iter().collect(),
+                            ),
+                        ])]),
+                    ),
+                    (
+                        Key::new_identifier("allow"),
+                        Value::Map(vec![MapValues::new_unmerged(vec![
+                            (Key::new_identifier("name"), Value::from("lan")),
+                            (
+                                Key::new_identifier("cidrs"),
+                                vec![Value::from("192.168.0.0/16")].into_iter().collect(),
+                            ),
+                        ])]),
+                    ),
+                    (
+                        Key::new_identifier("deny"),
+                        Value::Map(vec![MapValues::new_unmerged(vec![
+                            (Key::new_identifier("name"), Value::from("internet")),
+                            (
+                                Key::new_identifier("cidrs"),
+                                vec![Value::from("0.0.0.0/0")].into_iter().collect(),
+                            ),
+                        ])]),
+                    ),
+                ]),
+            )]),
+            Block::new_unmerged(vec![(
+                vec!["security/group", "second"],
+                MapValues::new_unmerged(vec![
+                    (Key::new_identifier("name"), Value::from("second")),
+                    (
+                        Key::new_identifier("allow"),
+                        Value::Map(vec![MapValues::new_unmerged(vec![
+                            (Key::new_identifier("name"), Value::from("all")),
+                            (
+                                Key::new_identifier("cidrs"),
+                                vec![Value::from("0.0.0.0/0")].into_iter().collect(),
+                            ),
+                        ])]),
+                    ),
+                ]),
+            )]),
+            Block::new_unmerged(vec![(
+                vec!["instance", "an_instance"],
+                MapValues::new_unmerged(vec![
+                    (Key::new_identifier("name"), Value::from("an_instance")),
+                    (Key::new_identifier("image"), Value::from("ubuntu:18.04")),
+                    (
+                        Key::new_identifier("user"),
+                        Value::Block(Block::new_unmerged(vec![(
+                            vec!["test"],
+                            MapValues::new_unmerged(vec![(
+                                Key::new_identifier("root"),
+                                Value::from(true),
+                            )]),
+                        )])),
+                    ),
+                ]),
+            )]),
+        ];
+        assert_list_eq(expected_resources, resources);
     }
 
     // TODO: Tests for merging
