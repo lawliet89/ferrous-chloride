@@ -1163,7 +1163,15 @@ foo = "bar"
         let resource = parsed.get("resource").unwrap().unwrap_one();
         assert_eq!(resource.len(), 3);
         let resource = resource.unwrap_borrow_block();
-        println!("{:#?}", resource);
-        // let sg_foobar = resource[&["security/group", "foobar"][..]];
+
+        use std::borrow::Borrow;
+        let test = vec!["security/group".to_string(), "foobar".to_string()];
+        let borrowed: &[String] = test.borrow();
+        let test_borrowed: &[String] =
+            &["security/group".to_string(), "foobar".to_string()].borrow();
+
+        // let sg_foobar = resource.get_str(&["security/group", "foobar"]);
+
+        // let sg_foobar = resource[&["security/group".to_string(), "foobar".to_string()]];
     }
 }

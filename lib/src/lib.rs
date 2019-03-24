@@ -13,8 +13,10 @@ pub use constants::*;
 pub use errors::Error;
 pub use value::Value;
 
+use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::hash::Hash;
+use std::ops::Deref;
 
 /// Has scalar length
 pub trait ScalarLength {
@@ -53,6 +55,46 @@ pub enum OneOrMany<T> {
     One(T),
     Many(Vec<T>),
 }
+
+/// Wrapper type for a `Vec<String>`, representing the keys of a block
+///
+/// # Why a wrapper type?
+/// This is a limitation of [`HashMap::get`] which specifies that to lookup a
+/// key of type `K`, you may use any type `Q` that `Borrow<K>`.
+///
+/// Now consider that the list of blocks for is implemented by `HashMap<Vec<String>, Value>`.
+///
+/// Since `Vec<T>` only implements `Borrow<[T]>`, a `Vec<String>` only implements
+/// `Borrow<[String]>`.
+///
+/// The implication is that we cannot lookup the `HashMap<Vec<String>, Value>` with a list of
+/// `&str`.
+///
+/// Consider the following:
+///
+/// ```rust
+/// use std::collections::HashMap;
+/// use std::borrow::Borrow;
+///
+/// let mut hashmap: HashMap<Vec<String>, usize> = HashMap::new();
+/// let _ = hashmap.insert(vec!["a".to_string(), "b".to_string()], 123);
+///
+/// // Let's try to retrieve the value
+/// // The following won't compile
+/// // let _ = hashmap.get(&["a", "b"]);
+///
+/// // We have to use this...
+/// let _ = hashmap.get::<[String]>(&["a".to_string(), "b".to_string()]);
+/// ```
+///
+/// As you can see, this is not ergonomic at all.
+///
+/// # Alternatives?
+///
+/// The unstable [raw entry API](https://github.com/rust-lang/rust/issues/56167) might help with
+/// this in the future.
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Default)]
+pub struct StringKeys(pub Vec<String>);
 
 impl<T> OneOrMany<T> {
     pub fn len(&self) -> usize {
@@ -176,6 +218,24 @@ where
             }
             KeyValuePairs::Unmerged(vec) => {
                 iter::KeyValuePairsIntoIterator::Unmerged(vec.into_iter())
+            }
+        }
+    }
+
+    pub fn keys(&self) -> iter::KeyIterator<K, V> {
+        match self {
+            KeyValuePairs::Merged(hashmap) => iter::KeyIterator::Merged(hashmap.keys()),
+            KeyValuePairs::Unmerged(vec) => {
+                iter::KeyIterator::Unmerged(Box::new(vec.iter().map(|(k, _)| k)))
+            }
+        }
+    }
+
+    pub fn values(&self) -> iter::ValueIterator<K, V> {
+        match self {
+            KeyValuePairs::Merged(hashmap) => iter::ValueIterator::Merged(hashmap.values()),
+            KeyValuePairs::Unmerged(vec) => {
+                iter::ValueIterator::Unmerged(Box::new(vec.iter().map(|(_, v)| v)))
             }
         }
     }
@@ -354,5 +414,46 @@ where
 {
     fn is_merged(&self) -> bool {
         self.1.is_merged()
+    }
+}
+
+impl Deref for StringKeys {
+    type Target = Vec<String>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl ScalarLength for StringKeys {
+    fn len_scalar(&self) -> usize {
+        self.len()
+    }
+}
+
+impl AsRef<Vec<String>> for StringKeys {
+    fn as_ref(&self) -> &Vec<String> {
+        &self.0
+    }
+}
+
+impl AsRef<[String]> for StringKeys {
+    fn as_ref(&self) -> &[String] {
+        AsRef::<[String]>::as_ref(&self.0)
+    }
+}
+
+// Index?
+// IntoIterator?
+
+impl std::iter::FromIterator<String> for StringKeys {
+    fn from_iter<T: IntoIterator<Item = String>>(iter: T) -> Self {
+        Self(iter.into_iter().collect())
+    }
+}
+
+impl Borrow<[String]> for StringKeys {
+    fn borrow(&self) -> &[String] {
+        self.0.borrow()
     }
 }

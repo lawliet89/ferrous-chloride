@@ -184,3 +184,53 @@ impl<K, V> Iterator for KeyValuePairsIntoIterator<K, V> {
 }
 
 impl<K, V> ExactSizeIterator for KeyValuePairsIntoIterator<K, V> {}
+
+pub enum KeyIterator<'a, K: 'a, V: 'a> {
+    Merged(std::collections::hash_map::Keys<'a, K, V>),
+    // Can we do better?
+    // `std::iter::Map<std::slice::Iter<'_, (K, V)>, [closure@lib/src/lib.rs:228:88: 228:98]>`
+    // is not really writable...
+    Unmerged(Box<dyn Iterator<Item = &'a K> + 'a>),
+}
+
+impl<'a, K: 'a, V: 'a> Iterator for KeyIterator<'a, K, V> {
+    type Item = &'a K;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            KeyIterator::Merged(iter) => iter.next(),
+            KeyIterator::Unmerged(iter) => iter.next(),
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        match self {
+            KeyIterator::Merged(iter) => iter.size_hint(),
+            KeyIterator::Unmerged(iter) => iter.size_hint(),
+        }
+    }
+}
+
+pub enum ValueIterator<'a, K: 'a, V: 'a> {
+    Merged(std::collections::hash_map::Values<'a, K, V>),
+    // Can we do better?
+    Unmerged(Box<dyn Iterator<Item = &'a V> + 'a>),
+}
+
+impl<'a, K: 'a, V: 'a> Iterator for ValueIterator<'a, K, V> {
+    type Item = &'a V;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            ValueIterator::Merged(iter) => iter.next(),
+            ValueIterator::Unmerged(iter) => iter.next(),
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        match self {
+            ValueIterator::Merged(iter) => iter.size_hint(),
+            ValueIterator::Unmerged(iter) => iter.size_hint(),
+        }
+    }
+}
