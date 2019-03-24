@@ -13,6 +13,7 @@ pub use constants::*;
 pub use errors::Error;
 pub use value::Value;
 
+use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::hash::Hash;
 

@@ -557,12 +557,73 @@ impl<'a> Block<'a> {
         )
     }
 
+    pub fn merge(self) -> Result<Self, Error> {
+        if let KeyValuePairs::Unmerged(vec) = self {
+            Self::new_merged(vec.into_iter())
+        } else {
+            Ok(self)
+        }
+    }
+
+    pub fn as_merged(&self) -> Result<Self, Error> {
+        if let KeyValuePairs::Unmerged(vec) = self {
+            Self::new_merged(vec.iter().cloned())
+        } else {
+            Ok(self.clone())
+        }
+    }
+
+    pub fn unmerge(self) -> Self {
+        if let KeyValuePairs::Merged(hashmap) = self {
+            Self::new_unmerged(hashmap.into_iter())
+        } else {
+            self
+        }
+    }
+
+    pub fn as_unmerged(&self) -> Self {
+        if let KeyValuePairs::Merged(hashmap) = self {
+            Self::new_unmerged(
+                hashmap
+                    .iter()
+                    .map(|(key, value)| (key.clone(), value.clone())),
+            )
+        } else {
+            self.clone()
+        }
+    }
+
     /// Borrow the keys as `Vec<&str>` for more ergonomic indexing.
     ///
     /// # Usage
     ///
     /// ```rust
+    /// use ferrous_chloride::literals::Key;
+    /// use ferrous_chloride::value::*;
     ///
+    /// let block = Block::new_unmerged(vec![(
+    ///     vec!["instance", "an_instance"],
+    ///     MapValues::new_unmerged(vec![
+    ///         (Key::new_identifier("name"), Value::from("an_instance")),
+    ///         (Key::new_identifier("image"), Value::from("ubuntu:18.04")),
+    ///         (
+    ///             Key::new_identifier("user"),
+    ///             Value::Block(Block::new_unmerged(vec![(
+    ///                 vec!["test"],
+    ///                 MapValues::new_unmerged(vec![(
+    ///                     Key::new_identifier("root"),
+    ///                     Value::from(true),
+    ///                 )]),
+    ///             )])),
+    ///         ),
+    ///     ]),
+    /// )]);
+    /// let block = block.merge().unwrap();
+    /// let instance = block
+    ///     .borrow_keys()
+    ///     .get::<[&str]>(&["instance", "an_instance"])
+    ///     .unwrap()
+    ///     .unwrap_one();
     /// ```
     ///
     /// # Motivation
@@ -1248,12 +1309,89 @@ foo = "bar"
         assert_eq!(resource.len(), 3);
         let resource = resource.unwrap_borrow_block();
 
-        let sg_foobar = resource
-            .borrow_keys()
-            .get::<[&str]>(&["security/group", "foobar"])
-            .unwrap()
-            .unwrap_one();
-
-        // let sg_foobar = resource[&["security/group".to_string(), "foobar".to_string()]];
+        let expected_resources = Block::new_merged(vec![
+            (
+                vec!["security/group", "foobar"],
+                MapValues::new_merged(vec![
+                    (Key::new_identifier("name"), Value::from("foobar")),
+                    (
+                        Key::new_identifier("allow"),
+                        Value::Map(vec![MapValues::new_merged(vec![
+                            (Key::new_identifier("name"), Value::from("localhost")),
+                            (
+                                Key::new_identifier("cidrs"),
+                                vec![Value::from("127.0.0.1/32")].into_iter().collect(),
+                            ),
+                        ])
+                        .unwrap()]),
+                    ),
+                    (
+                        Key::new_identifier("allow"),
+                        Value::Map(vec![MapValues::new_merged(vec![
+                            (Key::new_identifier("name"), Value::from("lan")),
+                            (
+                                Key::new_identifier("cidrs"),
+                                vec![Value::from("192.168.0.0/16")].into_iter().collect(),
+                            ),
+                        ])
+                        .unwrap()]),
+                    ),
+                    (
+                        Key::new_identifier("deny"),
+                        Value::Map(vec![MapValues::new_merged(vec![
+                            (Key::new_identifier("name"), Value::from("internet")),
+                            (
+                                Key::new_identifier("cidrs"),
+                                vec![Value::from("0.0.0.0/0")].into_iter().collect(),
+                            ),
+                        ])
+                        .unwrap()]),
+                    ),
+                ])
+                .unwrap(),
+            ),
+            (
+                vec!["security/group", "second"],
+                MapValues::new_merged(vec![
+                    (Key::new_identifier("name"), Value::from("second")),
+                    (
+                        Key::new_identifier("allow"),
+                        Value::Map(vec![MapValues::new_merged(vec![
+                            (Key::new_identifier("name"), Value::from("all")),
+                            (
+                                Key::new_identifier("cidrs"),
+                                vec![Value::from("0.0.0.0/0")].into_iter().collect(),
+                            ),
+                        ])
+                        .unwrap()]),
+                    ),
+                ])
+                .unwrap(),
+            ),
+            (
+                vec!["instance", "an_instance"],
+                MapValues::new_merged(vec![
+                    (Key::new_identifier("name"), Value::from("an_instance")),
+                    (Key::new_identifier("image"), Value::from("ubuntu:18.04")),
+                    (
+                        Key::new_identifier("user"),
+                        Value::Block(
+                            Block::new_merged(vec![(
+                                vec!["test"],
+                                MapValues::new_merged(vec![(
+                                    Key::new_identifier("root"),
+                                    Value::from(true),
+                                )])
+                                .unwrap(),
+                            )])
+                            .unwrap(),
+                        ),
+                    ),
+                ])
+                .unwrap(),
+            ),
+        ])
+        .unwrap();
+        assert_eq!(&expected_resources, resource);
     }
 }
