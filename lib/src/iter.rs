@@ -5,14 +5,14 @@
 
 use std::hash::Hash;
 
-use crate::KeyValuePairs;
+use crate::{KeyValuePairs, OneOrMany};
 
 pub enum OneOrManyIterator<'a, T> {
     One(std::iter::Once<&'a T>),
     Many(std::slice::Iter<'a, T>),
 }
 
-impl<'a, T> std::iter::IntoIterator for &'a crate::OneOrMany<T> {
+impl<'a, T> std::iter::IntoIterator for &'a OneOrMany<T> {
     type Item = &'a T;
     type IntoIter = OneOrManyIterator<'a, T>;
 
@@ -46,12 +46,15 @@ pub enum OneOrManyIntoIterator<T> {
     Many(std::vec::IntoIter<T>),
 }
 
-impl<T> std::iter::IntoIterator for crate::OneOrMany<T> {
+impl<T> std::iter::IntoIterator for OneOrMany<T> {
     type Item = T;
     type IntoIter = OneOrManyIntoIterator<T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.into_iter()
+        match self {
+            OneOrMany::One(value) => OneOrManyIntoIterator::One(std::iter::once(value)),
+            OneOrMany::Many(vec) => OneOrManyIntoIterator::Many(vec.into_iter()),
+        }
     }
 }
 
@@ -110,7 +113,14 @@ where
     type IntoIter = KeyValuePairsIntoIterator<K, V>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.into_iter()
+        match self {
+            KeyValuePairs::Merged(hashmap) => {
+                KeyValuePairsIntoIterator::Merged(hashmap.into_iter())
+            }
+            KeyValuePairs::Unmerged(vec) => {
+                KeyValuePairsIntoIterator::Unmerged(vec.into_iter())
+            }
+        }
     }
 }
 

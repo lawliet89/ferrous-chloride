@@ -13,9 +13,8 @@ pub use constants::*;
 pub use errors::Error;
 pub use value::Value;
 
-use std::borrow::Borrow;
 use std::collections::HashMap;
-use std::hash::Hash;
+use std::hash::{Hash, BuildHasher};
 
 /// Has scalar length
 pub trait ScalarLength {
@@ -86,13 +85,6 @@ impl<T> OneOrMany<T> {
         }
     }
 
-    pub fn into_iter(self) -> iter::OneOrManyIntoIterator<T> {
-        match self {
-            OneOrMany::One(value) => iter::OneOrManyIntoIterator::One(std::iter::once(value)),
-            OneOrMany::Many(vec) => iter::OneOrManyIntoIterator::Many(vec.into_iter()),
-        }
-    }
-
     pub fn unwrap_one(self) -> T {
         if let OneOrMany::One(one) = self {
             one
@@ -158,17 +150,6 @@ where
         }
     }
 
-    pub fn into_iter(self) -> iter::KeyValuePairsIntoIterator<K, V> {
-        match self {
-            KeyValuePairs::Merged(hashmap) => {
-                iter::KeyValuePairsIntoIterator::Merged(hashmap.into_iter())
-            }
-            KeyValuePairs::Unmerged(vec) => {
-                iter::KeyValuePairsIntoIterator::Unmerged(vec.into_iter())
-            }
-        }
-    }
-
     pub fn keys(&self) -> iter::KeyIterator<K, V> {
         match self {
             KeyValuePairs::Merged(hashmap) => iter::KeyIterator::Merged(hashmap.keys()),
@@ -211,7 +192,7 @@ where
         Q: Eq + Hash,
     {
         match self {
-            KeyValuePairs::Merged(hashmap) => hashmap.get(key).map(|v| OneOrMany::One(v)),
+            KeyValuePairs::Merged(hashmap) => hashmap.get(key).map(OneOrMany::One),
             KeyValuePairs::Unmerged(vec) => {
                 let values: Vec<_> = vec
                     .iter()
@@ -264,10 +245,11 @@ where
     }
 }
 
-impl<K, V> ScalarLength for HashMap<K, V>
+impl<K, V, S> ScalarLength for HashMap<K, V, S>
 where
     K: Eq + Hash,
     V: ScalarLength,
+    S: BuildHasher,
 {
     fn len_scalar(&self) -> usize {
         self.iter().fold(0, |acc, (_, v)| acc + v.len_scalar())
@@ -356,10 +338,11 @@ where
     }
 }
 
-impl<K, V> Mergeable for HashMap<K, V>
+impl<K, V, S> Mergeable for HashMap<K, V, S>
 where
     K: Hash + Eq,
     V: Mergeable,
+    S: BuildHasher,
 {
     fn is_merged(&self) -> bool {
         self.iter().all(|(_, v)| v.is_merged())
