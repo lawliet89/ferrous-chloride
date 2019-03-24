@@ -438,6 +438,21 @@ impl<'a> ScalarLength for Value<'a> {
     }
 }
 
+impl<'a> crate::Mergeable for Value<'a> {
+    fn is_merged(&self) -> bool {
+        if self.is_scalar() {
+            true
+        } else {
+            match self {
+                Value::List(vector) => vector.is_merged(),
+                Value::Map(vectors) => vectors.is_merged(),
+                Value::Block(block) => block.is_merged(),
+                _ => unreachable!("Impossible to reach this. This is a bug."),
+            }
+        }
+    }
+}
+
 macro_rules! impl_from_value (
     ($variant: ident, $type: ty) => (
         impl<'a> From<$type> for Value<'a> {
@@ -483,6 +498,16 @@ impl<'a> From<Option<Vec<Value<'a>>>> for Value<'a> {
 impl<'a> From<MapValues<'a>> for Value<'a> {
     fn from(values: MapValues<'a>) -> Self {
         Value::from(vec![values])
+    }
+}
+
+impl<'a> FromIterator<Value<'a>> for Value<'a> {
+    fn from_iter<T>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = Value<'a>>,
+    {
+        let list = iter.into_iter().collect();
+        Value::List(list)
     }
 }
 
@@ -719,7 +744,7 @@ named!(
 mod tests {
     use super::*;
 
-    use crate::utils::ResultUtilsString;
+    use crate::utils::{assert_list_eq, ResultUtilsString};
 
     #[test]
     fn list_values_are_parsed_successfully() {
@@ -990,9 +1015,10 @@ foo = "bar"
     fn multiple_maps_are_parsed_correctly() {
         let hcl = include_str!("../fixtures/map.hcl");
         let parsed = map_values(CompleteStr(hcl)).unwrap_output();
+        assert!(parsed.is_unmerged());
 
         assert_eq!(parsed.len(), 5); // unmerged values
-        assert_eq!(parsed.len_scalar(), 16);
+        assert_eq!(parsed.len_scalar(), 19);
 
         // simple_map
         let simple_map = parsed.get("simple_map").unwrap().unwrap_many();
@@ -1023,6 +1049,47 @@ foo = "bar"
             .into_iter()
             .map(|v| v.borrow_block().expect("to be a block"))
             .collect();
+
+        let expected_resources = vec![Block::new_unmerged(vec![(
+            vec!["security/group", "foobar"],
+            MapValues::new_unmerged(vec![
+                (Key::new_identifier("name"), Value::from("foobar")),
+                (
+                    Key::new_identifier("allow"),
+                    Value::Map(vec![MapValues::new_unmerged(vec![
+                        (Key::new_identifier("name"), Value::from("localhost")),
+                        (
+                            Key::new_identifier("cidrs"),
+                            vec![Value::from("127.0.0.1/32")].into_iter().collect(),
+                        ),
+                    ])]),
+                ),
+                (
+                    Key::new_identifier("allow"),
+                    Value::Map(vec![MapValues::new_unmerged(vec![
+                        (Key::new_identifier("name"), Value::from("lan")),
+                        (
+                            Key::new_identifier("cidrs"),
+                            vec![Value::from("192.168.0.0/16")].into_iter().collect(),
+                        ),
+                    ])]),
+                ),
+                (
+                    Key::new_identifier("deny"),
+                    Value::Map(vec![MapValues::new_unmerged(vec![
+                        (Key::new_identifier("name"), Value::from("internet")),
+                        (
+                            Key::new_identifier("cidrs"),
+                            vec![Value::from("0.0.0.0/0")].into_iter().collect(),
+                        ),
+                    ])]),
+                ),
+            ]),
+        )])];
+        assert_list_eq(
+            expected_resources,
+            resources.into_iter().take(2).collect::<Vec<_>>(),
+        );
     }
 
     // TODO: Tests for merging
@@ -1031,10 +1098,12 @@ foo = "bar"
     fn maps_are_merged_correctly() {
         let hcl = include_str!("../fixtures/map.hcl");
         let parsed = map_values(CompleteStr(hcl)).unwrap_output();
+        assert!(parsed.is_unmerged());
         let parsed = parsed.merge().unwrap();
+        assert!(parsed.is_merged());
 
         assert_eq!(parsed.len(), 2);
-        assert_eq!(parsed.len_scalar(), 16);
+        assert_eq!(parsed.len_scalar(), 19);
 
         // simple_map
         let simple_map = parsed.get("simple_map").unwrap().unwrap_one();

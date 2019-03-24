@@ -26,6 +26,25 @@ pub trait ScalarLength {
     }
 }
 
+/// Type is mergeable
+pub trait Mergeable {
+    /// Recursively checks that self is merged
+    ///
+    /// This method should return true if all values recursively are merged.
+    ///
+    /// Note that this method might not be the complement of `is_unmerged`.
+    fn is_merged(&self) -> bool;
+
+    /// Recursively checks that self is unmerged
+    ///
+    /// This method should return true if all values recursively are unmerged.
+    ///
+    /// Note that this method might not be the complement of `is_merged`.
+    fn is_unmerged(&self) -> bool {
+        !self.is_merged()
+    }
+}
+
 /// Either a single value, or many values
 ///
 /// This is a utility type to make some implementation easier.
@@ -248,6 +267,15 @@ where
     }
 }
 
+impl<T1, T2> ScalarLength for (T1, T2)
+where
+    T2: ScalarLength,
+{
+    fn len_scalar(&self) -> usize {
+        self.1.len_scalar()
+    }
+}
+
 macro_rules! array_impls {
     ($($N:expr)+) => {
         $(
@@ -267,4 +295,64 @@ array_impls! {
     10 11 12 13 14 15 16 17 18 19
     20 21 22 23 24 25 26 27 28 29
     30 31 32
+}
+
+impl<T> Mergeable for OneOrMany<T>
+where
+    T: Mergeable,
+{
+    fn is_merged(&self) -> bool {
+        match self {
+            OneOrMany::One(inner) => inner.is_merged(),
+            OneOrMany::Many(vector) => vector.iter().all(T::is_merged),
+        }
+    }
+}
+
+impl<K, V> Mergeable for KeyValuePairs<K, V>
+where
+    K: Hash + Eq,
+    V: Mergeable,
+{
+    fn is_merged(&self) -> bool {
+        match self {
+            KeyValuePairs::Merged(hashmap) => hashmap.is_merged(),
+            KeyValuePairs::Unmerged(_) => false,
+        }
+    }
+
+    fn is_unmerged(&self) -> bool {
+        match self {
+            KeyValuePairs::Merged(_) => false,
+            KeyValuePairs::Unmerged(vec) => vec.is_merged(),
+        }
+    }
+}
+
+impl<T> Mergeable for Vec<T>
+where
+    T: Mergeable,
+{
+    fn is_merged(&self) -> bool {
+        self.iter().all(T::is_merged)
+    }
+}
+
+impl<K, V> Mergeable for HashMap<K, V>
+where
+    K: Hash + Eq,
+    V: Mergeable,
+{
+    fn is_merged(&self) -> bool {
+        self.iter().all(|(_, v)| v.is_merged())
+    }
+}
+
+impl<T1, T2> Mergeable for (T1, T2)
+where
+    T2: Mergeable,
+{
+    fn is_merged(&self) -> bool {
+        self.1.is_merged()
+    }
 }

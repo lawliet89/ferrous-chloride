@@ -2,6 +2,9 @@ use std::fmt::Debug;
 
 use nom::IResult;
 
+#[cfg(test)]
+use std::borrow::Borrow;
+
 pub(crate) trait ResultUtils<O> {
     /// Unwraps the Output from `IResult`
     ///
@@ -64,4 +67,30 @@ where
         |item| !predicate(item.as_char()),
         nom::ErrorKind::AlphaNumeric,
     )
+}
+
+#[cfg(test)]
+pub(crate) fn assert_list_eq<B1, B2, T1, T2, L1, L2>(left: L1, right: L2)
+where
+    B1: Borrow<T1>,
+    B2: Borrow<T2>,
+    T1: PartialEq<T2>,
+    T2: PartialEq<T1>,
+    L1: IntoIterator<Item = B1> + Debug,
+    L2: IntoIterator<Item = B2> + Debug,
+{
+    println!(
+        r#"Checking `(left == right)`
+  left: `{:#?}`,
+  right: `{:#?}`"#,
+        left, right
+    );
+
+    let equal = left
+        .into_iter()
+        .zip(right)
+        .all(|(left, right)| left.borrow().eq(right.borrow()));
+    if !equal {
+        panic!("left != right");
+    }
 }
