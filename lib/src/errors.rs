@@ -1,8 +1,10 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 
 use failure_derive::Fail;
 use nom::verbose_errors::Context;
 use nom::ErrorKind;
+
+use crate::OneOrMany;
 
 /// Error type for this library
 #[derive(Debug, Fail)]
@@ -30,16 +32,22 @@ pub enum Error {
         incoming_variant: &'static str,
     },
     #[fail(
-        display = "Expected value to be of variant {} but got {} instead",
-        expected, actual
+        display = "Expected type {} to be of variant {} but got {} instead",
+        enum_type, expected, actual
     )]
-    UnexpectedValueVariant {
+    UnexpectedVariant {
+        enum_type: &'static str,
         expected: &'static str,
         actual: &'static str,
     },
 }
 
 impl Error {
+    /// "Unknown" generic error
+    fn new_generic<E: Display>(err: E) -> Self {
+        Error::ParseError(format!("{:#}", err))
+    }
+
     /// Convert a Nom Err into something useful
     pub fn from_err_bytes<I>(err: &nom::Err<I>) -> Self
     where
@@ -71,11 +79,46 @@ impl Error {
                 Some(e) => e,
                 None => Error::ParseError(format!("{:#}", err)),
             },
-            err => Error::ParseError(format!("{:#}", err)),
+            err => Self::new_generic(err),
         }
     }
 
-    // Convert a Nom context into something more useful
+    /// Convert to a Custom Nom Error
+    pub fn make_custom_error<I, F>(err: nom::Err<I>, convert_fn: F) -> nom::Err<I, Error>
+    where
+        I: nom::AsBytes + std::fmt::Debug,
+        F: Fn(&I) -> Option<String>,
+    {
+        // let custom_error = Self::from_err(err, convert_fn);
+
+        match err {
+            nom::Err::Incomplete(needed) => nom::Err::Incomplete(needed),
+            nom::Err::Error(context) => nom::Err::Error(Self::convert_context(context, convert_fn)),
+            nom::Err::Failure(context) => {
+                nom::Err::Failure(Self::convert_context(context, convert_fn))
+            }
+        }
+    }
+
+    pub fn make_custom_err_str<I>(err: nom::Err<I>) -> nom::Err<I, Error>
+    where
+        I: nom::AsBytes + AsRef<str> + Debug,
+    {
+        Self::make_custom_error(err, |s| Some(s.as_ref().to_string()))
+    }
+
+    pub fn make_custom_err_bytes<I>(err: nom::Err<I>) -> nom::Err<I, Error>
+    where
+        I: nom::AsBytes + Debug,
+    {
+        Self::make_custom_error(err, |s| {
+            std::str::from_utf8(s.as_bytes())
+                .ok()
+                .map(|s| s.to_string())
+        })
+    }
+
+    /// Convert a Nom context into something more useful
     fn from_context<I, F>(context: &Context<I>, convert_fn: F) -> Option<Self>
     where
         F: Fn(&I) -> Option<String>,
@@ -93,6 +136,47 @@ impl Error {
                 }
             }
             _ => None,
+        }
+    }
+
+    /// Convert Context with custom Error Kind
+    fn convert_context<I, F>(context: Context<I>, convert_fn: F) -> Context<I, Error>
+    where
+        F: Fn(&I) -> Option<String>,
+        I: nom::AsBytes,
+    {
+        let custom_error = match context {
+            Context::Code(input, ErrorKind::Custom(code)) => {
+                let error = nom::ErrorKind::Custom(
+                    Self::from_input_and_code(&input, code, convert_fn)
+                        .unwrap_or_else(|| Error::new_generic("UNKNOWN")),
+                );
+                OneOrMany::One((input, error))
+            }
+            Context::List(list) => OneOrMany::Many(
+                list.into_iter()
+                    .map(|(input, error_kind)| {
+                        let error = match error_kind {
+                            ErrorKind::Custom(code) => {
+                                Self::from_input_and_code(&input, code, &convert_fn)
+                                    .unwrap_or_else(|| Error::new_generic("UNKNOWN"))
+                            }
+                            other => Error::new_generic(other.description()),
+                        };
+
+                        (input, nom::ErrorKind::Custom(error))
+                    })
+                    .collect(),
+            ),
+            Context::Code(input, other) => OneOrMany::One((
+                input,
+                nom::ErrorKind::Custom(Self::new_generic(other.description())),
+            )),
+        };
+
+        match custom_error {
+            OneOrMany::One((input, error)) => Context::Code(input, error),
+            OneOrMany::Many(list) => Context::List(list),
         }
     }
 

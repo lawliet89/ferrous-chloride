@@ -1,25 +1,17 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::fmt::Debug;
 use std::iter::FromIterator;
-use std::ops::Deref;
+use std::string::ToString;
 
+use crate::constants::*;
 use crate::literals::{self, Key};
-use crate::Error;
+use crate::{Error, KeyValuePairs, ScalarLength};
 
 use nom::types::CompleteStr;
 use nom::{
     alt, alt_complete, call, char, complete, do_parse, many0, many1, map, named, opt, preceded,
     tag, terminated, ws,
 };
-
-pub static INTEGER: &str = "INTEGER";
-pub static FLOAT: &str = "FLOAT";
-pub static BOOLEAN: &str = "BOOLEAN";
-pub static STRING: &str = "STRING";
-pub static LIST: &str = "LIST";
-pub static MAP: &str = "Map";
-pub static BLOCK: &str = "BLOCK";
 
 #[derive(Debug, PartialEq, Clone)]
 /// Value in HCL
@@ -33,12 +25,11 @@ pub enum Value<'a> {
     Block(Block<'a>),
 }
 
-pub type Block<'a> = HashMap<Vec<String>, MapValues<'a>>;
+pub type Block<'a> = KeyValuePairs<Vec<String>, MapValues<'a>>;
 
 pub type Map<'a> = Vec<MapValues<'a>>;
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct MapValues<'a>(pub HashMap<Key<'a>, Value<'a>>);
+pub type MapValues<'a> = KeyValuePairs<Key<'a>, Value<'a>>;
 
 pub type List<'a> = Vec<Value<'a>>;
 
@@ -123,29 +114,12 @@ impl<'a> Value<'a> {
         self.len() == 0
     }
 
-    /// Recursively count the number of scalars
-    pub fn len_scalar(&self) -> usize {
-        if self.is_scalar() {
-            1
-        } else {
-            match self {
-                Value::List(vector) => vector.iter().fold(0, |acc, v| acc + v.len_scalar()),
-                Value::Map(vectors) => vectors.iter().fold(0, |acc, v| acc + v.len_scalar()),
-                Value::Block(block) => block.iter().fold(0, |acc, (_, v)| acc + v.len_scalar()),
-                _ => unreachable!("Impossible to reach this. This is a bug."),
-            }
-        }
-    }
-
-    pub fn is_empty_scalar(&self) -> bool {
-        self.len_scalar() == 0
-    }
-
     pub fn integer(&self) -> Result<i64, Error> {
         if let Value::Integer(i) = self {
             Ok(*i)
         } else {
-            Err(Error::UnexpectedValueVariant {
+            Err(Error::UnexpectedVariant {
+                enum_type: VALUE,
                 expected: INTEGER,
                 actual: self.variant_name(),
             })
@@ -162,7 +136,8 @@ impl<'a> Value<'a> {
         if let Value::Float(f) = self {
             Ok(*f)
         } else {
-            Err(Error::UnexpectedValueVariant {
+            Err(Error::UnexpectedVariant {
+                enum_type: VALUE,
                 expected: FLOAT,
                 actual: self.variant_name(),
             })
@@ -179,7 +154,8 @@ impl<'a> Value<'a> {
         if let Value::Boolean(v) = self {
             Ok(*v)
         } else {
-            Err(Error::UnexpectedValueVariant {
+            Err(Error::UnexpectedVariant {
+                enum_type: VALUE,
                 expected: BOOLEAN,
                 actual: self.variant_name(),
             })
@@ -196,7 +172,8 @@ impl<'a> Value<'a> {
         if let Value::String(v) = self {
             Ok(v)
         } else {
-            Err(Error::UnexpectedValueVariant {
+            Err(Error::UnexpectedVariant {
+                enum_type: VALUE,
                 expected: STRING,
                 actual: self.variant_name(),
             })
@@ -213,7 +190,8 @@ impl<'a> Value<'a> {
         if let Value::String(ref mut v) = self {
             Ok(v)
         } else {
-            Err(Error::UnexpectedValueVariant {
+            Err(Error::UnexpectedVariant {
+                enum_type: VALUE,
                 expected: STRING,
                 actual: self.variant_name(),
             })
@@ -231,7 +209,8 @@ impl<'a> Value<'a> {
             Ok(v)
         } else {
             Err((
-                Error::UnexpectedValueVariant {
+                Error::UnexpectedVariant {
+                    enum_type: VALUE,
                     expected: STRING,
                     actual: self.variant_name(),
                 },
@@ -250,7 +229,8 @@ impl<'a> Value<'a> {
         if let Value::List(v) = self {
             Ok(v)
         } else {
-            Err(Error::UnexpectedValueVariant {
+            Err(Error::UnexpectedVariant {
+                enum_type: VALUE,
                 expected: LIST,
                 actual: self.variant_name(),
             })
@@ -267,7 +247,8 @@ impl<'a> Value<'a> {
         if let Value::List(ref mut v) = self {
             Ok(v)
         } else {
-            Err(Error::UnexpectedValueVariant {
+            Err(Error::UnexpectedVariant {
+                enum_type: VALUE,
                 expected: LIST,
                 actual: self.variant_name(),
             })
@@ -285,7 +266,8 @@ impl<'a> Value<'a> {
             Ok(v)
         } else {
             Err((
-                Error::UnexpectedValueVariant {
+                Error::UnexpectedVariant {
+                    enum_type: VALUE,
                     expected: LIST,
                     actual: self.variant_name(),
                 },
@@ -304,7 +286,8 @@ impl<'a> Value<'a> {
         if let Value::Map(v) = self {
             Ok(v)
         } else {
-            Err(Error::UnexpectedValueVariant {
+            Err(Error::UnexpectedVariant {
+                enum_type: VALUE,
                 expected: MAP,
                 actual: self.variant_name(),
             })
@@ -321,7 +304,8 @@ impl<'a> Value<'a> {
         if let Value::Map(ref mut v) = self {
             Ok(v)
         } else {
-            Err(Error::UnexpectedValueVariant {
+            Err(Error::UnexpectedVariant {
+                enum_type: VALUE,
                 expected: MAP,
                 actual: self.variant_name(),
             })
@@ -339,7 +323,8 @@ impl<'a> Value<'a> {
             Ok(v)
         } else {
             Err((
-                Error::UnexpectedValueVariant {
+                Error::UnexpectedVariant {
+                    enum_type: VALUE,
                     expected: MAP,
                     actual: self.variant_name(),
                 },
@@ -358,7 +343,8 @@ impl<'a> Value<'a> {
         if let Value::Block(v) = self {
             Ok(v)
         } else {
-            Err(Error::UnexpectedValueVariant {
+            Err(Error::UnexpectedVariant {
+                enum_type: VALUE,
                 expected: BLOCK,
                 actual: self.variant_name(),
             })
@@ -375,7 +361,8 @@ impl<'a> Value<'a> {
         if let Value::Block(ref mut v) = self {
             Ok(v)
         } else {
-            Err(Error::UnexpectedValueVariant {
+            Err(Error::UnexpectedVariant {
+                enum_type: VALUE,
                 expected: BLOCK,
                 actual: self.variant_name(),
             })
@@ -393,7 +380,8 @@ impl<'a> Value<'a> {
             Ok(v)
         } else {
             Err((
-                Error::UnexpectedValueVariant {
+                Error::UnexpectedVariant {
+                    enum_type: VALUE,
                     expected: BLOCK,
                     actual: self.variant_name(),
                 },
@@ -406,6 +394,77 @@ impl<'a> Value<'a> {
     /// Panics if the variant is not a block
     pub fn unwrap_block(self) -> Block<'a> {
         self.block().unwrap()
+    }
+
+    /// Recursively merge value
+    pub fn merge(self) -> Result<Self, Error> {
+        match self {
+            no_op @ Value::Integer(_)
+            | no_op @ Value::Float(_)
+            | no_op @ Value::Boolean(_)
+            | no_op @ Value::String(_) => Ok(no_op),
+            Value::List(list) => Ok(Value::List(
+                list.into_iter()
+                    .map(Value::merge)
+                    .collect::<Result<_, _>>()?,
+            )),
+            Value::Map(maps) => Ok(Value::Map(
+                maps.into_iter()
+                    .map(MapValues::merge)
+                    .collect::<Result<_, _>>()?,
+            )),
+            Value::Block(block) => {
+                let unmerged: Block = block
+                    .into_iter()
+                    .map(|(key, value)| Ok((key, value.merge()?)))
+                    .collect::<Result<_, _>>()?;
+                let merged = Block::new_merged(unmerged)?;
+                Ok(Value::Block(merged))
+            }
+        }
+    }
+}
+
+impl<'a> ScalarLength for Value<'a> {
+    fn len_scalar(&self) -> usize {
+        if self.is_scalar() {
+            1
+        } else {
+            match self {
+                Value::List(vector) => vector.len_scalar(),
+                Value::Map(vectors) => vectors.len_scalar(),
+                Value::Block(block) => block.len_scalar(),
+                _ => unreachable!("Impossible to reach this. This is a bug."),
+            }
+        }
+    }
+}
+
+impl<'a> crate::Mergeable for Value<'a> {
+    fn is_merged(&self) -> bool {
+        if self.is_scalar() {
+            true
+        } else {
+            match self {
+                Value::List(vector) => vector.is_merged(),
+                Value::Map(vectors) => vectors.is_merged(),
+                Value::Block(block) => block.is_merged(),
+                _ => unreachable!("Impossible to reach this. This is a bug."),
+            }
+        }
+    }
+
+    fn is_unmerged(&self) -> bool {
+        if self.is_scalar() {
+            true
+        } else {
+            match self {
+                Value::List(vector) => vector.is_unmerged(),
+                Value::Map(vectors) => vectors.is_unmerged(),
+                Value::Block(block) => block.is_unmerged(),
+                _ => unreachable!("Impossible to reach this. This is a bug."),
+            }
+        }
     }
 }
 
@@ -457,15 +516,195 @@ impl<'a> From<MapValues<'a>> for Value<'a> {
     }
 }
 
+impl<'a> FromIterator<Value<'a>> for Value<'a> {
+    fn from_iter<T>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = Value<'a>>,
+    {
+        let list = iter.into_iter().collect();
+        Value::List(list)
+    }
+}
+
+impl<'a> Block<'a> {
+    // TODO: Customise behaviour wrt duplicate block keys
+    pub fn new_merged<T, K, S>(iter: T) -> Result<Self, Error>
+    where
+        T: IntoIterator<Item = (K, MapValues<'a>)>,
+        K: IntoIterator<Item = S>,
+        S: ToString,
+    {
+        let mut merged = HashMap::new();
+        for (key, value) in iter {
+            let _ = merged.insert(
+                key.into_iter().map(|s| s.to_string()).collect(),
+                value.merge()?,
+            );
+        }
+        Ok(KeyValuePairs::Merged(merged))
+    }
+
+    pub fn new_unmerged<T, K, S>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = (K, MapValues<'a>)>,
+        K: IntoIterator<Item = S>,
+        S: ToString,
+    {
+        KeyValuePairs::Unmerged(
+            iter.into_iter()
+                .map(|(keys, value)| (keys.into_iter().map(|s| s.to_string()).collect(), value))
+                .collect(),
+        )
+    }
+
+    pub fn merge(self) -> Result<Self, Error> {
+        if let KeyValuePairs::Unmerged(vec) = self {
+            Self::new_merged(vec.into_iter())
+        } else {
+            Ok(self)
+        }
+    }
+
+    pub fn as_merged(&self) -> Result<Self, Error> {
+        if let KeyValuePairs::Unmerged(vec) = self {
+            Self::new_merged(vec.iter().cloned())
+        } else {
+            Ok(self.clone())
+        }
+    }
+
+    pub fn unmerge(self) -> Self {
+        if let KeyValuePairs::Merged(hashmap) = self {
+            Self::new_unmerged(hashmap.into_iter())
+        } else {
+            self
+        }
+    }
+
+    pub fn as_unmerged(&self) -> Self {
+        if let KeyValuePairs::Merged(hashmap) = self {
+            Self::new_unmerged(
+                hashmap
+                    .iter()
+                    .map(|(key, value)| (key.clone(), value.clone())),
+            )
+        } else {
+            self.clone()
+        }
+    }
+
+    /// Borrow the keys as `Vec<&str>` for more ergonomic indexing.
+    ///
+    /// # Usage
+    ///
+    /// ```rust
+    /// use ferrous_chloride::literals::Key;
+    /// use ferrous_chloride::value::*;
+    ///
+    /// let block = Block::new_unmerged(vec![(
+    ///     vec!["instance", "an_instance"],
+    ///     MapValues::new_unmerged(vec![
+    ///         (Key::new_identifier("name"), Value::from("an_instance")),
+    ///         (Key::new_identifier("image"), Value::from("ubuntu:18.04")),
+    ///         (
+    ///             Key::new_identifier("user"),
+    ///             Value::Block(Block::new_unmerged(vec![(
+    ///                 vec!["test"],
+    ///                 MapValues::new_unmerged(vec![(
+    ///                     Key::new_identifier("root"),
+    ///                     Value::from(true),
+    ///                 )]),
+    ///             )])),
+    ///         ),
+    ///     ]),
+    /// )]);
+    /// let block = block.merge().unwrap();
+    /// let instance = block
+    ///     .borrow_keys()
+    ///     .get::<[&str]>(&["instance", "an_instance"])
+    ///     .unwrap()
+    ///     .unwrap_one();
+    /// ```
+    ///
+    /// # Motivation
+    /// A Block is implemented as [`KeyValuePairs`] with `Vec<String>` as keys.
+    /// Behind the scenes, a merged [`KeyValuePairs`] is backed by a [`HashMap`].
+    ///
+    /// Retrieving a key from a [`HashMap`] involves using the [`HashMap::get`] method
+    /// which specifies that to lookup a key of type `K`, you may use any type `Q` that
+    /// implements [`std::borrow::Borrow`]`<K>`.
+    ///
+    /// Since `Vec<T>` only implements `Borrow<[T]>`, a `Vec<String>` only implements
+    /// `Borrow<[String]>`.
+    ///
+    /// The implication is that we cannot lookup the `HashMap<Vec<String>, Value>` with a list of
+    /// `&str`.
+    ///
+    /// Consider the following:
+    ///
+    /// ```rust
+    /// use std::collections::HashMap;
+    /// use std::borrow::Borrow;
+    ///
+    /// let mut hashmap: HashMap<Vec<String>, usize> = HashMap::new();
+    /// let _ = hashmap.insert(vec!["a".to_string(), "b".to_string()], 123);
+    ///
+    /// // Let's try to retrieve the value
+    /// // The following won't compile
+    /// // let _ = hashmap.get(&["a", "b"]);
+    ///
+    /// // We have to use this...
+    /// let _ = hashmap.get::<[String]>(&["a".to_string(), "b".to_string()]);
+    /// ```
+    ///
+    /// As you can see, this is not ergonomic at all.
+    ///
+    /// Fundamentally, this is because it's not zero-cost to convert a `Vec<Stirng>` into a
+    /// `&[&str]`. See this [question](https://stackoverflow.com/q/41179659/602002) on
+    /// StackOverflow.
+    ///
+    /// # Alternatives
+    ///
+    /// The unstable [raw entry API](https://github.com/rust-lang/rust/issues/56167) might help with
+    /// this in the future.
+    pub fn borrow_keys(&self) -> KeyValuePairs<Vec<&str>, &MapValues<'a>> {
+        match self {
+            KeyValuePairs::Merged(hashmap) => KeyValuePairs::Merged(
+                hashmap
+                    .iter()
+                    .map(|(k, v)| (k.iter().map(|s| s.as_str()).collect(), v))
+                    .collect(),
+            ),
+            KeyValuePairs::Unmerged(vec) => KeyValuePairs::Unmerged(
+                vec.iter()
+                    .map(|(k, v)| (k.iter().map(|s| s.as_str()).collect(), v))
+                    .collect(),
+            ),
+        }
+    }
+}
+
+impl<'a, K, S> FromIterator<(K, MapValues<'a>)> for Block<'a>
+where
+    K: IntoIterator<Item = S>,
+    S: ToString,
+{
+    fn from_iter<T: IntoIterator<Item = (K, MapValues<'a>)>>(iter: T) -> Self {
+        Self::new_unmerged(iter)
+    }
+}
+
 impl<'a> MapValues<'a> {
-    pub fn new<T>(iter: T) -> Result<Self, Error>
+    // TODO: Customise merging behaviour wrt duplicate keys
+    pub fn new_merged<T>(iter: T) -> Result<Self, Error>
     where
         T: IntoIterator<Item = (Key<'a>, Value<'a>)>,
     {
         use std::collections::hash_map::Entry;
 
         let mut map = HashMap::new();
-        for (key, mut value) in iter {
+        for (key, value) in iter {
+            let mut value = value.merge()?;
             match map.entry(key) {
                 Entry::Vacant(vacant) => {
                     vacant.insert(value);
@@ -473,7 +712,6 @@ impl<'a> MapValues<'a> {
                 Entry::Occupied(mut occupied) => {
                     let key = occupied.key().to_string();
                     match occupied.get_mut() {
-                        // TODO: Make this behaviour be customizable
                         illegal @ Value::Integer(_)
                         | illegal @ Value::Float(_)
                         | illegal @ Value::Boolean(_)
@@ -511,26 +749,56 @@ impl<'a> MapValues<'a> {
                 }
             };
         }
-        Ok(MapValues(map))
+        Ok(KeyValuePairs::Merged(map))
     }
 
-    pub fn len_scalar(&self) -> usize {
-        self.iter().fold(0, |acc, (_, v)| acc + v.len_scalar())
+    pub fn new_unmerged<T>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = (Key<'a>, Value<'a>)>,
+    {
+        KeyValuePairs::Unmerged(iter.into_iter().collect())
     }
-}
 
-impl<'a> Deref for MapValues<'a> {
-    type Target = HashMap<Key<'a>, Value<'a>>;
+    pub fn merge(self) -> Result<Self, Error> {
+        if let KeyValuePairs::Unmerged(vec) = self {
+            Self::new_merged(vec.into_iter())
+        } else {
+            Ok(self)
+        }
+    }
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
+    pub fn as_merged(&self) -> Result<Self, Error> {
+        if let KeyValuePairs::Unmerged(vec) = self {
+            Self::new_merged(vec.iter().cloned())
+        } else {
+            Ok(self.clone())
+        }
+    }
+
+    pub fn unmerge(self) -> Self {
+        if let KeyValuePairs::Merged(hashmap) = self {
+            Self::new_unmerged(hashmap.into_iter())
+        } else {
+            self
+        }
+    }
+
+    pub fn as_unmerged(&self) -> Self {
+        if let KeyValuePairs::Merged(hashmap) = self {
+            Self::new_unmerged(
+                hashmap
+                    .iter()
+                    .map(|(key, value)| (key.clone(), value.clone())),
+            )
+        } else {
+            self.clone()
+        }
     }
 }
 
 impl<'a> FromIterator<(Key<'a>, Value<'a>)> for MapValues<'a> {
-    /// Can panic if merging fails
     fn from_iter<T: IntoIterator<Item = (Key<'a>, Value<'a>)>>(iter: T) -> Self {
-        Self::new(iter).unwrap()
+        Self::new_unmerged(iter)
     }
 }
 
@@ -609,40 +877,16 @@ named!(
                         )
                     )
                 )
-        >> (values.into_iter().collect()) // FIXME: This can panic!
+        >> (values.into_iter().collect())
     )
 );
-
-/// Collect a bunch of `(Key, Value)` pairs into a vector
-named!(
-    pub map_values_vec(CompleteStr) -> Vec<(Key, Value)>,
-    many0!(
-        terminated!(
-            call!(key_value),
-            alt!(
-                whitespace!(tag!(","))
-                | map!(many1!(nom::eol), |_| CompleteStr(""))
-            )
-        )
-    )
-);
-
-// pub fn map_values_err(i: CompleteStr) -> nom::IResult<CompleteStr, Vec<(Key, Value)>, Error> {
-
-// }
-
-/// Parse a document's body
-// pub fn body<'a>(input: &'a str) -> Result<MapValues<'a>, Error> {
-//     let (remaining_inpuit, pairs) =
-//         map_values_vec(CompleteStr(input)).map_err(Error::from_err_str)?;
-//     MapValues::new(pairs.into_iter())
-// }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    use crate::utils::ResultUtilsString;
+    use crate::utils::{assert_list_eq, ResultUtilsString};
+    use crate::Mergeable;
 
     #[test]
     fn list_values_are_parsed_successfully() {
@@ -854,7 +1098,7 @@ foo = "bar"
         .into_iter()
         .collect();
 
-        assert_eq!(expected.iter().len(), parsed.iter().len());
+        assert_eq!(expected.len(), parsed.len());
         for (expected_key, expected_value) in expected {
             println!("Checking {}", expected_key);
             let actual_value = &parsed[expected_key];
@@ -901,7 +1145,7 @@ foo = "bar"
         .into_iter()
         .collect();
 
-        assert_eq!(expected.iter().len(), parsed.iter().len());
+        assert_eq!(expected.len(), parsed.len());
         for (expected_key, expected_value) in expected {
             println!("Checking {}", expected_key);
             let actual_value = &parsed[expected_key];
@@ -913,24 +1157,143 @@ foo = "bar"
     fn multiple_maps_are_parsed_correctly() {
         let hcl = include_str!("../fixtures/map.hcl");
         let parsed = map_values(CompleteStr(hcl)).unwrap_output();
-
         println!("{:#?}", parsed);
+        assert!(parsed.is_unmerged());
 
-        assert_eq!(parsed.len(), 2);
-        assert_eq!(parsed.len_scalar(), 14);
+        assert_eq!(parsed.len(), 5); // unmerged values
+        assert_eq!(parsed.len_scalar(), 19);
 
         // simple_map
-        let simple_map = &parsed["simple_map"];
+        let simple_map = parsed.get("simple_map").unwrap().unwrap_many();
         assert_eq!(simple_map.len(), 2);
 
         let expected_simple_maps = vec![
-            MapValues::new(vec![
+            vec![MapValues::new_unmerged(vec![
+                (Key::new_identifier("foo"), Value::from("bar")),
+                (Key::new_identifier("bar"), Value::from("baz")),
+                (Key::new_identifier("index"), Value::from(1)),
+            ])],
+            vec![MapValues::new_unmerged(vec![
+                (Key::new_identifier("foo"), Value::from("bar")),
+                (Key::new_identifier("bar"), Value::from("baz")),
+                (Key::new_identifier("index"), Value::from(0)),
+            ])],
+        ];
+        let actual_simple_map: Vec<_> = simple_map
+            .into_iter()
+            .map(|v| v.borrow_map().expect("to be a map"))
+            .collect();
+        assert_list_eq!(expected_simple_maps, actual_simple_map);
+
+        // resource
+        let resources = parsed.get("resource").unwrap().unwrap_many();
+        assert_eq!(resources.len(), 3);
+        let resources: Vec<_> = resources
+            .into_iter()
+            .map(|v| v.borrow_block().expect("to be a block"))
+            .collect();
+
+        let expected_resources = vec![
+            Block::new_unmerged(vec![(
+                vec!["security/group", "foobar"],
+                MapValues::new_unmerged(vec![
+                    (Key::new_identifier("name"), Value::from("foobar")),
+                    (
+                        Key::new_identifier("allow"),
+                        Value::Map(vec![MapValues::new_unmerged(vec![
+                            (Key::new_identifier("name"), Value::from("localhost")),
+                            (
+                                Key::new_identifier("cidrs"),
+                                vec![Value::from("127.0.0.1/32")].into_iter().collect(),
+                            ),
+                        ])]),
+                    ),
+                    (
+                        Key::new_identifier("allow"),
+                        Value::Map(vec![MapValues::new_unmerged(vec![
+                            (Key::new_identifier("name"), Value::from("lan")),
+                            (
+                                Key::new_identifier("cidrs"),
+                                vec![Value::from("192.168.0.0/16")].into_iter().collect(),
+                            ),
+                        ])]),
+                    ),
+                    (
+                        Key::new_identifier("deny"),
+                        Value::Map(vec![MapValues::new_unmerged(vec![
+                            (Key::new_identifier("name"), Value::from("internet")),
+                            (
+                                Key::new_identifier("cidrs"),
+                                vec![Value::from("0.0.0.0/0")].into_iter().collect(),
+                            ),
+                        ])]),
+                    ),
+                ]),
+            )]),
+            Block::new_unmerged(vec![(
+                vec!["security/group", "second"],
+                MapValues::new_unmerged(vec![
+                    (Key::new_identifier("name"), Value::from("second")),
+                    (
+                        Key::new_identifier("allow"),
+                        Value::Map(vec![MapValues::new_unmerged(vec![
+                            (Key::new_identifier("name"), Value::from("all")),
+                            (
+                                Key::new_identifier("cidrs"),
+                                vec![Value::from("0.0.0.0/0")].into_iter().collect(),
+                            ),
+                        ])]),
+                    ),
+                ]),
+            )]),
+            Block::new_unmerged(vec![(
+                vec!["instance", "an_instance"],
+                MapValues::new_unmerged(vec![
+                    (Key::new_identifier("name"), Value::from("an_instance")),
+                    (Key::new_identifier("image"), Value::from("ubuntu:18.04")),
+                    (
+                        Key::new_identifier("user"),
+                        Value::Block(Block::new_unmerged(vec![(
+                            vec!["test"],
+                            MapValues::new_unmerged(vec![(
+                                Key::new_identifier("root"),
+                                Value::from(true),
+                            )]),
+                        )])),
+                    ),
+                ]),
+            )]),
+        ];
+        assert_list_eq(expected_resources, resources);
+    }
+
+    // TODO: Tests for merging
+
+    #[test]
+    fn maps_are_merged_correctly() {
+        let hcl = include_str!("../fixtures/map.hcl");
+        let parsed = map_values(CompleteStr(hcl)).unwrap_output();
+        assert!(parsed.is_unmerged());
+
+        let parsed = parsed.merge().unwrap();
+        println!("{:#?}", parsed);
+        assert!(parsed.is_merged());
+
+        assert_eq!(parsed.len(), 2);
+        assert_eq!(parsed.len_scalar(), 19);
+
+        // simple_map
+        let simple_map = parsed.get("simple_map").unwrap().unwrap_one();
+        assert_eq!(simple_map.len(), 2);
+
+        let expected_simple_maps = vec![
+            MapValues::new_merged(vec![
                 (Key::new_identifier("foo"), Value::from("bar")),
                 (Key::new_identifier("bar"), Value::from("baz")),
                 (Key::new_identifier("index"), Value::from(1)),
             ])
             .unwrap(),
-            MapValues::new(vec![
+            MapValues::new_merged(vec![
                 (Key::new_identifier("foo"), Value::from("bar")),
                 (Key::new_identifier("bar"), Value::from("baz")),
                 (Key::new_identifier("index"), Value::from(0)),
@@ -938,12 +1301,97 @@ foo = "bar"
             .unwrap(),
         ];
         let simple_maps = simple_map.unwrap_borrow_map();
+        println!("{:#?}", simple_maps);
         assert!(simple_maps.iter().eq(&expected_simple_maps));
 
         // resource
-        let resource = &parsed["resource"];
-        assert_eq!(resource.len(), 2);
+        let resource = parsed.get("resource").unwrap().unwrap_one();
+        assert_eq!(resource.len(), 3);
         let resource = resource.unwrap_borrow_block();
-        // let sg_foobar = resource[&["security/group", "foobar"][..]];
+
+        let expected_resources = Block::new_merged(vec![
+            (
+                vec!["security/group", "foobar"],
+                MapValues::new_merged(vec![
+                    (Key::new_identifier("name"), Value::from("foobar")),
+                    (
+                        Key::new_identifier("allow"),
+                        Value::Map(vec![MapValues::new_merged(vec![
+                            (Key::new_identifier("name"), Value::from("localhost")),
+                            (
+                                Key::new_identifier("cidrs"),
+                                vec![Value::from("127.0.0.1/32")].into_iter().collect(),
+                            ),
+                        ])
+                        .unwrap()]),
+                    ),
+                    (
+                        Key::new_identifier("allow"),
+                        Value::Map(vec![MapValues::new_merged(vec![
+                            (Key::new_identifier("name"), Value::from("lan")),
+                            (
+                                Key::new_identifier("cidrs"),
+                                vec![Value::from("192.168.0.0/16")].into_iter().collect(),
+                            ),
+                        ])
+                        .unwrap()]),
+                    ),
+                    (
+                        Key::new_identifier("deny"),
+                        Value::Map(vec![MapValues::new_merged(vec![
+                            (Key::new_identifier("name"), Value::from("internet")),
+                            (
+                                Key::new_identifier("cidrs"),
+                                vec![Value::from("0.0.0.0/0")].into_iter().collect(),
+                            ),
+                        ])
+                        .unwrap()]),
+                    ),
+                ])
+                .unwrap(),
+            ),
+            (
+                vec!["security/group", "second"],
+                MapValues::new_merged(vec![
+                    (Key::new_identifier("name"), Value::from("second")),
+                    (
+                        Key::new_identifier("allow"),
+                        Value::Map(vec![MapValues::new_merged(vec![
+                            (Key::new_identifier("name"), Value::from("all")),
+                            (
+                                Key::new_identifier("cidrs"),
+                                vec![Value::from("0.0.0.0/0")].into_iter().collect(),
+                            ),
+                        ])
+                        .unwrap()]),
+                    ),
+                ])
+                .unwrap(),
+            ),
+            (
+                vec!["instance", "an_instance"],
+                MapValues::new_merged(vec![
+                    (Key::new_identifier("name"), Value::from("an_instance")),
+                    (Key::new_identifier("image"), Value::from("ubuntu:18.04")),
+                    (
+                        Key::new_identifier("user"),
+                        Value::Block(
+                            Block::new_merged(vec![(
+                                vec!["test"],
+                                MapValues::new_merged(vec![(
+                                    Key::new_identifier("root"),
+                                    Value::from(true),
+                                )])
+                                .unwrap(),
+                            )])
+                            .unwrap(),
+                        ),
+                    ),
+                ])
+                .unwrap(),
+            ),
+        ])
+        .unwrap();
+        assert_eq!(&expected_resources, resource);
     }
 }
