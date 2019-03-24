@@ -413,12 +413,14 @@ impl<'a> Value<'a> {
                     .map(MapValues::merge)
                     .collect::<Result<_, _>>()?,
             )),
-            Value::Block(block) => Ok(Value::Block(
-                block
+            Value::Block(block) => {
+                let unmerged: Block = block
                     .into_iter()
                     .map(|(key, value)| Ok((key, value.merge()?)))
-                    .collect::<Result<_, _>>()?,
-            )),
+                    .collect::<Result<_, _>>()?;
+                let merged = Block::new_merged(unmerged)?;
+                Ok(Value::Block(merged))
+            }
         }
     }
 }
@@ -1211,9 +1213,10 @@ foo = "bar"
         let hcl = include_str!("../fixtures/map.hcl");
         let parsed = map_values(CompleteStr(hcl)).unwrap_output();
         assert!(parsed.is_unmerged());
+
         let parsed = parsed.merge().unwrap();
-        assert!(parsed.is_merged());
         println!("{:#?}", parsed);
+        assert!(parsed.is_merged());
 
         assert_eq!(parsed.len(), 2);
         assert_eq!(parsed.len_scalar(), 19);
