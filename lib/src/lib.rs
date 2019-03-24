@@ -313,6 +313,13 @@ where
             OneOrMany::Many(vector) => vector.iter().all(T::is_merged),
         }
     }
+
+    fn is_unmerged(&self) -> bool {
+        match self {
+            OneOrMany::One(inner) => inner.is_unmerged(),
+            OneOrMany::Many(vector) => vector.iter().all(T::is_unmerged),
+        }
+    }
 }
 
 impl<K, V> Mergeable for KeyValuePairs<K, V>
@@ -330,7 +337,7 @@ where
     fn is_unmerged(&self) -> bool {
         match self {
             KeyValuePairs::Merged(_) => false,
-            KeyValuePairs::Unmerged(vec) => vec.is_merged(),
+            KeyValuePairs::Unmerged(vec) => vec.is_unmerged(),
         }
     }
 }
@@ -342,6 +349,10 @@ where
     fn is_merged(&self) -> bool {
         self.iter().all(T::is_merged)
     }
+
+    fn is_unmerged(&self) -> bool {
+        self.iter().all(T::is_unmerged)
+    }
 }
 
 impl<K, V> Mergeable for HashMap<K, V>
@@ -352,6 +363,10 @@ where
     fn is_merged(&self) -> bool {
         self.iter().all(|(_, v)| v.is_merged())
     }
+
+    fn is_unmerged(&self) -> bool {
+        self.iter().all(|(_, v)| v.is_unmerged())
+    }
 }
 
 impl<T1, T2> Mergeable for (T1, T2)
@@ -360,5 +375,22 @@ where
 {
     fn is_merged(&self) -> bool {
         self.1.is_merged()
+    }
+
+    fn is_unmerged(&self) -> bool {
+        self.1.is_unmerged()
+    }
+}
+
+impl<T> Mergeable for &T
+where
+    T: Mergeable,
+{
+    fn is_merged(&self) -> bool {
+        T::is_merged(self)
+    }
+
+    fn is_unmerged(&self) -> bool {
+        T::is_unmerged(self)
     }
 }

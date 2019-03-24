@@ -451,6 +451,19 @@ impl<'a> crate::Mergeable for Value<'a> {
             }
         }
     }
+
+    fn is_unmerged(&self) -> bool {
+        if self.is_scalar() {
+            true
+        } else {
+            match self {
+                Value::List(vector) => vector.is_unmerged(),
+                Value::Map(vectors) => vectors.is_unmerged(),
+                Value::Block(block) => block.is_unmerged(),
+                _ => unreachable!("Impossible to reach this. This is a bug."),
+            }
+        }
+    }
 }
 
 macro_rules! impl_from_value (
@@ -809,8 +822,8 @@ named!(
 mod tests {
     use super::*;
 
-    use crate::Mergeable;
     use crate::utils::{assert_list_eq, ResultUtilsString};
+    use crate::Mergeable;
 
     #[test]
     fn list_values_are_parsed_successfully() {
@@ -1081,6 +1094,7 @@ foo = "bar"
     fn multiple_maps_are_parsed_correctly() {
         let hcl = include_str!("../fixtures/map.hcl");
         let parsed = map_values(CompleteStr(hcl)).unwrap_output();
+        println!("{:#?}", parsed);
         assert!(parsed.is_unmerged());
 
         assert_eq!(parsed.len(), 5); // unmerged values
