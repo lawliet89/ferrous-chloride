@@ -541,6 +541,71 @@ impl<'a> Block<'a> {
                 .collect(),
         )
     }
+
+    /// Borrow the keys as `Vec<&str>` for more ergonomic indexing.
+    ///
+    /// # Usage
+    ///
+    /// ```rust
+    ///
+    /// ```
+    ///
+    /// # Motivation
+    /// A Block is implemented as [`KeyValuePairs`] with `Vec<String>` as keys.
+    /// Behind the scenes, a merged [`KeyValuePairs`] is backed by a [`HashMap`].
+    ///
+    /// Retrieving a key from a [`HashMap`] involves using the [`HashMap::get`] method
+    /// which specifies that to lookup a key of type `K`, you may use any type `Q` that
+    /// implements [`std::borrow::Borrow`]`<K>`.
+    ///
+    /// Since `Vec<T>` only implements `Borrow<[T]>`, a `Vec<String>` only implements
+    /// `Borrow<[String]>`.
+    ///
+    /// The implication is that we cannot lookup the `HashMap<Vec<String>, Value>` with a list of
+    /// `&str`.
+    ///
+    /// Consider the following:
+    ///
+    /// ```rust
+    /// use std::collections::HashMap;
+    /// use std::borrow::Borrow;
+    ///
+    /// let mut hashmap: HashMap<Vec<String>, usize> = HashMap::new();
+    /// let _ = hashmap.insert(vec!["a".to_string(), "b".to_string()], 123);
+    ///
+    /// // Let's try to retrieve the value
+    /// // The following won't compile
+    /// // let _ = hashmap.get(&["a", "b"]);
+    ///
+    /// // We have to use this...
+    /// let _ = hashmap.get::<[String]>(&["a".to_string(), "b".to_string()]);
+    /// ```
+    ///
+    /// As you can see, this is not ergonomic at all.
+    ///
+    /// Fundamentally, this is because it's not zero-cost to convert a `Vec<Stirng>` into a
+    /// `&[&str]`. See this [question](https://stackoverflow.com/q/41179659/602002) on
+    /// StackOverflow.
+    ///
+    /// # Alternatives
+    ///
+    /// The unstable [raw entry API](https://github.com/rust-lang/rust/issues/56167) might help with
+    /// this in the future.
+    pub fn borrow_keys(&self) -> KeyValuePairs<Vec<&str>, &MapValues<'a>> {
+        match self {
+            KeyValuePairs::Merged(hashmap) => KeyValuePairs::Merged(
+                hashmap
+                    .iter()
+                    .map(|(k, v)| (k.iter().map(|s| s.as_str()).collect(), v))
+                    .collect(),
+            ),
+            KeyValuePairs::Unmerged(vec) => KeyValuePairs::Unmerged(
+                vec.iter()
+                    .map(|(k, v)| (k.iter().map(|s| s.as_str()).collect(), v))
+                    .collect(),
+            ),
+        }
+    }
 }
 
 impl<'a, K, S> FromIterator<(K, MapValues<'a>)> for Block<'a>
@@ -744,6 +809,7 @@ named!(
 mod tests {
     use super::*;
 
+    use crate::Mergeable;
     use crate::utils::{assert_list_eq, ResultUtilsString};
 
     #[test]
@@ -1133,6 +1199,7 @@ foo = "bar"
         assert!(parsed.is_unmerged());
         let parsed = parsed.merge().unwrap();
         assert!(parsed.is_merged());
+        println!("{:#?}", parsed);
 
         assert_eq!(parsed.len(), 2);
         assert_eq!(parsed.len_scalar(), 19);
@@ -1164,13 +1231,11 @@ foo = "bar"
         assert_eq!(resource.len(), 3);
         let resource = resource.unwrap_borrow_block();
 
-        use std::borrow::Borrow;
-        let test = vec!["security/group".to_string(), "foobar".to_string()];
-        let borrowed: &[String] = test.borrow();
-        let test_borrowed: &[String] =
-            &["security/group".to_string(), "foobar".to_string()].borrow();
-
-        // let sg_foobar = resource.get_str(&["security/group", "foobar"]);
+        let sg_foobar = resource
+            .borrow_keys()
+            .get::<[&str]>(&["security/group", "foobar"])
+            .unwrap()
+            .unwrap_one();
 
         // let sg_foobar = resource[&["security/group".to_string(), "foobar".to_string()]];
     }

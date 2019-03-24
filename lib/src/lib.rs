@@ -13,10 +13,8 @@ pub use constants::*;
 pub use errors::Error;
 pub use value::Value;
 
-use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::hash::Hash;
-use std::ops::Deref;
 
 /// Has scalar length
 pub trait ScalarLength {
@@ -127,18 +125,6 @@ impl<K, V> KeyValuePairs<K, V>
 where
     K: Hash + Eq,
 {
-    pub fn is_merged(&self) -> bool {
-        if let KeyValuePairs::Merged(_) = self {
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn is_unmerged(&self) -> bool {
-        !self.is_merged()
-    }
-
     pub fn len(&self) -> usize {
         match self {
             KeyValuePairs::Merged(hashmap) => hashmap.len(),
