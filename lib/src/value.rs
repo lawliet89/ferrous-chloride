@@ -25,6 +25,8 @@ pub enum Value<'a> {
     Block(Block<'a>),
 }
 
+/// Contains a list of HCL Blocks sharing the same identifier with one or more labels
+/// differentiating each Block from each other.
 pub type Block<'a> = KeyValuePairs<Vec<String>, MapValues<'a>>;
 
 pub type Map<'a> = Vec<MapValues<'a>>;
@@ -417,7 +419,7 @@ impl<'a> Value<'a> {
                 let unmerged: Block = block
                     .into_iter()
                     .map(|(key, value)| Ok((key, value.merge()?)))
-                    .collect::<Result<_, _>>()?;
+                    .collect::<Result<_, Error>>()?;
                 let merged = Block::new_merged(unmerged)?;
                 Ok(Value::Block(merged))
             }
@@ -902,6 +904,7 @@ named!(
 mod tests {
     use super::*;
 
+    use crate::fixtures;
     use crate::utils::{assert_list_eq, ResultUtilsString};
     use crate::Mergeable;
 
@@ -1081,7 +1084,7 @@ foo = "bar"
 
     #[test]
     fn empty_map_values_are_parsed_correctly() {
-        let hcl = include_str!("../fixtures/empty.hcl");
+        let hcl = "";
         let parsed = map_values(CompleteStr(hcl)).unwrap_output();
 
         assert_eq!(0, parsed.len());
@@ -1089,7 +1092,7 @@ foo = "bar"
 
     #[test]
     fn non_terminating_new_lines_are_parsed_correctly() {
-        let hcl = include_str!("../fixtures/no_newline_terminating.hcl");
+        let hcl = fixtures::NO_NEWLINE_EOF;
         let parsed = map_values(CompleteStr(hcl)).unwrap_output();
 
         assert_eq!(1, parsed.len());
@@ -1098,7 +1101,7 @@ foo = "bar"
 
     #[test]
     fn single_map_values_are_parsed_correctly() {
-        let hcl = include_str!("../fixtures/single.hcl");
+        let hcl = fixtures::SINGLE;
         let parsed = map_values(CompleteStr(hcl)).unwrap_output();
 
         assert_eq!(1, parsed.len());
@@ -1107,7 +1110,7 @@ foo = "bar"
 
     #[test]
     fn scalar_map_values_are_parsed_correctly() {
-        let hcl = include_str!("../fixtures/scalar.hcl");
+        let hcl = fixtures::SCALAR;
         let parsed = map_values(CompleteStr(hcl)).unwrap_output();
 
         let expected: HashMap<_, _> = vec![
@@ -1134,7 +1137,7 @@ foo = "bar"
 
     #[test]
     fn list_map_values_are_parsed_correctly() {
-        let hcl = include_str!("../fixtures/list.hcl");
+        let hcl = fixtures::LIST;
         let parsed = map_values(CompleteStr(hcl)).unwrap_output();
 
         let expected: HashMap<_, _> = vec![
@@ -1181,7 +1184,7 @@ foo = "bar"
 
     #[test]
     fn multiple_maps_are_parsed_correctly() {
-        let hcl = include_str!("../fixtures/map.hcl");
+        let hcl = fixtures::MAP;
         let parsed = map_values(CompleteStr(hcl)).unwrap_output();
         println!("{:#?}", parsed);
         assert!(parsed.is_unmerged());
@@ -1297,7 +1300,7 @@ foo = "bar"
 
     #[test]
     fn maps_are_merged_correctly() {
-        let hcl = include_str!("../fixtures/map.hcl");
+        let hcl = fixtures::MAP;
         let parsed = map_values(CompleteStr(hcl)).unwrap_output();
         assert!(parsed.is_unmerged());
 

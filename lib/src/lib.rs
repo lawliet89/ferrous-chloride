@@ -17,6 +17,8 @@ pub use value::Value;
 use std::collections::HashMap;
 use std::hash::{BuildHasher, Hash};
 
+use nom::types::CompleteStr;
+
 /// Has scalar length
 pub trait ScalarLength {
     /// Recursively count the number of scalars
@@ -64,6 +66,27 @@ pub enum OneOrMany<T> {
     One(T),
     Many(Vec<T>),
 }
+
+/// Merge behaviour when parsing HCL Documents
+#[derive(Debug, PartialEq, Clone, Copy, Eq, Hash)]
+pub enum MergeBehaviour {
+    /// Error on duplicate identifiers in a map or duplicate labels between block with the same
+    /// identifier
+    Error,
+    /// Take the first value seen on duplicate identifiers in a map or duplicate labels
+    /// between block with the same identifier
+    ///
+    /// __Unimplemented__
+    TakeFirst,
+    /// Take the last value seen on duplicate identifiers in a map or duplicate labels
+    /// between block with the same identifier
+    ///
+    /// __Unimplemented__
+    TakeLast,
+}
+
+/// A HCL document body
+pub type Body<'a> = value::MapValues<'a>;
 
 impl<T> OneOrMany<T> {
     pub fn len(&self) -> usize {
@@ -444,7 +467,7 @@ where
     type Output = Vec<O>;
 
     fn as_owned(&self) -> Self::Output {
-        self.iter().map(|i| i.as_owned()).collect()
+        self.iter().map(AsOwned::as_owned).collect()
     }
 }
 
@@ -467,5 +490,96 @@ impl AsOwned for String {
     type Output = String;
     fn as_owned(&self) -> Self::Output {
         self.clone()
+    }
+}
+
+impl Default for MergeBehaviour {
+    fn default() -> Self {
+        MergeBehaviour::Error
+    }
+}
+
+/// Parse a HCL string into a [`Value`] which is close to an abstract syntax tree of the
+/// HCL string.
+///
+/// You can opt to merge the parsed body after parsing. The behaviour of merging is determined by
+/// the [`MergeBehaviour`] enum.
+pub fn parse_str(input: &str, merge: Option<MergeBehaviour>) -> Result<Body, Error> {
+    let (remaining_input, unmerged) =
+        value::map_values(CompleteStr(input)).map_err(|e| Error::from_err_str(&e))?;
+
+    if !remaining_input.is_empty() {
+        Err(Error::Bug(format!(
+            r#"Input was not completely parsed:
+Input: {},
+Remaining: {}
+"#,
+            input, remaining_input
+        )))?
+    }
+
+    let pairs = match merge {
+        None => unmerged,
+        Some(MergeBehaviour::Error) => unmerged.merge()?,
+        Some(_) => unimplemented!("Not implemented yet"),
+    };
+
+    Ok(pairs)
+}
+
+/// Parse a HCL string from a IO stream reader
+///
+/// The entire IO stream has to be buffered in memory first before parsing can occur.
+///
+/// When reading from a source against which short reads are not efficient, such as a
+/// [`File`](std::fs::File), you will want to apply your own buffering because the library
+/// will not buffer the input. See [`std::io::BufReader`].
+pub fn parse_reader<R: std::io::Read>(
+    mut reader: R,
+    merge: Option<MergeBehaviour>,
+) -> Result<Body<'static>, Error> {
+    let mut buffer = String::new();
+    reader.read_to_string(&mut buffer)?;
+
+    // FIXME: Can we do better? We are allocating twice. Once for reading into a buffer
+    // and second time calling `as_owned`.
+    Ok(parse_str(&buffer, merge)?.as_owned())
+}
+
+/// Parse a HCL string from a slice of bytes
+pub fn parse_slice(bytes: &[u8], merge: Option<MergeBehaviour>) -> Result<Body, Error> {
+    let input = std::str::from_utf8(bytes)?;
+    parse_str(input, merge)
+}
+
+#[cfg(test)]
+pub(crate) mod fixtures {
+    pub static ALL: &[&str] = &[LIST, NO_NEWLINE_EOF, SINGLE, SCALAR, MAP];
+
+    pub static LIST: &str = include_str!("../fixtures/list.hcl");
+    pub static NO_NEWLINE_EOF: &str = include_str!("../fixtures/no_newline_terminating.hcl");
+    pub static SINGLE: &str = include_str!("../fixtures/single.hcl");
+    pub static SCALAR: &str = include_str!("../fixtures/scalar.hcl");
+    pub static MAP: &str = include_str!("../fixtures/map.hcl");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn strings_are_parsed_correctly_unmerged() {
+        for string in fixtures::ALL {
+            let parsed = parse_str(string, None).unwrap();
+            assert!(parsed.is_unmerged());
+        }
+    }
+
+    #[test]
+    fn strings_are_parsed_correctly_merged() {
+        for string in fixtures::ALL {
+            let parsed = parse_str(string, Some(MergeBehaviour::Error)).unwrap();
+            assert!(parsed.is_merged());
+        }
     }
 }

@@ -24,7 +24,8 @@ pub enum Error {
     )]
     IllegalMultipleEntries { key: String, variant: &'static str },
     #[fail(
-        display = "Error merging key {} into `Value`: existing value of variant {} cannot be merged with variant {}",
+        display = "Error merging key {} into `Value`: existing value of variant {} \
+                   cannot be merged with variant {}",
         key, existing_variant, incoming_variant
     )]
     ErrorMergingKeys {
@@ -41,6 +42,16 @@ pub enum Error {
         expected: &'static str,
         actual: &'static str,
     },
+    #[fail(display = "IO Error: {}", _0)]
+    IOError(#[cause] std::io::Error),
+    #[fail(display = "Bytes to be parsed is invalid UTF-8: {}", _0)]
+    InvalidUnicodeToParse(#[cause] std::str::Utf8Error),
+    #[fail(
+        display = "Possible bug with the library encountered: {}; Please report to \
+                   https://github.com/lawliet89/ferrous-chloride/issues",
+        _0
+    )]
+    Bug(String),
 }
 
 impl Error {
@@ -202,6 +213,18 @@ impl Error {
         } else {
             None
         }
+    }
+}
+
+impl From<std::io::Error> for Error {
+    fn from(e: std::io::Error) -> Self {
+        Error::IOError(e)
+    }
+}
+
+impl From<std::str::Utf8Error> for Error {
+    fn from(e: std::str::Utf8Error) -> Self {
+        Error::InvalidUnicodeToParse(e)
     }
 }
 
