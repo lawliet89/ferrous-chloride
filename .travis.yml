@@ -2,6 +2,7 @@ language: rust
 rust:
   - stable
   - beta
+
 before_script:
   - rustup component add rustfmt
   - rustup component add clippy
@@ -14,13 +15,9 @@ jobs:
         - cargo clippy --all-targets --all-features -- -D warnings
         - cargo test --all-features
     - stage: docs
+      if: branch = master AND env(TRAVIS_RUST_VERSION) = stable
       script:
         - cargo doc --no-deps --all-features
-
-stages:
-  - test
-  - name: deploy
-    if: branch = master
 
 branches:
   only:
