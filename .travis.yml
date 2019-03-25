@@ -25,8 +25,9 @@ jobs:
         provider: pages
         github-token: $GITHUB_TOKEN
         committer-from-gh: true
-        local-dir: "/home/travis/build/lawliet89/ferrous-chloride/target/doc"
+        local-dir: "target/doc"
         keep-history: true
+        skip_cleanup: true
 
 branches:
   only:
