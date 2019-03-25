@@ -49,9 +49,9 @@ fn hex_to_string(s: &str) -> Result<String, InternalKind> {
         .to_string())
 }
 
-/// Unescape characters according to the reference https://en.cppreference.com/w/cpp/language/escape
-/// Source: https://github.com/hashicorp/hcl/blob/ef8a98b0bbce4a65b5aa4c368430a80ddc533168/hcl/scanner/scanner.go#L513
-/// Unicode References: https://en.wikipedia.org/wiki/List_of_Unicode_characters
+// Unescape characters according to the reference https://en.cppreference.com/w/cpp/language/escape
+// Source: https://github.com/hashicorp/hcl/blob/ef8a98b0bbce4a65b5aa4c368430a80ddc533168/hcl/scanner/scanner.go#L513
+// Unicode References: https://en.wikipedia.org/wiki/List_of_Unicode_characters
 // TODO: Issues with variable length alt https://docs.rs/nom/4.2.0/nom/macro.alt.html#behaviour-of-alt
 named!(unescape(CompleteStr) -> Cow<str>,
         alt!(
@@ -88,7 +88,7 @@ named!(hex_to_unicode(CompleteStr) -> Cow<str>,
     )
 );
 
-/// Contents of a single line string
+// Contents of a single line string
 named!(
     quoted_string_content(CompleteStr) -> String,
     escaped_transform!(

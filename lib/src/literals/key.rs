@@ -72,7 +72,7 @@ impl<'a> Hash for Key<'a> {
     }
 }
 
-/// Parse a "key" for a map
+// Parse a "key" for a map
 named!(
     pub key(CompleteStr) -> Key,
     alt_complete!(
