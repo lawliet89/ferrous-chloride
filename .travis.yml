@@ -16,7 +16,8 @@ script:
 jobs:
   include:
     - stage: docs
-      if: branch = master AND env(TRAVIS_RUST_VERSION) = stable
+      if: branch = master
+      rust: stable
       script:
         - cargo doc --no-deps --all-features
       deploy:
