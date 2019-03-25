@@ -50,7 +50,7 @@ impl From<f64> for Number {
     }
 }
 
-/// Parse Number
+// Parse Number
 named!(pub number(CompleteStr) -> Number,
     flat_map!(call!(recognize_float), parse_to!(Number))
 );

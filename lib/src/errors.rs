@@ -1,4 +1,5 @@
 use std::fmt::{Debug, Display};
+use std::string::ToString;
 
 use failure_derive::Fail;
 use nom::verbose_errors::Context;
@@ -56,7 +57,7 @@ impl Error {
         Self::from_err(err, |s| {
             std::str::from_utf8(s.as_bytes())
                 .ok()
-                .map(|s| s.to_string())
+                .map(ToString::to_string)
         })
     }
 
@@ -114,7 +115,7 @@ impl Error {
         Self::make_custom_error(err, |s| {
             std::str::from_utf8(s.as_bytes())
                 .ok()
-                .map(|s| s.to_string())
+                .map(ToString::to_string)
         })
     }
 
@@ -232,7 +233,7 @@ macro_rules! enum_number {
     }
 }
 
-/// Custom ErrorKind
+// Custom ErrorKind
 enum_number!(InternalKind {
     InvalidUnicodeCodePoint = 0,
     InvalidUnicode = 1,

@@ -1,7 +1,7 @@
 use nom::types::CompleteStr;
 use nom::{call, do_parse, named_attr, verify};
 
-/// Parse an identifier
+// Parse an identifier
 named_attr!(#[allow(clippy::block_in_if_condition_stmt)], pub identifier(CompleteStr) -> &str,
     do_parse!(
         identifier: verify!(

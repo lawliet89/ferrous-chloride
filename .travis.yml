@@ -1,0 +1,31 @@
+language: rust
+rust:
+  - stable
+  - beta
+
+before_script:
+  - rustup component add rustfmt
+  - rustup component add clippy
+
+script:
+  - cargo fetch --locked
+  - cargo fmt --all -- --check
+  - cargo clippy --all-targets --all-features -- -D warnings
+  - cargo test --all-features
+
+jobs:
+  include:
+    - stage: docs
+      if: branch = master AND env(TRAVIS_RUST_VERSION) = stable
+      script:
+        - cargo doc --no-deps --all-features
+      deploy:
+        provider: pages
+        github-token: $GITHUB_TOKEN
+        committer-from-gh: true
+        local-dir: "target/doc"
+        keep-history: true
+
+branches:
+  only:
+    - master

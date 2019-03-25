@@ -672,12 +672,12 @@ impl<'a> Block<'a> {
             KeyValuePairs::Merged(hashmap) => KeyValuePairs::Merged(
                 hashmap
                     .iter()
-                    .map(|(k, v)| (k.iter().map(|s| s.as_str()).collect(), v))
+                    .map(|(k, v)| (k.iter().map(String::as_str).collect(), v))
                     .collect(),
             ),
             KeyValuePairs::Unmerged(vec) => KeyValuePairs::Unmerged(
                 vec.iter()
-                    .map(|(k, v)| (k.iter().map(|s| s.as_str()).collect(), v))
+                    .map(|(k, v)| (k.iter().map(String::as_str).collect(), v))
                     .collect(),
             ),
         }
@@ -833,8 +833,8 @@ named!(
     )
 );
 
-/// Parse single key value pair in the form of
-/// `"key" = ... | ["..."] | {...}`
+// Parse single key value pair in the form of
+// `"key" = ... | ["..."] | {...}`
 named!(
     pub key_value(CompleteStr) -> (Key, Value),
     space_tab!(

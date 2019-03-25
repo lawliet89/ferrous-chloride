@@ -1,7 +1,7 @@
 use nom::types::CompleteStr;
 use nom::{alt, map, named, tag};
 
-/// Parse a boolean literal
+// Parse a boolean literal
 named!(pub boolean(CompleteStr) -> bool,
     map!(
         alt!(
