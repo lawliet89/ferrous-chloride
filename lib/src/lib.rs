@@ -14,7 +14,7 @@ pub use errors::Error;
 pub use value::Value;
 
 use std::collections::HashMap;
-use std::hash::{Hash, BuildHasher};
+use std::hash::{BuildHasher, Hash};
 
 /// Has scalar length
 pub trait ScalarLength {

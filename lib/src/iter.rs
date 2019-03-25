@@ -117,9 +117,7 @@ where
             KeyValuePairs::Merged(hashmap) => {
                 KeyValuePairsIntoIterator::Merged(hashmap.into_iter())
             }
-            KeyValuePairs::Unmerged(vec) => {
-                KeyValuePairsIntoIterator::Unmerged(vec.into_iter())
-            }
+            KeyValuePairs::Unmerged(vec) => KeyValuePairsIntoIterator::Unmerged(vec.into_iter()),
         }
     }
 }
