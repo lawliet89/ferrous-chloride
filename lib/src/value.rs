@@ -5,12 +5,12 @@ use std::string::ToString;
 
 use crate::constants::*;
 use crate::literals::{self, Key};
-use crate::{Error, KeyValuePairs, ScalarLength};
+use crate::{AsOwned, Error, KeyValuePairs, ScalarLength};
 
 use nom::types::CompleteStr;
 use nom::{
-    alt, alt_complete, call, char, complete, do_parse, many0, many1, map, named, opt, preceded,
-    tag, terminated, ws, eof
+    alt, alt_complete, call, char, complete, do_parse, eof, many0, many1, map, named, opt,
+    preceded, tag, terminated, ws,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -523,6 +523,22 @@ impl<'a> FromIterator<Value<'a>> for Value<'a> {
     {
         let list = iter.into_iter().collect();
         Value::List(list)
+    }
+}
+
+impl<'a> AsOwned for Value<'a> {
+    type Output = Value<'static>;
+
+    fn as_owned(&self) -> Self::Output {
+        match self {
+            Value::Integer(i) => Value::Integer(*i),
+            Value::Float(f) => Value::Float(*f),
+            Value::Boolean(b) => Value::Boolean(*b),
+            Value::String(ref string) => Value::String(string.clone()),
+            Value::List(ref vec) => Value::List(vec.as_owned()),
+            Value::Map(ref map) => Value::Map(map.as_owned()),
+            Value::Block(ref block) => Value::Block(block.as_owned()),
+        }
     }
 }
 

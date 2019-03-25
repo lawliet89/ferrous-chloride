@@ -35,6 +35,25 @@ impl<'a> Key<'a> {
             Key::String(s) => s,
         }
     }
+
+    /// Returns key where nothing is borrowed
+    pub fn as_owned(&self) -> Key<'static> {
+        match self {
+            Key::Identifier(s) => Key::Identifier(Cow::Owned(s.to_string())),
+            Key::String(s) => Key::String(Cow::Owned(s.to_string())),
+        }
+    }
+}
+
+impl<'a> crate::AsOwned for Key<'a> {
+    type Output = Key<'static>;
+
+    fn as_owned(&self) -> Key<'static> {
+        match self {
+            Key::Identifier(s) => Key::Identifier(Cow::Owned(s.to_string())),
+            Key::String(s) => Key::String(Cow::Owned(s.to_string())),
+        }
+    }
 }
 
 impl<'a> Deref for Key<'a> {

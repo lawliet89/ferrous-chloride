@@ -46,6 +46,16 @@ pub trait Mergeable {
     }
 }
 
+/// Type which has borrowed content which is able to be turned into an Owned version
+///
+/// In other words, this type should have some lifetime `'a` that can be turned into `'static`.
+pub trait AsOwned {
+    type Output: 'static;
+
+    /// Returns a variant of `Self` where nothing is borrowed.
+    fn as_owned(&self) -> Self::Output;
+}
+
 /// Either a single value, or many values
 ///
 /// This is a utility type to make some implementation easier.
@@ -246,6 +256,18 @@ where
     }
 }
 
+// Can't do. Orphan rules: https://www.reddit.com/r/rust/comments/b56p8i/_/ejc1syk/
+
+// impl<T, I> ScalarLength for T
+// where
+//     T: IntoIterator<Item = I>,
+//     I: ScalarLength,
+// {
+//     fn len_scalar(&self) -> usize {
+//         self.into_iter().fold(0, |acc, v| acc + v.len_scalar())
+//     }
+// }
+
 impl<K, V, S> ScalarLength for HashMap<K, V, S>
 where
     K: Eq + Hash,
@@ -254,15 +276,6 @@ where
 {
     fn len_scalar(&self) -> usize {
         self.iter().fold(0, |acc, (_, v)| acc + v.len_scalar())
-    }
-}
-
-impl<T1, T2> ScalarLength for (T1, T2)
-where
-    T2: ScalarLength,
-{
-    fn len_scalar(&self) -> usize {
-        self.1.len_scalar()
     }
 }
 
@@ -377,5 +390,82 @@ where
 
     fn is_unmerged(&self) -> bool {
         T::is_unmerged(self)
+    }
+}
+
+impl<K, V, KO, VO> AsOwned for KeyValuePairs<K, V>
+where
+    K: Hash + Eq + AsOwned<Output = KO>,
+    V: AsOwned<Output = VO>,
+    KO: Hash + Eq + 'static,
+    VO: 'static,
+{
+    type Output = KeyValuePairs<KO, VO>;
+
+    fn as_owned(&self) -> Self::Output {
+        match self {
+            KeyValuePairs::Merged(hashmap) => KeyValuePairs::Merged(hashmap.as_owned()),
+            KeyValuePairs::Unmerged(vec) => KeyValuePairs::Unmerged(vec.as_owned()),
+        }
+    }
+}
+
+impl<T, O> AsOwned for &T
+where
+    T: AsOwned<Output = O>,
+    O: 'static,
+{
+    type Output = O;
+
+    fn as_owned(&self) -> Self::Output {
+        T::as_owned(self)
+    }
+}
+
+impl<K, V, KO, VO> AsOwned for (K, V)
+where
+    K: AsOwned<Output = KO>,
+    V: AsOwned<Output = VO>,
+    KO: 'static,
+    VO: 'static,
+{
+    type Output = (KO, VO);
+
+    fn as_owned(&self) -> Self::Output {
+        (self.0.as_owned(), self.1.as_owned())
+    }
+}
+
+impl<T, O> AsOwned for Vec<T>
+where
+    T: AsOwned<Output = O>,
+    O: 'static,
+{
+    type Output = Vec<O>;
+
+    fn as_owned(&self) -> Self::Output {
+        self.iter().map(|i| i.as_owned()).collect()
+    }
+}
+
+impl<K, V, S, KO, VO> AsOwned for HashMap<K, V, S>
+where
+    K: Hash + Eq + AsOwned<Output = KO>,
+    V: AsOwned<Output = VO>,
+    S: BuildHasher + Default + 'static,
+    KO: Hash + Eq + 'static,
+    VO: 'static,
+{
+    type Output = HashMap<KO, VO, S>;
+
+    fn as_owned(&self) -> Self::Output {
+        self.iter().map(|pair| pair.as_owned()).collect()
+    }
+}
+
+impl AsOwned for String {
+    type Output = String;
+    fn as_owned(&self) -> Self::Output {
+        self.clone()
     }
 }
