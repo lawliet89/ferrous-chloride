@@ -11,6 +11,7 @@ pub mod value;
 
 pub use constants::*;
 pub use errors::Error;
+#[doc(inline)]
 pub use value::Value;
 
 use std::collections::HashMap;

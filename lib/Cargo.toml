@@ -17,3 +17,6 @@ nom = { version = "^4.2.3", features = ["verbose-errors"] }
 
 # [dev-dependencies]
 # serde_json = "1.0"
+
+[package.metadata.docs.rs]
+all-features = true

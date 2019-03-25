@@ -20,7 +20,7 @@ jobs:
       if: branch = master
       rust: stable
       script:
-        - cargo doc --no-deps --all-features
+        - cargo doc --all-features
       deploy:
         provider: pages
         github-token: $GITHUB_TOKEN
