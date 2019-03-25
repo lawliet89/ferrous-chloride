@@ -257,6 +257,29 @@
 <span id="257">257</span>
 <span id="258">258</span>
 <span id="259">259</span>
+<span id="260">260</span>
+<span id="261">261</span>
+<span id="262">262</span>
+<span id="263">263</span>
+<span id="264">264</span>
+<span id="265">265</span>
+<span id="266">266</span>
+<span id="267">267</span>
+<span id="268">268</span>
+<span id="269">269</span>
+<span id="270">270</span>
+<span id="271">271</span>
+<span id="272">272</span>
+<span id="273">273</span>
+<span id="274">274</span>
+<span id="275">275</span>
+<span id="276">276</span>
+<span id="277">277</span>
+<span id="278">278</span>
+<span id="279">279</span>
+<span id="280">280</span>
+<span id="281">281</span>
+<span id="282">282</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">fmt</span>::{<span class="ident">Debug</span>, <span class="ident">Display</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">string</span>::<span class="ident">ToString</span>;
@@ -284,7 +307,8 @@
     )]</span>
     <span class="ident">IllegalMultipleEntries</span> { <span class="ident">key</span>: <span class="ident">String</span>, <span class="ident">variant</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> },
     <span class="attribute">#[<span class="ident">fail</span>(
-        <span class="ident">display</span> <span class="op">=</span> <span class="string">&quot;Error merging key {} into `Value`: existing value of variant {} cannot be merged with variant {}&quot;</span>,
+        <span class="ident">display</span> <span class="op">=</span> <span class="string">&quot;Error merging key {} into `Value`: existing value of variant {} \
+                   cannot be merged with variant {}&quot;</span>,
         <span class="ident">key</span>, <span class="ident">existing_variant</span>, <span class="ident">incoming_variant</span>
     )]</span>
     <span class="ident">ErrorMergingKeys</span> {
@@ -301,6 +325,16 @@
         <span class="ident">expected</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>,
         <span class="ident">actual</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>,
     },
+    <span class="attribute">#[<span class="ident">fail</span>(<span class="ident">display</span> <span class="op">=</span> <span class="string">&quot;IO Error: {}&quot;</span>, <span class="ident">_0</span>)]</span>
+    <span class="ident">IOError</span>(<span class="attribute">#[<span class="ident">cause</span>]</span> <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Error</span>),
+    <span class="attribute">#[<span class="ident">fail</span>(<span class="ident">display</span> <span class="op">=</span> <span class="string">&quot;Bytes to be parsed is invalid UTF-8: {}&quot;</span>, <span class="ident">_0</span>)]</span>
+    <span class="ident">InvalidUnicodeToParse</span>(<span class="attribute">#[<span class="ident">cause</span>]</span> <span class="ident">std</span>::<span class="ident">str</span>::<span class="ident">Utf8Error</span>),
+    <span class="attribute">#[<span class="ident">fail</span>(
+        <span class="ident">display</span> <span class="op">=</span> <span class="string">&quot;Possible bug with the library encountered: {}; Please report to \
+                   https://github.com/lawliet89/ferrous-chloride/issues&quot;</span>,
+        <span class="ident">_0</span>
+    )]</span>
+    <span class="ident">Bug</span>(<span class="ident">String</span>),
 }
 
 <span class="kw">impl</span> <span class="ident">Error</span> {
@@ -462,6 +496,18 @@
         } <span class="kw">else</span> {
             <span class="prelude-val">None</span>
         }
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Error</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Error</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">e</span>: <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Error</span>) <span class="op">-&gt;</span> <span class="self">Self</span> {
+        <span class="ident">Error</span>::<span class="ident">IOError</span>(<span class="ident">e</span>)
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">std</span>::<span class="ident">str</span>::<span class="ident">Utf8Error</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Error</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">e</span>: <span class="ident">std</span>::<span class="ident">str</span>::<span class="ident">Utf8Error</span>) <span class="op">-&gt;</span> <span class="self">Self</span> {
+        <span class="ident">Error</span>::<span class="ident">InvalidUnicodeToParse</span>(<span class="ident">e</span>)
     }
 }
 
