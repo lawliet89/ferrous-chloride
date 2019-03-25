@@ -10,7 +10,7 @@ use crate::{Error, KeyValuePairs, ScalarLength};
 use nom::types::CompleteStr;
 use nom::{
     alt, alt_complete, call, char, complete, do_parse, many0, many1, map, named, opt, preceded,
-    tag, terminated, ws,
+    tag, terminated, ws, eof
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -874,6 +874,7 @@ named!(
                         alt!(
                             whitespace!(tag!(","))
                             | map!(many1!(nom::eol), |_| CompleteStr(""))
+                            | eof!()
                         )
                     )
                 )
@@ -1068,6 +1069,15 @@ foo = "bar"
         let parsed = map_values(CompleteStr(hcl)).unwrap_output();
 
         assert_eq!(0, parsed.len());
+    }
+
+    #[test]
+    fn non_terminating_new_lines_are_parsed_correctly() {
+        let hcl = include_str!("../fixtures/no_newline_terminating.hcl");
+        let parsed = map_values(CompleteStr(hcl)).unwrap_output();
+
+        assert_eq!(1, parsed.len());
+        assert_eq!(parsed["test"], Value::from(true));
     }
 
     #[test]
