@@ -5,11 +5,30 @@ rust:
 before_script:
   - rustup component add rustfmt
   - rustup component add clippy
-script:
-  - cargo fmt --all -- --check
-  - cargo clippy --all-targets --all-features -- -D warnings
-  - cargo test --all-features
+
+jobs:
+  include:
+    - stage: test
+      script:
+        - cargo fmt --all -- --check
+        - cargo clippy --all-targets --all-features -- -D warnings
+        - cargo test --all-features
+    - stage: docs
+      script:
+        - cargo doc --no-deps --all-features
+
+stages:
+  - test
+  - name: deploy
+    if: branch = master
 
 branches:
   only:
     - master
+
+deploy:
+  provider: pages
+  github-token: $GITHUB_TOKEN
+  committer-from-gh: true
+  local-dir: "target/doc"
+  keep-history: true
