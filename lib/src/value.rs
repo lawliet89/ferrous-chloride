@@ -848,6 +848,7 @@ named!(
         | call!(literals::boolean) => { |v| Value::Boolean(v) }
         | literals::string => { |v| Value::String(v) }
         | list => { |v| Value::List(v) }
+        | map_expression => { |m| Value::Map(vec![m]) }
     )
 );
 
@@ -867,24 +868,24 @@ named!(
     pub key_value(CompleteStr) -> (Key, Value),
     space_tab!(
         alt!(
-                do_parse!(
-                    key: call!(literals::key)
-                    >> char!('=')
-                    >> value: call!(single_value)
-                    >> (key, value)
-                )
-                | do_parse!(
-                    identifier: call!(literals::identifier)
-                    >> complete!(opt!(char!('=')))
-                    >> values: call!(map_expression)
-                    >> (Key::Identifier(Cow::Borrowed(identifier)), Value::from(values))
-                )
-                | do_parse!(
-                    identifier: call!(literals::identifier)
-                    >> keys: many0!(literals::quoted_single_line_string)
-                    >> values: call!(map_expression)
-                    >> (Key::Identifier(Cow::Borrowed(identifier)), Value::Block(vec![(keys, values)].into_iter().collect()))
-                )
+            do_parse!(
+                key: call!(literals::key)
+                >> char!('=')
+                >> value: call!(single_value)
+                >> (key, value)
+            )
+            | do_parse!(
+                identifier: call!(literals::identifier)
+                >> complete!(opt!(char!('=')))
+                >> values: call!(map_expression)
+                >> (Key::Identifier(Cow::Borrowed(identifier)), Value::from(values))
+            )
+            | do_parse!(
+                identifier: call!(literals::identifier)
+                >> keys: many0!(literals::quoted_single_line_string)
+                >> values: call!(map_expression)
+                >> (Key::Identifier(Cow::Borrowed(identifier)), Value::Block(vec![(keys, values)].into_iter().collect()))
+            )
         )
     )
 );
