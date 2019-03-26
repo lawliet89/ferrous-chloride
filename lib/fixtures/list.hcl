@@ -13,3 +13,16 @@ list_in_list = [
     2,
     -3,
 ]
+
+
+map_in_list = [
+    {
+        test = 123
+    },
+    {
+        foo = "bar"
+    },
+    {
+        baz = false,
+    },
+]
