@@ -851,6 +851,16 @@ named!(
     )
 );
 
+named!(
+    pub map_expression(CompleteStr) -> MapValues,
+    do_parse!(
+        whitespace!(char!('{'))
+        >> values: whitespace!(call!(map_values))
+        >> char!('}')
+        >> (values)
+    )
+);
+
 // Parse single key value pair in the form of
 // `"key" = ... | ["..."] | {...}`
 named!(
@@ -985,6 +995,38 @@ EOF
         for (input, expected_value) in test_cases.iter() {
             println!("Testing {}", input);
             let actual_value = single_value(CompleteStr(input)).unwrap_output();
+            assert_eq!(actual_value, *expected_value);
+        }
+    }
+
+    #[test]
+    fn map_expressions_are_parsed_correctly() {
+        let test_cases = [
+            (
+                r#"{
+foo = "bar"
+}"#,
+                MapValues::new_unmerged(vec![(From::from("foo"), Value::from("bar"))]),
+            ),
+            (
+                r#"{
+foo = "bar"
+
+
+}"#,
+                MapValues::new_unmerged(vec![(From::from("foo"), Value::from("bar"))]),
+            ),
+            (
+                r#"{
+            foo = "bar"
+            }"#,
+                MapValues::new_unmerged(vec![(From::from("foo"), Value::from("bar"))]),
+            ),
+        ];
+
+        for (input, expected_value) in test_cases.iter() {
+            println!("Testing {}", input);
+            let actual_value = map_expression(CompleteStr(input)).unwrap_output();
             assert_eq!(actual_value, *expected_value);
         }
     }
