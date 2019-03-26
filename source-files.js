@@ -1,10 +1,14 @@
 var N = null;var sourcesIndex = {};
+sourcesIndex["ansi_term"] = {"name":"","dirs":[],"files":["ansi.rs","debug.rs","difference.rs","display.rs","lib.rs","style.rs","windows.rs","write.rs"]};
+sourcesIndex["atty"] = {"name":"","dirs":[],"files":["lib.rs"]};
 sourcesIndex["backtrace"] = {"name":"","dirs":[{"name":"backtrace","dirs":[],"files":["libunwind.rs","mod.rs"]},{"name":"symbolize","dirs":[],"files":["libbacktrace.rs","mod.rs"]}],"files":["capture.rs","dylib.rs","lib.rs","types.rs"]};
 sourcesIndex["backtrace_sys"] = {"name":"","dirs":[],"files":["lib.rs"]};
+sourcesIndex["bitflags"] = {"name":"","dirs":[],"files":["lib.rs"]};
 sourcesIndex["cfg_if"] = {"name":"","dirs":[],"files":["lib.rs"]};
+sourcesIndex["clap"] = {"name":"","dirs":[{"name":"app","dirs":[],"files":["help.rs","meta.rs","mod.rs","parser.rs","settings.rs","usage.rs","validator.rs"]},{"name":"args","dirs":[{"name":"arg_builder","dirs":[],"files":["base.rs","flag.rs","mod.rs","option.rs","positional.rs","switched.rs","valued.rs"]}],"files":["any_arg.rs","arg.rs","arg_matcher.rs","arg_matches.rs","group.rs","macros.rs","matched_arg.rs","mod.rs","settings.rs","subcommand.rs"]},{"name":"completions","dirs":[],"files":["bash.rs","elvish.rs","fish.rs","macros.rs","mod.rs","powershell.rs","shell.rs","zsh.rs"]}],"files":["errors.rs","fmt.rs","lib.rs","macros.rs","map.rs","osstringext.rs","strext.rs","suggestions.rs","usage_parser.rs"]};
 sourcesIndex["failure"] = {"name":"","dirs":[{"name":"backtrace","dirs":[],"files":["internal.rs","mod.rs"]},{"name":"error","dirs":[],"files":["error_impl.rs","mod.rs"]}],"files":["as_fail.rs","box_std.rs","compat.rs","context.rs","error_message.rs","lib.rs","macros.rs","result_ext.rs","sync_failure.rs"]};
 sourcesIndex["failure_derive"] = {"name":"","dirs":[],"files":["lib.rs"]};
-sourcesIndex["fecl"] = {"name":"","dirs":[],"files":["main.rs"]};
+sourcesIndex["fecl"] = {"name":"","dirs":[],"files":["error.rs","main.rs"]};
 sourcesIndex["ferrous_chloride"] = {"name":"","dirs":[{"name":"literals","dirs":[],"files":["boolean.rs","identifier.rs","key.rs","number.rs","string.rs"]}],"files":["constants.rs","errors.rs","iter.rs","lib.rs","literals.rs","macros.rs","utils.rs","value.rs"]};
 sourcesIndex["libc"] = {"name":"","dirs":[{"name":"unix","dirs":[{"name":"notbsd","dirs":[{"name":"linux","dirs":[{"name":"other","dirs":[{"name":"b64","dirs":[],"files":["mod.rs","not_x32.rs","x86_64.rs"]}],"files":["align.rs","mod.rs"]}],"files":["align.rs","mod.rs"]}],"files":["mod.rs"]}],"files":["align.rs","mod.rs"]}],"files":["lib.rs","macros.rs"]};
 sourcesIndex["log"] = {"name":"","dirs":[],"files":["lib.rs","macros.rs"]};
@@ -13,6 +17,10 @@ sourcesIndex["nom"] = {"name":"","dirs":[],"files":["bits.rs","branch.rs","bytes
 sourcesIndex["proc_macro2"] = {"name":"","dirs":[],"files":["fallback.rs","lib.rs","strnom.rs","wrapper.rs"]};
 sourcesIndex["quote"] = {"name":"","dirs":[],"files":["ext.rs","lib.rs","to_tokens.rs"]};
 sourcesIndex["rustc_demangle"] = {"name":"","dirs":[],"files":["lib.rs"]};
+sourcesIndex["strsim"] = {"name":"","dirs":[],"files":["lib.rs"]};
 sourcesIndex["syn"] = {"name":"","dirs":[{"name":"gen","dirs":[],"files":["gen_helper.rs","visit.rs"]}],"files":["attr.rs","buffer.rs","data.rs","derive.rs","error.rs","export.rs","expr.rs","ext.rs","generics.rs","group.rs","ident.rs","keyword.rs","lib.rs","lifetime.rs","lit.rs","lookahead.rs","mac.rs","macros.rs","op.rs","parse.rs","parse_macro_input.rs","parse_quote.rs","path.rs","print.rs","punctuated.rs","span.rs","spanned.rs","thread.rs","token.rs","tt.rs","ty.rs"]};
 sourcesIndex["synstructure"] = {"name":"","dirs":[],"files":["lib.rs","macros.rs"]};
+sourcesIndex["textwrap"] = {"name":"","dirs":[],"files":["lib.rs"]};
+sourcesIndex["unicode_width"] = {"name":"","dirs":[],"files":["lib.rs","tables.rs"]};
 sourcesIndex["unicode_xid"] = {"name":"","dirs":[],"files":["lib.rs","tables.rs"]};
+sourcesIndex["vec_map"] = {"name":"","dirs":[],"files":["lib.rs"]};

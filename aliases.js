@@ -1,7 +1,11 @@
 var ALIASES = {};
+ALIASES["ansi_term"] = {};
+ALIASES["atty"] = {};
 ALIASES["backtrace"] = {};
 ALIASES["backtrace_sys"] = {};
+ALIASES["bitflags"] = {};
 ALIASES["cfg_if"] = {};
+ALIASES["clap"] = {};
 ALIASES["failure"] = {};
 ALIASES["failure_derive"] = {};
 ALIASES["fecl"] = {};
@@ -13,6 +17,10 @@ ALIASES["nom"] = {"/=":[{'crate':'nom','ty':8,'name':'DivAssign','desc':'The div
 ALIASES["proc_macro2"] = {};
 ALIASES["quote"] = {};
 ALIASES["rustc_demangle"] = {};
+ALIASES["strsim"] = {};
 ALIASES["syn"] = {};
 ALIASES["synstructure"] = {};
+ALIASES["textwrap"] = {};
+ALIASES["unicode_width"] = {};
 ALIASES["unicode_xid"] = {};
+ALIASES["vec_map"] = {};
