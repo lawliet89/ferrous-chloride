@@ -47,7 +47,7 @@ fn run_parse(args: &ArgMatches) -> Result<(), Error> {
     // Write
     {
         let mut output = output_writer(output)?;
-        output.write_all(format!("{:#?}", parsed).as_bytes())?;
+        output.write_all(format!("{:#?}\n", parsed).as_bytes())?;
     }
 
     Ok(())
