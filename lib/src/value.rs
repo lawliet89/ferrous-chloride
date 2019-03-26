@@ -987,6 +987,12 @@ EOF
                     Value::from("foobar"),
                 ]),
             ),
+            (
+                r#"{
+        test = 123
+}"#,
+                Value::new_map(vec![vec![(Key::new_identifier("test"), Value::from(123))]]),
+            ),
         ];
 
         for (input, expected_value) in test_cases.iter() {
