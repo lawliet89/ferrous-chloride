@@ -12,8 +12,13 @@ use clap::{
 
 fn main() -> Result<(), Error> {
     let args = make_parser().get_matches();
-    run_subcommand(&args)?;
-    Ok(())
+    match run_subcommand(&args) {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            println!("Error: {}", e);
+            std::process::exit(1);
+        }
+    }
 }
 
 fn run_subcommand(args: &ArgMatches) -> Result<(), Error> {
