@@ -18,6 +18,7 @@ use std::collections::HashMap;
 use std::hash::{BuildHasher, Hash};
 
 use nom::types::CompleteStr;
+use nom::{call, do_parse, eof, named};
 
 /// Has scalar length
 pub trait ScalarLength {
@@ -499,6 +500,15 @@ impl Default for MergeBehaviour {
     }
 }
 
+named!(
+    pub body(CompleteStr) -> Body,
+    do_parse!(
+        body: call!(value::map_values)
+        >> eof!()
+        >> (body)
+    )
+);
+
 /// Parse a HCL string into a [`Value`] which is close to an abstract syntax tree of the
 /// HCL string.
 ///
@@ -506,7 +516,7 @@ impl Default for MergeBehaviour {
 /// the [`MergeBehaviour`] enum.
 pub fn parse_str(input: &str, merge: Option<MergeBehaviour>) -> Result<Body, Error> {
     let (remaining_input, unmerged) =
-        value::map_values(CompleteStr(input)).map_err(|e| Error::from_err_str(&e))?;
+        body(CompleteStr(input)).map_err(|e| Error::from_err_str(&e))?;
 
     if !remaining_input.is_empty() {
         Err(Error::Bug(format!(
