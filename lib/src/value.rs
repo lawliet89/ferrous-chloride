@@ -848,6 +848,17 @@ named!(
         | call!(literals::boolean) => { |v| Value::Boolean(v) }
         | literals::string => { |v| Value::String(v) }
         | list => { |v| Value::List(v) }
+        | map_expression => { |m| Value::Map(vec![m]) }
+    )
+);
+
+named!(
+    pub map_expression(CompleteStr) -> MapValues,
+    do_parse!(
+        whitespace!(char!('{'))
+        >> values: whitespace!(call!(map_values))
+        >> char!('}')
+        >> (values)
     )
 );
 
@@ -857,28 +868,24 @@ named!(
     pub key_value(CompleteStr) -> (Key, Value),
     space_tab!(
         alt!(
-                do_parse!(
-                    key: call!(literals::key)
-                    >> char!('=')
-                    >> value: call!(single_value)
-                    >> (key, value)
-                )
-                | do_parse!(
-                    identifier: call!(literals::identifier)
-                    >> complete!(opt!(char!('=')))
-                    >> whitespace!(char!('{'))
-                    >> values: whitespace!(call!(map_values))
-                    >> char!('}')
-                    >> (Key::Identifier(Cow::Borrowed(identifier)), Value::from(values))
-                )
-                | do_parse!(
-                    identifier: call!(literals::identifier)
-                    >> keys: many0!(literals::quoted_single_line_string)
-                    >> whitespace!(char!('{'))
-                    >> values: whitespace!(call!(map_values))
-                    >> char!('}')
-                    >> (Key::Identifier(Cow::Borrowed(identifier)), Value::Block(vec![(keys, values)].into_iter().collect()))
-                )
+            do_parse!(
+                key: call!(literals::key)
+                >> char!('=')
+                >> value: call!(single_value)
+                >> (key, value)
+            )
+            | do_parse!(
+                identifier: call!(literals::identifier)
+                >> complete!(opt!(char!('=')))
+                >> values: call!(map_expression)
+                >> (Key::Identifier(Cow::Borrowed(identifier)), Value::from(values))
+            )
+            | do_parse!(
+                identifier: call!(literals::identifier)
+                >> keys: many0!(literals::quoted_single_line_string)
+                >> values: call!(map_expression)
+                >> (Key::Identifier(Cow::Borrowed(identifier)), Value::Block(vec![(keys, values)].into_iter().collect()))
+            )
         )
     )
 );
@@ -980,11 +987,49 @@ EOF
                     Value::from("foobar"),
                 ]),
             ),
+            (
+                r#"{
+        test = 123
+}"#,
+                Value::new_map(vec![vec![(Key::new_identifier("test"), Value::from(123))]]),
+            ),
         ];
 
         for (input, expected_value) in test_cases.iter() {
             println!("Testing {}", input);
             let actual_value = single_value(CompleteStr(input)).unwrap_output();
+            assert_eq!(actual_value, *expected_value);
+        }
+    }
+
+    #[test]
+    fn map_expressions_are_parsed_correctly() {
+        let test_cases = [
+            (
+                r#"{
+foo = "bar"
+}"#,
+                MapValues::new_unmerged(vec![(From::from("foo"), Value::from("bar"))]),
+            ),
+            (
+                r#"{
+foo = "bar"
+
+
+}"#,
+                MapValues::new_unmerged(vec![(From::from("foo"), Value::from("bar"))]),
+            ),
+            (
+                r#"{
+            foo = "bar"
+            }"#,
+                MapValues::new_unmerged(vec![(From::from("foo"), Value::from("bar"))]),
+            ),
+        ];
+
+        for (input, expected_value) in test_cases.iter() {
+            println!("Testing {}", input);
+            let actual_value = map_expression(CompleteStr(input)).unwrap_output();
             assert_eq!(actual_value, *expected_value);
         }
     }
@@ -1168,6 +1213,14 @@ foo = "bar"
                     Value::from(1),
                     Value::from(2),
                     Value::from(-3),
+                ]),
+            ),
+            (
+                "map_in_list",
+                Value::new_list(vec![
+                    Value::new_map(vec![vec![(Key::new_identifier("test"), Value::from(123))]]),
+                    Value::new_map(vec![vec![(Key::new_identifier("foo"), Value::from("bar"))]]),
+                    Value::new_map(vec![vec![(Key::new_identifier("baz"), Value::from(false))]]),
                 ]),
             ),
         ]
