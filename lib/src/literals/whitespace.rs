@@ -1,6 +1,6 @@
 //! Whitespace and comments related
 use nom::types::CompleteStr;
-use nom::{alt_complete, call, delimited, eat_separator, eol, named, tag, take_while};
+use nom::{alt_complete, call, delimited, eat_separator, eol, named, tag, take_until, take_while};
 
 fn not_eol(c: char) -> bool {
     c != '\r' && c != '\n'
@@ -13,6 +13,8 @@ named!(pub inline_whitespace(CompleteStr) -> CompleteStr,
 named!(pub whitespace(CompleteStr) -> CompleteStr,
     alt_complete!(
         delimited!(tag!("#"), take_while!(not_eol), call!(eol))
+        | delimited!(tag!("//"), take_while!(not_eol), call!(eol))
+        | delimited!(tag!("/*"), take_until!("*/"), tag!("*/"))
         | eat_separator!(" \t\r\n")
     )
 );
@@ -67,14 +69,20 @@ mod tests {
     use super::*;
     use crate::utils::ResultUtilsString;
 
-    use nom::{tag, take, take_while};
+    use nom::{tag, take};
 
     named!(inline_whitespace_test<CompleteStr, (CompleteStr, CompleteStr) >,
         inline_whitespace!(tuple!(take!(3), tag!("de")))
     );
 
     named!(whitespace_test<CompleteStr, Vec<CompleteStr>>,
-        many1!(whitespace!(take_while!(|c| c != ' ')))
+        whitespace!(
+            separated_list!(
+                tag!("|"),
+                call!(crate::utils::while_predicate1,
+                      |c| c.is_alphanumeric() || c == '_' || c == '-' || c == '.')
+            )
+        )
     );
 
     #[test]
@@ -90,12 +98,17 @@ mod tests {
         let test_cases = [
             ("  \t\r\n", "  \t\r\n"),
             ("# Test Comment\r\n", " Test Comment"),
+            ("// Test Comment\n", " Test Comment"),
+            ("/* Test Comment One liner */", " Test Comment One liner "),
+            (
+                "/* Test Comment \nmultiple\r\n liner */",
+                " Test Comment \nmultiple\r\n liner ",
+            ),
         ];
 
         for (input, expected) in test_cases.iter() {
-            println!("Testing {}", input);
             let actual = whitespace(CompleteStr(input)).unwrap_output();
-            assert_eq!(actual.0, *expected);
+            assert_eq!(actual.0, *expected, "Input: {}", input);
         }
     }
 
@@ -103,16 +116,35 @@ mod tests {
     fn whitespace_are_ignored() {
         let test_cases = [
             (
-                "foo bar \t\t baz \r\n more!",
-                vec!["foo", "bar", "baz", "more!"],
+                "foo | bar \t | baz | \r\n more",
+                vec!["foo", "bar", "baz", "more"],
             ),
+            ("# Test Comment\n", vec![]),
+            ("// Test Comment\n", vec![]),
+            ("/* Test Comment One liner */", vec![]),
             ("foobar # Test Comment\n", vec!["foobar"]),
+            (
+                "foo | bar | baz // Test Comment\n",
+                vec!["foo", "bar", "baz"],
+            ),
+            (
+                "foo | bar | /* Test Comment One liner */ baz // Test Comment",
+                vec!["foo", "bar", "baz"],
+            ),
+            (
+                "foo | bar | /* Test Comment \nmultiple\r\n liner */ baz // Test Comment",
+                vec!["foo", "bar", "baz"],
+            ),
         ];
 
         for (input, expected) in test_cases.iter() {
-            println!("Testing {}", input);
             let actual = whitespace_test(CompleteStr(input)).unwrap_output();
-            assert_eq!(actual.iter().map(|s| s.0).collect::<Vec<_>>(), *expected);
+            assert_eq!(
+                actual.iter().map(|s| s.0).collect::<Vec<_>>(),
+                *expected,
+                "Input: {}",
+                input
+            );
         }
     }
 }

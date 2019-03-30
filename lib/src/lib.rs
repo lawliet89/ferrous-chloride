@@ -19,7 +19,7 @@ use std::collections::HashMap;
 use std::hash::{BuildHasher, Hash};
 
 use nom::types::CompleteStr;
-use nom::{call, do_parse, eof, named};
+use nom::{call, exact, named};
 
 /// Has scalar length
 pub trait ScalarLength {
@@ -503,11 +503,7 @@ impl Default for MergeBehaviour {
 
 named!(
     pub body(CompleteStr) -> Body,
-    do_parse!(
-        body: call!(value::map_values)
-        >> eof!()
-        >> (body)
-    )
+    exact!(call!(value::map_values))
 );
 
 /// Parse a HCL string into a [`Value`] which is close to an abstract syntax tree of the
