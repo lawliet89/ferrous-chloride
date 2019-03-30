@@ -15,7 +15,7 @@ where
 
 #[cfg(test)]
 pub(crate) mod test {
-    use nom::{AtEof, IResult};
+    use nom::{IResult, InputLength};
     use std::borrow::Borrow;
     use std::fmt::Debug;
 
@@ -40,7 +40,7 @@ pub(crate) mod test {
 
     impl<I, O> ResultUtils<O> for IResult<I, O>
     where
-        I: nom::AsBytes + Debug + AtEof,
+        I: nom::AsBytes + Debug + InputLength,
     {
         fn unwrap_output(self) -> O {
             match self {
@@ -49,7 +49,7 @@ pub(crate) mod test {
                     panic!("{:#}", e)
                 }
                 Ok((remaining, output)) => {
-                    assert!(remaining.at_eof());
+                    assert!(remaining.input_len() == 0, "Remaining: {:#?}", remaining);
                     output
                 }
             }
@@ -58,7 +58,7 @@ pub(crate) mod test {
 
     impl<I, O> ResultUtilsString<O> for IResult<I, O>
     where
-        I: nom::AsBytes + AsRef<str> + std::fmt::Debug + AtEof,
+        I: nom::AsBytes + AsRef<str> + std::fmt::Debug + InputLength,
     {
         fn unwrap_output(self) -> O {
             match self {
@@ -67,7 +67,11 @@ pub(crate) mod test {
                     panic!("{:#}", e)
                 }
                 Ok((remaining, output)) => {
-                    assert!(remaining.at_eof());
+                    assert!(
+                        remaining.input_len() == 0,
+                        "Remaining: {}",
+                        remaining.as_ref()
+                    );
                     output
                 }
             }

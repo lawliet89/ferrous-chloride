@@ -295,7 +295,7 @@ mod tests {
 
         for (input, expected) in test_cases.iter() {
             println!("Testing {}", input);
-            let (_, actual) = heredoc_begin(CompleteStr(input)).unwrap();
+            let actual = ResultUtilsString::unwrap_output(heredoc_begin(CompleteStr(input)));
             assert_eq!(&actual, expected);
         }
     }
@@ -309,6 +309,7 @@ mod tests {
                     identifier: CompleteStr("EOF"),
                     indented: false,
                 },
+                "\n"
             ),
             (
                 "\n    EOH\n",
@@ -316,12 +317,26 @@ mod tests {
                     identifier: CompleteStr("EOH"),
                     indented: true,
                 },
+                "\n"
+            ),
+            (
+                "\r\nEOF\r\n",
+                HereDoc {
+                    identifier: CompleteStr("EOF"),
+                    indented: false,
+                },
+                "\r\n"
             ),
         ];
 
-        for (input, identifier) in test_cases.iter() {
+        for (input, identifier, expected_remaining) in test_cases.iter() {
             println!("Testing {}", input);
-            let _ = heredoc_end(CompleteStr(input), &identifier).unwrap();
+            let (remaining, ()) = heredoc_end(CompleteStr(input), &identifier).unwrap();
+            assert_eq!(
+                &remaining.0, expected_remaining,
+                "Input: {}; Remaining: {}",
+                input, remaining
+            );
         }
     }
 
@@ -330,7 +345,8 @@ mod tests {
         let test_cases = [
             (
                 r#"<<EOF
-EOF"#,
+EOF
+"#,
                 "",
             ),
             (
@@ -357,10 +373,9 @@ and quotes ""#,
 
         for (input, expected) in test_cases.iter() {
             println!("Testing {}", input);
-            assert_eq!(
-                heredoc_string(CompleteStr(input)).unwrap().1,
-                expected.to_string()
-            );
+            let (remaining, actual) = heredoc_string(CompleteStr(input)).unwrap();
+            assert_eq!(remaining.0, "\n");
+            assert_eq!(actual, expected.to_string());
         }
     }
 
@@ -407,7 +422,7 @@ and quotes ""#,
         for (input, expected) in test_cases.iter() {
             println!("Testing {}", input);
             let actual = ResultUtilsString::unwrap_output(string(CompleteStr(input)));
-            assert_eq!(&actual, expected);
+            assert_eq!(&actual, expected, "Input: {}", input);
         }
     }
 }
