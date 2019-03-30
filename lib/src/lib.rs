@@ -1,12 +1,13 @@
 #[macro_use]
 mod macros;
+#[macro_use]
+pub mod literals;
 
 mod errors;
 mod utils;
 
 mod constants;
 pub mod iter;
-pub mod literals;
 pub mod value;
 
 pub use constants::*;

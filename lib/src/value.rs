@@ -10,7 +10,7 @@ use crate::{AsOwned, Error, KeyValuePairs, ScalarLength};
 use nom::types::CompleteStr;
 use nom::{
     alt, alt_complete, call, char, complete, do_parse, eof, many0, many1, map, named, opt,
-    preceded, tag, terminated, ws,
+    preceded, tag, terminated,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -866,7 +866,7 @@ named!(
 // `"key" = ... | ["..."] | {...}`
 named!(
     pub key_value(CompleteStr) -> (Key, Value),
-    space_tab!(
+    inline_whitespace!(
         alt!(
             do_parse!(
                 key: call!(literals::key)
