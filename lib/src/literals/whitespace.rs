@@ -8,8 +8,18 @@ fn not_eol(c: char) -> bool {
     c != '\r' && c != '\n'
 }
 
-named!(pub inline_whitespace(CompleteStr) -> CompleteStr,
-    eat_separator!(" \t")
+named!(
+    inline_comment(CompleteStr) -> CompleteStr,
+    delimited!(tag!("/*"), take_until!("*/"), tag!("*/"))
+);
+
+named!(pub inline_whitespace(CompleteStr) -> Vec<CompleteStr>,
+    many0!(
+        alt_complete!(
+            inline_comment
+            | eat_separator!(" \t")
+        )
+    )
 );
 
 named!(pub whitespace(CompleteStr) -> Vec<CompleteStr>,
@@ -17,7 +27,7 @@ named!(pub whitespace(CompleteStr) -> Vec<CompleteStr>,
         alt_complete!(
             delimited!(tag!("#"), take_while!(not_eol), call!(eol))
             | delimited!(tag!("//"), take_while!(not_eol), call!(eol))
-            | delimited!(tag!("/*"), take_until!("*/"), tag!("*/"))
+            | inline_comment
             | eat_separator!(" \t\r\n")
         )
     )

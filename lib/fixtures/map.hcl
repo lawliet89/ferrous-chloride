@@ -1,4 +1,4 @@
-simple_map {
+simple_map /* Inline comment */ { // Comment
   foo   = "bar"
   bar   = "baz"
   index = 1
