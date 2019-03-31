@@ -962,13 +962,13 @@ mod tests {
     #[test]
     fn single_values_are_parsed_successfully() {
         let test_cases = [
-            (r#"123"#, Value::Integer(123)),
-            ("123", Value::Integer(123)),
-            ("123", Value::Integer(123)),
-            ("true", Value::Boolean(true)),
-            ("123.456", Value::Float(123.456)),
-            ("123", Value::Integer(123)),
-            (r#""foobar""#, Value::String("foobar".to_string())),
+            (r#"123"#, Value::Integer(123), ""),
+            ("123", Value::Integer(123), ""),
+            ("123", Value::Integer(123), ""),
+            ("true", Value::Boolean(true), ""),
+            ("123.456", Value::Float(123.456), ""),
+            ("123", Value::Integer(123), ""),
+            (r#""foobar""#, Value::String("foobar".to_string()), ""),
             (
                 r#"<<EOF
 new
@@ -976,6 +976,7 @@ line
 EOF
 "#,
                 Value::String("new\nline".to_string()),
+                "\n",
             ),
             (
                 r#"[true, false, 123, -123.456, "foobar"]"#,
@@ -986,18 +987,21 @@ EOF
                     Value::from(-123.456),
                     Value::from("foobar"),
                 ]),
+                "",
             ),
             (
                 r#"{
         test = 123
 }"#,
                 Value::new_map(vec![vec![(Key::new_identifier("test"), Value::from(123))]]),
+                "",
             ),
         ];
 
-        for (input, expected_value) in test_cases.iter() {
+        for (input, expected_value, expected_remaining) in test_cases.iter() {
             println!("Testing {}", input);
-            let actual_value = single_value(CompleteStr(input)).unwrap_output();
+            let (remaining, actual_value) = single_value(CompleteStr(input)).unwrap();
+            assert_eq!(&remaining.0, expected_remaining);
             assert_eq!(actual_value, *expected_value);
         }
     }
@@ -1037,14 +1041,15 @@ foo = "bar"
     #[test]
     fn key_value_pairs_are_parsed_successfully() {
         let test_cases = [
-            ("test = 123", ("test", Value::Integer(123))),
-            ("test = 123", ("test", Value::Integer(123))),
-            ("test = true", ("test", Value::Boolean(true))),
-            ("test = 123.456", ("test", Value::Float(123.456))),
-            ("   test   =   123  ", ("test", Value::Integer(123))), // Random spaces
+            ("test = 123", ("test", Value::Integer(123)), ""),
+            ("test = 123", ("test", Value::Integer(123)), ""),
+            ("test = true", ("test", Value::Boolean(true)), ""),
+            ("test = 123.456", ("test", Value::Float(123.456)), ""),
+            ("   test   =   123  ", ("test", Value::Integer(123)), ""), // Random spaces
             (
                 r#""a/b/c" = "foobar","#,
                 ("a/b/c", Value::String("foobar".to_string())),
+                ",",
             ),
             (
                 r#"test = <<EOF
@@ -1053,11 +1058,13 @@ line
 EOF
 "#,
                 ("test", Value::String("new\nline".to_string())),
+                "\n",
             ),
-            (r#"test = [],"#, ("test", Value::List(vec![]))),
+            (r#"test = [],"#, ("test", Value::List(vec![])), ","),
             (
                 r#"test = [1,]"#,
                 ("test", Value::new_list(vec![Value::from(1)])),
+                "",
             ),
             (
                 r#"test = [true, false, 123, -123.456, "foobar"],"#,
@@ -1071,12 +1078,14 @@ EOF
                         Value::from("foobar"),
                     ]),
                 ),
+                ",",
             ),
         ];
 
-        for (input, (expected_key, expected_value)) in test_cases.iter() {
+        for (input, (expected_key, expected_value), expected_remaining) in test_cases.iter() {
             println!("Testing {}", input);
-            let (actual_key, actual_value) = key_value(CompleteStr(input)).unwrap_output();
+            let (remaining, (actual_key, actual_value)) = key_value(CompleteStr(input)).unwrap();
+            assert_eq!(&remaining.0, expected_remaining);
             assert_eq!(actual_key.unwrap(), *expected_key);
             assert_eq!(actual_value, *expected_value);
         }
