@@ -19,4 +19,4 @@ pub use number::{number, Number};
 #[doc(inline)]
 pub use string::{quoted_single_line_string, string};
 #[doc(inline)]
-pub use whitespace::{inline_whitespace, whitespace};
+pub use whitespace::{inline_whitespace, newline, whitespace};

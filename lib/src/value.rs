@@ -4,13 +4,13 @@ use std::iter::FromIterator;
 use std::string::ToString;
 
 use crate::constants::*;
-use crate::literals::{self, Key};
+use crate::literals::{self, newline, Key};
 use crate::{AsOwned, Error, KeyValuePairs, ScalarLength};
 
 use nom::types::CompleteStr;
 use nom::{
-    alt, alt_complete, call, char, complete, do_parse, eof, many0, many1, map, named, opt,
-    preceded, tag, terminated,
+    alt, alt_complete, call, char, complete, do_parse, eof, many0, named, opt, preceded, tag,
+    terminated,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -908,7 +908,7 @@ named!(
                         call!(key_value),
                         alt!(
                             whitespace!(tag!(","))
-                            | map!(many1!(nom::eol), |_| CompleteStr(""))
+                            | call!(newline) => { |_| CompleteStr("") }
                             | eof!()
                         )
                     )

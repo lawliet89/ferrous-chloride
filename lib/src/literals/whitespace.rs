@@ -1,7 +1,8 @@
 //! Whitespace and comments related
 use nom::types::CompleteStr;
 use nom::{
-    alt_complete, call, delimited, eat_separator, eol, many0, named, tag, take_until, take_while,
+    alt_complete, call, delimited, do_parse, eat_separator, eol, many0, many1, named, tag,
+    take_until, take_while,
 };
 
 fn not_eol(c: char) -> bool {
@@ -11,6 +12,16 @@ fn not_eol(c: char) -> bool {
 named!(
     inline_comment(CompleteStr) -> CompleteStr,
     delimited!(tag!("/*"), take_until!("*/"), tag!("*/"))
+);
+
+named!(
+    hash_comment(CompleteStr) -> CompleteStr,
+    delimited!(tag!("#"), take_while!(not_eol), call!(eol))
+);
+
+named!(
+    slash_comment(CompleteStr) -> CompleteStr,
+    delimited!(tag!("//"), take_while!(not_eol), call!(eol))
 );
 
 named!(pub inline_whitespace(CompleteStr) -> Vec<CompleteStr>,
@@ -25,10 +36,26 @@ named!(pub inline_whitespace(CompleteStr) -> Vec<CompleteStr>,
 named!(pub whitespace(CompleteStr) -> Vec<CompleteStr>,
     many0!(
         alt_complete!(
-            delimited!(tag!("#"), take_while!(not_eol), call!(eol))
-            | delimited!(tag!("//"), take_while!(not_eol), call!(eol))
+            hash_comment
+            | slash_comment
             | inline_comment
             | eat_separator!(" \t\r\n")
+        )
+    )
+);
+
+named!(
+    pub newline(CompleteStr) -> Vec<CompleteStr>,
+    many1!(
+        alt_complete!(
+            hash_comment
+            | slash_comment
+            | do_parse!(
+                comment: inline_comment
+                >> call!(eol)
+                >> (comment)
+            )
+            | call!(eol)
         )
     )
 );
@@ -117,7 +144,10 @@ mod tests {
             ("  \t\r\n", vec!["  \t\r\n"]),
             ("# Test Comment\r\n", vec![" Test Comment"]),
             ("// Test Comment\n", vec![" Test Comment"]),
-            ("/* Test Comment One liner */", vec![" Test Comment One liner "]),
+            (
+                "/* Test Comment One liner */",
+                vec![" Test Comment One liner "],
+            ),
             (
                 "/* Test Comment \nmultiple\r\n liner */",
                 vec![" Test Comment \nmultiple\r\n liner "],
@@ -127,8 +157,8 @@ mod tests {
 # Comment Two
 /* I am the last */
 "#,
-                vec![" Comment One", " Comment Two", " I am the last ", "\n"]
-            )
+                vec![" Comment One", " Comment Two", " I am the last ", "\n"],
+            ),
         ];
 
         for (input, expected) in test_cases.iter() {
