@@ -1,6 +1,8 @@
 //! Whitespace and comments related
 use nom::types::CompleteStr;
-use nom::{alt_complete, call, delimited, eat_separator, eol, named, tag, take_until, take_while};
+use nom::{
+    alt_complete, call, delimited, eat_separator, eol, many0, named, tag, take_until, take_while,
+};
 
 fn not_eol(c: char) -> bool {
     c != '\r' && c != '\n'
@@ -10,12 +12,14 @@ named!(pub inline_whitespace(CompleteStr) -> CompleteStr,
     eat_separator!(" \t")
 );
 
-named!(pub whitespace(CompleteStr) -> CompleteStr,
-    alt_complete!(
-        delimited!(tag!("#"), take_while!(not_eol), call!(eol))
-        | delimited!(tag!("//"), take_while!(not_eol), call!(eol))
-        | delimited!(tag!("/*"), take_until!("*/"), tag!("*/"))
-        | eat_separator!(" \t\r\n")
+named!(pub whitespace(CompleteStr) -> Vec<CompleteStr>,
+    many0!(
+        alt_complete!(
+            delimited!(tag!("#"), take_while!(not_eol), call!(eol))
+            | delimited!(tag!("//"), take_while!(not_eol), call!(eol))
+            | delimited!(tag!("/*"), take_until!("*/"), tag!("*/"))
+            | eat_separator!(" \t\r\n")
+        )
     )
 );
 
@@ -100,19 +104,27 @@ mod tests {
     #[test]
     fn whitespace_finds_comments() {
         let test_cases = [
-            ("  \t\r\n", "  \t\r\n"),
-            ("# Test Comment\r\n", " Test Comment"),
-            ("// Test Comment\n", " Test Comment"),
-            ("/* Test Comment One liner */", " Test Comment One liner "),
+            ("  \t\r\n", vec!["  \t\r\n"]),
+            ("# Test Comment\r\n", vec![" Test Comment"]),
+            ("// Test Comment\n", vec![" Test Comment"]),
+            ("/* Test Comment One liner */", vec![" Test Comment One liner "]),
             (
                 "/* Test Comment \nmultiple\r\n liner */",
-                " Test Comment \nmultiple\r\n liner ",
+                vec![" Test Comment \nmultiple\r\n liner "],
             ),
+            (
+                r#"// Comment One
+# Comment Two
+/* I am the last */
+"#,
+                vec![" Comment One", " Comment Two", " I am the last ", "\n"]
+            )
         ];
 
         for (input, expected) in test_cases.iter() {
             let actual = whitespace(CompleteStr(input)).unwrap_output();
-            assert_eq!(actual.0, *expected, "Input: {}", input);
+            let actual: Vec<_> = actual.into_iter().map(|s| s.0).collect();
+            assert_eq!(actual, *expected, "Input: {}", input);
         }
     }
 

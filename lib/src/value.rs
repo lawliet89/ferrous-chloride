@@ -820,21 +820,31 @@ impl<'a> FromIterator<(Key<'a>, Value<'a>)> for MapValues<'a> {
     }
 }
 
+named!(
+    list_begin(CompleteStr) -> char,
+    char!('[')
+);
+
+named!(
+    list_separator(CompleteStr) -> char,
+    char!(',')
+);
+
 // From https://github.com/Geal/nom/issues/14#issuecomment-158788226
 // whitespace! Must not be captured after `]`!
 named!(
     pub list(CompleteStr) -> Vec<Value>,
     preceded!(
-        whitespace!(char!('[')),
+        list_begin,
         terminated!(
             whitespace!(
                 separated_list!(
-                    char!(','),
+                    list_separator,
                     single_value
                 )
             ),
             terminated!(
-                whitespace!(opt!(char!(','))),
+                whitespace!(opt!(list_separator)),
                 char!(']')
             )
         )
