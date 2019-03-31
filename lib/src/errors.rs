@@ -7,7 +7,7 @@ use nom::ErrorKind;
 
 use crate::OneOrMany;
 
-/// Error type for this library
+/// Error type for parsing
 #[derive(Debug, Fail)]
 pub enum Error {
     #[fail(display = "Invalid Unicode Code Points \\{}", _0)]

@@ -10,6 +10,9 @@ mod constants;
 pub mod iter;
 pub mod value;
 
+#[cfg(feature = "serde")]
+pub mod serde;
+
 pub use constants::*;
 pub use errors::Error;
 #[doc(inline)]
