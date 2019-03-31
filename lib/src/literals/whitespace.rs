@@ -41,7 +41,6 @@ macro_rules! inline_whitespace (
   )
 );
 
-// TODO: Handle comments
 #[macro_export]
 macro_rules! whitespace (
   ($i:expr, $($args:tt)*) => (
@@ -69,7 +68,7 @@ mod tests {
     use super::*;
     use crate::utils::ResultUtilsString;
 
-    use nom::{tag, take};
+    use nom::{eof, is_alphanumeric, tag, take, take_while1};
 
     named!(inline_whitespace_test<CompleteStr, (CompleteStr, CompleteStr) >,
         inline_whitespace!(tuple!(take!(3), tag!("de")))
@@ -77,10 +76,15 @@ mod tests {
 
     named!(whitespace_test<CompleteStr, Vec<CompleteStr>>,
         whitespace!(
-            separated_list!(
-                tag!("|"),
-                call!(crate::utils::while_predicate1,
-                      |c| c.is_alphanumeric() || c == '_' || c == '-' || c == '.')
+            do_parse!(
+                list: whitespace!(
+                    separated_list!(
+                         whitespace!(tag!("|")),
+                         whitespace!(take_while1!(|c| is_alphanumeric(c as u8)))
+                    )
+                )
+                >> whitespace!(eof!())
+                >> (list)
             )
         )
     );
@@ -122,22 +126,23 @@ mod tests {
             ("# Test Comment\n", vec![]),
             ("// Test Comment\n", vec![]),
             ("/* Test Comment One liner */", vec![]),
-            ("foobar # Test Comment\n", vec!["foobar"]),
+            ("foobar |  again # Test Comment\n", vec!["foobar", "again"]),
             (
                 "foo | bar | baz // Test Comment\n",
                 vec!["foo", "bar", "baz"],
             ),
             (
-                "foo | bar | /* Test Comment One liner */ baz // Test Comment",
+                "foo | bar | /* Test Comment One liner */ baz // Test Comment\n",
                 vec!["foo", "bar", "baz"],
             ),
             (
-                "foo | bar | /* Test Comment \nmultiple\r\n liner */ baz // Test Comment",
+                "foo | bar | /* Test Comment \nmultiple\r\n liner */ baz // Test Comment\n",
                 vec!["foo", "bar", "baz"],
             ),
         ];
 
         for (input, expected) in test_cases.iter() {
+            println!("Testing \"{}\"", input);
             let actual = whitespace_test(CompleteStr(input)).unwrap_output();
             assert_eq!(
                 actual.iter().map(|s| s.0).collect::<Vec<_>>(),
