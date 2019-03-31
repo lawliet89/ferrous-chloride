@@ -9,8 +9,12 @@ use std::ops::Deref;
 pub enum Error {
     #[fail(display = "HCL parse error: {}", _0)]
     ParseError(#[cause] crate::Error),
-    #[fail(display = "Input was not completely consumed")]
+    #[fail(display = "Input was not completely consumed during deserialization.")]
     TrailingCharacters,
+    #[fail(display = "Expected an integer but found a float.")]
+    UnexpectedFloat,
+    #[fail(display = "Overflow when trying to convert to {}", _0)]
+    Overflow(&'static str),
     #[fail(display = "{}", _0)]
     Custom(String),
 }

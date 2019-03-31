@@ -7,9 +7,29 @@ use serde::forward_to_deserialize_any;
 use serde::Deserialize;
 
 use super::{Compat, Error};
+use crate::literals;
 
 pub struct Deserializer<'de> {
     input: CompleteStr<'de>,
+}
+
+macro_rules! parse_integer {
+    ($name:ident, $target:ty) => {
+        fn $name(&mut self) -> Result<$target, Error> {
+            match self.parse_number()? {
+                literals::Number::Float(_) => Err(Error::UnexpectedFloat)?,
+                literals::Number::Integer(u) => {
+                    let min = <$target>::min_value() as i128;
+                    let max = <$target>::max_value() as i128;
+                    if u < min || u > max {
+                        Err(Error::Overflow(stringify!($target)))
+                    } else {
+                        Ok(u as $target)
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl<'de> Deserializer<'de> {
@@ -20,9 +40,43 @@ impl<'de> Deserializer<'de> {
     }
 
     fn parse_bool(&mut self) -> Result<bool, Error> {
-        let (remaining, output) = crate::literals::boolean(self.input)?;
+        let (remaining, output) = literals::boolean(self.input)?;
         self.input = remaining;
         Ok(output)
+    }
+
+    fn parse_number(&mut self) -> Result<literals::Number, Error> {
+        let (remaining, output) = literals::number(self.input)?;
+        self.input = remaining;
+        Ok(output)
+    }
+
+    parse_integer!(parse_i8, i8);
+    parse_integer!(parse_i16, i16);
+    parse_integer!(parse_i32, i32);
+    parse_integer!(parse_i64, i64);
+    parse_integer!(parse_u8, u8);
+    parse_integer!(parse_u16, u16);
+    parse_integer!(parse_u32, u32);
+    parse_integer!(parse_u64, u64);
+    parse_integer!(parse_u128, u128);
+
+    fn parse_i128(&mut self) -> Result<i128, Error> {
+        match self.parse_number()? {
+            literals::Number::Float(_) => Err(Error::UnexpectedFloat)?,
+            literals::Number::Integer(u) => Ok(u),
+        }
+    }
+}
+
+macro_rules! deserialize_integer {
+    ($name:ident, $visit:ident, $parse:ident) => {
+        fn $name<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+        where
+            V: Visitor<'de>,
+        {
+            visitor.$visit(self.$parse()?)
+        }
     }
 }
 
@@ -37,7 +91,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     }
 
     forward_to_deserialize_any! {
-        i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
+        f32 f64 char str string
         bytes byte_buf option unit unit_struct newtype_struct seq tuple
         tuple_struct map struct enum identifier ignored_any
     }
@@ -48,6 +102,17 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         visitor.visit_bool(self.parse_bool()?)
     }
+
+    deserialize_integer!(deserialize_i8, visit_i8, parse_i8);
+    deserialize_integer!(deserialize_i16, visit_i16, parse_i16);
+    deserialize_integer!(deserialize_i32, visit_i32, parse_i32);
+    deserialize_integer!(deserialize_i64, visit_i64, parse_i64);
+    deserialize_integer!(deserialize_i128, visit_i128, parse_i128);
+    deserialize_integer!(deserialize_u8, visit_u8, parse_u8);
+    deserialize_integer!(deserialize_u16, visit_u16, parse_u16);
+    deserialize_integer!(deserialize_u32, visit_u32, parse_u32);
+    deserialize_integer!(deserialize_u64, visit_u64, parse_u64);
+    deserialize_integer!(deserialize_u128, visit_u128, parse_u128);
 }
 
 pub fn from_str<'a, T>(s: &'a str) -> Result<T, Compat>
@@ -76,6 +141,17 @@ mod tests {
         let mut deserializer = Deserializer::from_str("false");
         let deserialized: bool = bool::deserialize(&mut deserializer).unwrap();
         assert_eq!(deserialized, false);
+    }
+
+    #[test]
+    fn deserialize_integer() {
+        let mut deserializer = Deserializer::from_str("12345");
+        let deserialized: u32 = u32::deserialize(&mut deserializer).unwrap();
+        assert_eq!(deserialized, 12345);
+
+        let mut deserializer = Deserializer::from_str("-12345");
+        let deserialized: i32 = i32::deserialize(&mut deserializer).unwrap();
+        assert_eq!(deserialized, -12345);
     }
 
 }

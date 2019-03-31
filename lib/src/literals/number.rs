@@ -7,7 +7,7 @@ use nom::{call, flat_map, named, parse_to};
 /// Parsed Number
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum Number {
-    Integer(i64),
+    Integer(i128),
     Float(f64),
 }
 
@@ -38,8 +38,8 @@ impl FromStr for Number {
     }
 }
 
-impl From<i64> for Number {
-    fn from(i: i64) -> Self {
+impl From<i128> for Number {
+    fn from(i: i128) -> Self {
         Number::Integer(i)
     }
 }
