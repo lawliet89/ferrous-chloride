@@ -67,9 +67,24 @@ impl<'de> Deserializer<'de> {
             literals::Number::Integer(u) => Ok(u),
         }
     }
+
+    /// Possibly Lossy
+    fn parse_f32(&mut self) -> Result<f32, Error> {
+        match self.parse_number()? {
+            literals::Number::Integer(i) => Ok(i as f32),
+            literals::Number::Float(f) => Ok(f as f32),
+        }
+    }
+
+    fn parse_f64(&mut self) -> Result<f64, Error> {
+        match self.parse_number()? {
+            literals::Number::Integer(i) => Ok(i as f64),
+            literals::Number::Float(f) => Ok(f),
+        }
+    }
 }
 
-macro_rules! deserialize_integer {
+macro_rules! deserialize_scalars {
     ($name:ident, $visit:ident, $parse:ident) => {
         fn $name<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
@@ -91,28 +106,31 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     }
 
     forward_to_deserialize_any! {
-        f32 f64 char str string
+        char str
         bytes byte_buf option unit unit_struct newtype_struct seq tuple
         tuple_struct map struct enum identifier ignored_any
     }
 
-    fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    deserialize_scalars!(deserialize_bool, visit_bool, parse_bool);
+    deserialize_scalars!(deserialize_i8, visit_i8, parse_i8);
+    deserialize_scalars!(deserialize_i16, visit_i16, parse_i16);
+    deserialize_scalars!(deserialize_i32, visit_i32, parse_i32);
+    deserialize_scalars!(deserialize_i64, visit_i64, parse_i64);
+    deserialize_scalars!(deserialize_i128, visit_i128, parse_i128);
+    deserialize_scalars!(deserialize_u8, visit_u8, parse_u8);
+    deserialize_scalars!(deserialize_u16, visit_u16, parse_u16);
+    deserialize_scalars!(deserialize_u32, visit_u32, parse_u32);
+    deserialize_scalars!(deserialize_u64, visit_u64, parse_u64);
+    deserialize_scalars!(deserialize_u128, visit_u128, parse_u128);
+    deserialize_scalars!(deserialize_f32, visit_f32, parse_f32);
+    deserialize_scalars!(deserialize_f64, visit_f64, parse_f64);
+
+    fn deserialize_string<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        visitor.visit_bool(self.parse_bool()?)
+        self.deserialize_str(visitor)
     }
-
-    deserialize_integer!(deserialize_i8, visit_i8, parse_i8);
-    deserialize_integer!(deserialize_i16, visit_i16, parse_i16);
-    deserialize_integer!(deserialize_i32, visit_i32, parse_i32);
-    deserialize_integer!(deserialize_i64, visit_i64, parse_i64);
-    deserialize_integer!(deserialize_i128, visit_i128, parse_i128);
-    deserialize_integer!(deserialize_u8, visit_u8, parse_u8);
-    deserialize_integer!(deserialize_u16, visit_u16, parse_u16);
-    deserialize_integer!(deserialize_u32, visit_u32, parse_u32);
-    deserialize_integer!(deserialize_u64, visit_u64, parse_u64);
-    deserialize_integer!(deserialize_u128, visit_u128, parse_u128);
 }
 
 pub fn from_str<'a, T>(s: &'a str) -> Result<T, Compat>
@@ -154,4 +172,14 @@ mod tests {
         assert_eq!(deserialized, -12345);
     }
 
+    #[test]
+    fn deserialize_float() {
+        let mut deserializer = Deserializer::from_str("12345");
+        let deserialized: f64 = f64::deserialize(&mut deserializer).unwrap();
+        assert_eq!(deserialized, 12345.);
+
+        let mut deserializer = Deserializer::from_str("-12345.12");
+        let deserialized: f32 = f32::deserialize(&mut deserializer).unwrap();
+        assert_eq!(deserialized, -12345.12);
+    }
 }
