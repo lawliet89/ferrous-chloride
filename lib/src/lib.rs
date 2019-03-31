@@ -561,13 +561,14 @@ pub fn parse_slice(bytes: &[u8], merge: Option<MergeBehaviour>) -> Result<Body, 
 
 #[cfg(test)]
 pub(crate) mod fixtures {
-    pub static ALL: &[&str] = &[LIST, NO_NEWLINE_EOF, SINGLE, SCALAR, MAP];
+    pub static ALL: &[&str] = &[LIST, NO_NEWLINE_EOF, SINGLE, SCALAR, MAP, STRINGS];
 
     pub static LIST: &str = include_str!("../fixtures/list.hcl");
     pub static NO_NEWLINE_EOF: &str = include_str!("../fixtures/no_newline_terminating.hcl");
     pub static SINGLE: &str = include_str!("../fixtures/single.hcl");
     pub static SCALAR: &str = include_str!("../fixtures/scalar.hcl");
     pub static MAP: &str = include_str!("../fixtures/map.hcl");
+    pub static STRINGS: &str = include_str!("../fixtures/strings.hcl");
 }
 
 #[cfg(test)]

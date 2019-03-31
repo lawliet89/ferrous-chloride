@@ -21,13 +21,13 @@ fn is_oct_digit(c: char) -> bool {
     c.is_digit(8)
 }
 
-fn not_quoted_string_illegal_char(c: char) -> bool {
+fn legal_quoted_string_character(c: char) -> bool {
     let test = c != '\\' && c != '"';
     debug!("Checking valid string character {:?}: {:?}", c, test);
     test
 }
 
-fn not_quoted_single_line_string_illegal_char(c: char) -> bool {
+fn legal_quoted_single_line_string_character(c: char) -> bool {
     let test = c != '\\' && c != '"' && c != '\r' && c != '\n';
     debug!("Checking valid string character {:?}: {:?}", c, test);
     test
@@ -92,7 +92,7 @@ named!(hex_to_unicode(CompleteStr) -> Cow<str>,
 named!(
     quoted_string_content(CompleteStr) -> String,
     escaped_transform!(
-        take_while1!(not_quoted_string_illegal_char),
+        take_while1!(legal_quoted_string_character),
         '\\',
         unescape
     )
@@ -110,7 +110,7 @@ named!(
 named!(
     quoted_single_line_string_content(CompleteStr) -> String,
     escaped_transform!(
-        take_while1!(not_quoted_single_line_string_illegal_char),
+        take_while1!(legal_quoted_single_line_string_character),
         '\\',
         unescape
     )
@@ -160,8 +160,8 @@ named!(
     heredoc_string(CompleteStr) -> String,
     do_parse!(
         identifier: call!(heredoc_begin)
-        >> strings: opt!(complete!(many_till!(call!(nom::anychar), call!(heredoc_end, &identifier))))
-        >> (strings.map(|s| s.0.into_iter().collect()).unwrap_or_else(|| "".to_string()))
+        >> strings: many_till!(call!(nom::anychar), call!(heredoc_end, &identifier))
+        >> (strings.0.into_iter().collect())
     )
 );
 
@@ -309,7 +309,7 @@ mod tests {
                     identifier: CompleteStr("EOF"),
                     indented: false,
                 },
-                "\n"
+                "\n",
             ),
             (
                 "\n    EOH\n",
@@ -317,7 +317,7 @@ mod tests {
                     identifier: CompleteStr("EOH"),
                     indented: true,
                 },
-                "\n"
+                "\n",
             ),
             (
                 "\r\nEOF\r\n",
@@ -325,7 +325,7 @@ mod tests {
                     identifier: CompleteStr("EOF"),
                     indented: false,
                 },
-                "\r\n"
+                "\r\n",
             ),
         ];
 
