@@ -15,6 +15,22 @@ pub enum Error {
     Custom(String),
 }
 
+impl From<crate::Error> for Error {
+    fn from(e: crate::Error) -> Self {
+        Error::ParseError(e)
+    }
+}
+
+impl<I> From<nom::Err<I, u32>> for Error
+where
+    I: nom::AsBytes + AsRef<str> + std::fmt::Debug,
+{
+    fn from(e: nom::Err<I, u32>) -> Self {
+        let parse_error = crate::Error::from_err_str(&e);
+        From::from(parse_error)
+    }
+}
+
 #[derive(Debug)]
 pub struct Compat(pub failure::Compat<Error>);
 
@@ -22,12 +38,6 @@ impl Deref for Compat {
     type Target = failure::Compat<Error>;
     fn deref(&self) -> &Self::Target {
         &self.0
-    }
-}
-
-impl From<crate::Error> for Error {
-    fn from(e: crate::Error) -> Self {
-        Error::ParseError(e)
     }
 }
 
