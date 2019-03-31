@@ -1,13 +1,22 @@
 //! Tokens and literals
+#[macro_use]
+pub mod whitespace;
 
-mod boolean;
-mod identifier;
-mod key;
-mod number;
-mod string;
+pub mod boolean;
+pub mod identifier;
+pub mod key;
+pub mod number;
+pub mod string;
 
+#[doc(inline)]
 pub use boolean::boolean;
+#[doc(inline)]
 pub use identifier::identifier;
+#[doc(inline)]
 pub use key::{key, Key};
+#[doc(inline)]
 pub use number::{number, Number};
+#[doc(inline)]
 pub use string::{quoted_single_line_string, string};
+#[doc(inline)]
+pub use whitespace::{inline_whitespace, newline, whitespace};

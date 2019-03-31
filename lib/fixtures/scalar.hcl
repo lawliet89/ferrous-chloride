@@ -1,11 +1,11 @@
 test_unsigned_int = 123
-test_signed_int = -123
+test_signed_int /*inline comment */ = -123
 test_float = -1.23
 
 bool_true = true
 bool_false = false
 
-comma_separed = "oh my, a rebel!",
+comma_separed = /*inline comment */ "oh my, a rebel!",
 
 string = "Hello World!"
 

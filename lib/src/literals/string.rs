@@ -21,13 +21,13 @@ fn is_oct_digit(c: char) -> bool {
     c.is_digit(8)
 }
 
-fn not_quoted_string_illegal_char(c: char) -> bool {
+fn legal_quoted_string_character(c: char) -> bool {
     let test = c != '\\' && c != '"';
     debug!("Checking valid string character {:?}: {:?}", c, test);
     test
 }
 
-fn not_quoted_single_line_string_illegal_char(c: char) -> bool {
+fn legal_quoted_single_line_string_character(c: char) -> bool {
     let test = c != '\\' && c != '"' && c != '\r' && c != '\n';
     debug!("Checking valid string character {:?}: {:?}", c, test);
     test
@@ -92,7 +92,7 @@ named!(hex_to_unicode(CompleteStr) -> Cow<str>,
 named!(
     quoted_string_content(CompleteStr) -> String,
     escaped_transform!(
-        take_while1!(not_quoted_string_illegal_char),
+        take_while1!(legal_quoted_string_character),
         '\\',
         unescape
     )
@@ -108,9 +108,9 @@ named!(
 );
 
 named!(
-    quoted_single_line_string_content(CompleteStr) -> String,
+    pub quoted_single_line_string_content(CompleteStr) -> String,
     escaped_transform!(
-        take_while1!(not_quoted_single_line_string_illegal_char),
+        take_while1!(legal_quoted_single_line_string_character),
         '\\',
         unescape
     )
@@ -127,17 +127,20 @@ named!(
 
 /// Heredoc marker
 #[derive(Debug, Eq, PartialEq)]
-struct HereDoc<'a> {
-    identifier: CompleteStr<'a>,
-    indented: bool,
+pub struct HereDoc<'a> {
+    pub identifier: CompleteStr<'a>,
+    pub indented: bool,
 }
 
-named!(heredoc_begin(CompleteStr) -> HereDoc,
+// Start of heredoc identifier. Must end with an EOL
+// EOL is not consumed
+named!(
+    pub heredoc_begin(CompleteStr) -> HereDoc,
     do_parse!(
         tag!("<<")
         >> indented: opt!(complete!(tag!("-")))
         >> identifier: call!(crate::utils::while_predicate1, |c| c.is_alphanumeric() || c == '_')
-        >> call!(nom::eol)
+        >> peek!(call!(nom::eol))
         >> (HereDoc {
                 identifier,
                 indented: indented == Some(CompleteStr("-"))
@@ -145,8 +148,10 @@ named!(heredoc_begin(CompleteStr) -> HereDoc,
     )
 );
 
+// End of heredoc. Must end with an EOL
+// EOL is not consumed
 named_args!(
-    heredoc_end<'a>(identifier: &'_ HereDoc<'_>)<CompleteStr<'a>, ()>,
+    pub heredoc_end<'a>(identifier: &'_ HereDoc<'_>)<CompleteStr<'a>, ()>,
     do_parse!(
         call!(nom::eol)
         >> call!(nom::multispace0)
@@ -156,12 +161,20 @@ named_args!(
     )
 );
 
+// Parse a Heredoc string
 named!(
-    heredoc_string(CompleteStr) -> String,
+    pub heredoc_string(CompleteStr) -> String,
     do_parse!(
         identifier: call!(heredoc_begin)
-        >> strings: opt!(complete!(many_till!(call!(nom::anychar), call!(heredoc_end, &identifier))))
-        >> (strings.map(|s| s.0.into_iter().collect()).unwrap_or_else(|| "".to_string()))
+        >> strings: alt!(
+            call!(heredoc_end, &identifier) => {|()| vec![] }
+            | do_parse!(
+                call!(nom::eol)
+                >> content: many_till!(call!(nom::anychar), call!(heredoc_end, &identifier))
+                >> (content.0)
+            )
+        )
+        >> (strings.into_iter().collect())
     )
 );
 
@@ -276,6 +289,7 @@ mod tests {
                     identifier: CompleteStr("EOF"),
                     indented: false,
                 },
+                "\n",
             ),
             (
                 "<<-EOH\n",
@@ -283,19 +297,22 @@ mod tests {
                     identifier: CompleteStr("EOH"),
                     indented: true,
                 },
+                "\n",
             ),
             (
-                "<<藏_\n",
+                "<<藏_\r\n",
                 HereDoc {
                     identifier: CompleteStr("藏_"),
                     indented: false,
                 },
+                "\r\n",
             ),
         ];
 
-        for (input, expected) in test_cases.iter() {
+        for (input, expected, expected_remaining) in test_cases.iter() {
             println!("Testing {}", input);
-            let (_, actual) = heredoc_begin(CompleteStr(input)).unwrap();
+            let (remaining, actual) = heredoc_begin(CompleteStr(input)).unwrap();
+            assert_eq!(&remaining.0, expected_remaining);
             assert_eq!(&actual, expected);
         }
     }
@@ -309,6 +326,7 @@ mod tests {
                     identifier: CompleteStr("EOF"),
                     indented: false,
                 },
+                "\n",
             ),
             (
                 "\n    EOH\n",
@@ -316,12 +334,26 @@ mod tests {
                     identifier: CompleteStr("EOH"),
                     indented: true,
                 },
+                "\n",
+            ),
+            (
+                "\r\nEOF\r\n",
+                HereDoc {
+                    identifier: CompleteStr("EOF"),
+                    indented: false,
+                },
+                "\r\n",
             ),
         ];
 
-        for (input, identifier) in test_cases.iter() {
+        for (input, identifier, expected_remaining) in test_cases.iter() {
             println!("Testing {}", input);
-            let _ = heredoc_end(CompleteStr(input), &identifier).unwrap();
+            let (remaining, ()) = heredoc_end(CompleteStr(input), &identifier).unwrap();
+            assert_eq!(
+                &remaining.0, expected_remaining,
+                "Input: {}; Remaining: {}",
+                input, remaining
+            );
         }
     }
 
@@ -330,7 +362,8 @@ mod tests {
         let test_cases = [
             (
                 r#"<<EOF
-EOF"#,
+EOF
+"#,
                 "",
             ),
             (
@@ -357,37 +390,40 @@ and quotes ""#,
 
         for (input, expected) in test_cases.iter() {
             println!("Testing {}", input);
-            assert_eq!(
-                heredoc_string(CompleteStr(input)).unwrap().1,
-                expected.to_string()
-            );
+            let (remaining, actual) = heredoc_string(CompleteStr(input)).unwrap();
+            assert_eq!(remaining.0, "\n");
+            assert_eq!(actual, expected.to_string());
         }
     }
 
     #[test]
     fn strings_are_parsed_correctly() {
         let test_cases = [
-            (r#""""#, ""),
-            (r#""abcd""#, r#"abcd"#),
-            (r#""ab\"cd""#, r#"ab"cd"#),
-            (r#""ab \\ cd""#, r#"ab \ cd"#),
-            (r#""ab \n cd""#, "ab \n cd"),
-            (r#""ab \? cd""#, "ab ? cd"),
+            (r#""""#, "", ""),
+            (r#""abcd""#, r#"abcd"#, ""),
+            (r#""ab\"cd""#, r#"ab"cd"#, ""),
+            (r#""ab \\ cd""#, r#"ab \ cd"#, ""),
+            (r#""ab \n cd""#, "ab \n cd", ""),
+            (r#""ab \? cd""#, "ab ? cd", ""),
             (
                 r#"<<EOF
-    EOF"#,
+    EOF
+"#,
                 "",
+                "\n",
             ),
             (
                 r#""ab \xff \251 \uD000 \U29000""#,
                 "ab ÿ © \u{D000} \u{29000}",
+                "",
             ),
             (
                 r#"<<EOF
 something
     EOF
-    "#,
+"#,
                 "something",
+                "\n",
             ),
             (
                 r#"<<EOH
@@ -396,18 +432,20 @@ with
 new lines
 and quotes "
                         EOH
-    "#,
+"#,
                 r#"something
 with
 new lines
 and quotes ""#,
+                "\n",
             ),
         ];
 
-        for (input, expected) in test_cases.iter() {
+        for (input, expected, expected_remaining) in test_cases.iter() {
             println!("Testing {}", input);
-            let actual = ResultUtilsString::unwrap_output(string(CompleteStr(input)));
-            assert_eq!(&actual, expected);
+            let (remaining, actual) = string(CompleteStr(input)).unwrap();
+            assert_eq!(&remaining.0, expected_remaining);
+            assert_eq!(&actual, expected, "Input: {}", input);
         }
     }
 }
