@@ -411,6 +411,44 @@
 <span id="411">411</span>
 <span id="412">412</span>
 <span id="413">413</span>
+<span id="414">414</span>
+<span id="415">415</span>
+<span id="416">416</span>
+<span id="417">417</span>
+<span id="418">418</span>
+<span id="419">419</span>
+<span id="420">420</span>
+<span id="421">421</span>
+<span id="422">422</span>
+<span id="423">423</span>
+<span id="424">424</span>
+<span id="425">425</span>
+<span id="426">426</span>
+<span id="427">427</span>
+<span id="428">428</span>
+<span id="429">429</span>
+<span id="430">430</span>
+<span id="431">431</span>
+<span id="432">432</span>
+<span id="433">433</span>
+<span id="434">434</span>
+<span id="435">435</span>
+<span id="436">436</span>
+<span id="437">437</span>
+<span id="438">438</span>
+<span id="439">439</span>
+<span id="440">440</span>
+<span id="441">441</span>
+<span id="442">442</span>
+<span id="443">443</span>
+<span id="444">444</span>
+<span id="445">445</span>
+<span id="446">446</span>
+<span id="447">447</span>
+<span id="448">448</span>
+<span id="449">449</span>
+<span id="450">450</span>
+<span id="451">451</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// https://www.reddit.com/r/rust/comments/8rpzjd/parsing_string_literals_in_nom/</span>
 <span class="comment">// https://github.com/Geal/nom/issues/787</span>
@@ -435,13 +473,13 @@
     <span class="ident">c</span>.<span class="ident">is_digit</span>(<span class="number">8</span>)
 }
 
-<span class="kw">fn</span> <span class="ident">not_quoted_string_illegal_char</span>(<span class="ident">c</span>: <span class="ident">char</span>) <span class="op">-&gt;</span> <span class="ident">bool</span> {
+<span class="kw">fn</span> <span class="ident">legal_quoted_string_character</span>(<span class="ident">c</span>: <span class="ident">char</span>) <span class="op">-&gt;</span> <span class="ident">bool</span> {
     <span class="kw">let</span> <span class="ident">test</span> <span class="op">=</span> <span class="ident">c</span> <span class="op">!=</span> <span class="string">&#39;\\&#39;</span> <span class="op">&amp;&amp;</span> <span class="ident">c</span> <span class="op">!=</span> <span class="string">&#39;&quot;&#39;</span>;
     <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;Checking valid string character {:?}: {:?}&quot;</span>, <span class="ident">c</span>, <span class="ident">test</span>);
     <span class="ident">test</span>
 }
 
-<span class="kw">fn</span> <span class="ident">not_quoted_single_line_string_illegal_char</span>(<span class="ident">c</span>: <span class="ident">char</span>) <span class="op">-&gt;</span> <span class="ident">bool</span> {
+<span class="kw">fn</span> <span class="ident">legal_quoted_single_line_string_character</span>(<span class="ident">c</span>: <span class="ident">char</span>) <span class="op">-&gt;</span> <span class="ident">bool</span> {
     <span class="kw">let</span> <span class="ident">test</span> <span class="op">=</span> <span class="ident">c</span> <span class="op">!=</span> <span class="string">&#39;\\&#39;</span> <span class="op">&amp;&amp;</span> <span class="ident">c</span> <span class="op">!=</span> <span class="string">&#39;&quot;&#39;</span> <span class="op">&amp;&amp;</span> <span class="ident">c</span> <span class="op">!=</span> <span class="string">&#39;\r&#39;</span> <span class="op">&amp;&amp;</span> <span class="ident">c</span> <span class="op">!=</span> <span class="string">&#39;\n&#39;</span>;
     <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;Checking valid string character {:?}: {:?}&quot;</span>, <span class="ident">c</span>, <span class="ident">test</span>);
     <span class="ident">test</span>
@@ -506,7 +544,7 @@
 <span class="macro">named</span><span class="macro">!</span>(
     <span class="ident">quoted_string_content</span>(<span class="ident">CompleteStr</span>) <span class="op">-&gt;</span> <span class="ident">String</span>,
     <span class="macro">escaped_transform</span><span class="macro">!</span>(
-        <span class="macro">take_while1</span><span class="macro">!</span>(<span class="ident">not_quoted_string_illegal_char</span>),
+        <span class="macro">take_while1</span><span class="macro">!</span>(<span class="ident">legal_quoted_string_character</span>),
         <span class="string">&#39;\\&#39;</span>,
         <span class="ident">unescape</span>
     )
@@ -522,9 +560,9 @@
 );
 
 <span class="macro">named</span><span class="macro">!</span>(
-    <span class="ident">quoted_single_line_string_content</span>(<span class="ident">CompleteStr</span>) <span class="op">-&gt;</span> <span class="ident">String</span>,
+    <span class="kw">pub</span> <span class="ident">quoted_single_line_string_content</span>(<span class="ident">CompleteStr</span>) <span class="op">-&gt;</span> <span class="ident">String</span>,
     <span class="macro">escaped_transform</span><span class="macro">!</span>(
-        <span class="macro">take_while1</span><span class="macro">!</span>(<span class="ident">not_quoted_single_line_string_illegal_char</span>),
+        <span class="macro">take_while1</span><span class="macro">!</span>(<span class="ident">legal_quoted_single_line_string_character</span>),
         <span class="string">&#39;\\&#39;</span>,
         <span class="ident">unescape</span>
     )
@@ -541,17 +579,20 @@
 
 <span class="doccomment">/// Heredoc marker</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>)]</span>
-<span class="kw">struct</span> <span class="ident">HereDoc</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-    <span class="ident">identifier</span>: <span class="ident">CompleteStr</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>,
-    <span class="ident">indented</span>: <span class="ident">bool</span>,
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">HereDoc</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="ident">identifier</span>: <span class="ident">CompleteStr</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">indented</span>: <span class="ident">bool</span>,
 }
 
-<span class="macro">named</span><span class="macro">!</span>(<span class="ident">heredoc_begin</span>(<span class="ident">CompleteStr</span>) <span class="op">-&gt;</span> <span class="ident">HereDoc</span>,
+<span class="comment">// Start of heredoc identifier. Must end with an EOL</span>
+<span class="comment">// EOL is not consumed</span>
+<span class="macro">named</span><span class="macro">!</span>(
+    <span class="kw">pub</span> <span class="ident">heredoc_begin</span>(<span class="ident">CompleteStr</span>) <span class="op">-&gt;</span> <span class="ident">HereDoc</span>,
     <span class="macro">do_parse</span><span class="macro">!</span>(
         <span class="macro">tag</span><span class="macro">!</span>(<span class="string">&quot;&lt;&lt;&quot;</span>)
         <span class="op">&gt;&gt;</span> <span class="ident">indented</span>: <span class="macro">opt</span><span class="macro">!</span>(<span class="macro">complete</span><span class="macro">!</span>(<span class="macro">tag</span><span class="macro">!</span>(<span class="string">&quot;-&quot;</span>)))
         <span class="op">&gt;&gt;</span> <span class="ident">identifier</span>: <span class="macro">call</span><span class="macro">!</span>(<span class="kw">crate</span>::<span class="ident">utils</span>::<span class="ident">while_predicate1</span>, <span class="op">|</span><span class="ident">c</span><span class="op">|</span> <span class="ident">c</span>.<span class="ident">is_alphanumeric</span>() <span class="op">||</span> <span class="ident">c</span> <span class="op">==</span> <span class="string">&#39;_&#39;</span>)
-        <span class="op">&gt;&gt;</span> <span class="macro">call</span><span class="macro">!</span>(<span class="ident">nom</span>::<span class="ident">eol</span>)
+        <span class="op">&gt;&gt;</span> <span class="macro">peek</span><span class="macro">!</span>(<span class="macro">call</span><span class="macro">!</span>(<span class="ident">nom</span>::<span class="ident">eol</span>))
         <span class="op">&gt;&gt;</span> (<span class="ident">HereDoc</span> {
                 <span class="ident">identifier</span>,
                 <span class="ident">indented</span>: <span class="ident">indented</span> <span class="op">==</span> <span class="prelude-val">Some</span>(<span class="ident">CompleteStr</span>(<span class="string">&quot;-&quot;</span>))
@@ -559,8 +600,10 @@
     )
 );
 
+<span class="comment">// End of heredoc. Must end with an EOL</span>
+<span class="comment">// EOL is not consumed</span>
 <span class="macro">named_args</span><span class="macro">!</span>(
-    <span class="ident">heredoc_end</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>(<span class="ident">identifier</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;_</span> <span class="ident">HereDoc</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>)<span class="op">&lt;</span><span class="ident">CompleteStr</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>, ()<span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">heredoc_end</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>(<span class="ident">identifier</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;_</span> <span class="ident">HereDoc</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>)<span class="op">&lt;</span><span class="ident">CompleteStr</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>, ()<span class="op">&gt;</span>,
     <span class="macro">do_parse</span><span class="macro">!</span>(
         <span class="macro">call</span><span class="macro">!</span>(<span class="ident">nom</span>::<span class="ident">eol</span>)
         <span class="op">&gt;&gt;</span> <span class="macro">call</span><span class="macro">!</span>(<span class="ident">nom</span>::<span class="ident">multispace0</span>)
@@ -570,12 +613,20 @@
     )
 );
 
+<span class="comment">// Parse a Heredoc string</span>
 <span class="macro">named</span><span class="macro">!</span>(
-    <span class="ident">heredoc_string</span>(<span class="ident">CompleteStr</span>) <span class="op">-&gt;</span> <span class="ident">String</span>,
+    <span class="kw">pub</span> <span class="ident">heredoc_string</span>(<span class="ident">CompleteStr</span>) <span class="op">-&gt;</span> <span class="ident">String</span>,
     <span class="macro">do_parse</span><span class="macro">!</span>(
         <span class="ident">identifier</span>: <span class="macro">call</span><span class="macro">!</span>(<span class="ident">heredoc_begin</span>)
-        <span class="op">&gt;&gt;</span> <span class="ident">strings</span>: <span class="macro">opt</span><span class="macro">!</span>(<span class="macro">complete</span><span class="macro">!</span>(<span class="macro">many_till</span><span class="macro">!</span>(<span class="macro">call</span><span class="macro">!</span>(<span class="ident">nom</span>::<span class="ident">anychar</span>), <span class="macro">call</span><span class="macro">!</span>(<span class="ident">heredoc_end</span>, <span class="kw-2">&amp;</span><span class="ident">identifier</span>))))
-        <span class="op">&gt;&gt;</span> (<span class="ident">strings</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">s</span>.<span class="number">0</span>.<span class="ident">into_iter</span>().<span class="ident">collect</span>()).<span class="ident">unwrap_or_else</span>(<span class="op">||</span> <span class="string">&quot;&quot;</span>.<span class="ident">to_string</span>()))
+        <span class="op">&gt;&gt;</span> <span class="ident">strings</span>: <span class="macro">alt</span><span class="macro">!</span>(
+            <span class="macro">call</span><span class="macro">!</span>(<span class="ident">heredoc_end</span>, <span class="kw-2">&amp;</span><span class="ident">identifier</span>) <span class="op">=&gt;</span> {<span class="op">|</span>()<span class="op">|</span> <span class="macro">vec</span><span class="macro">!</span>[] }
+            <span class="op">|</span> <span class="macro">do_parse</span><span class="macro">!</span>(
+                <span class="macro">call</span><span class="macro">!</span>(<span class="ident">nom</span>::<span class="ident">eol</span>)
+                <span class="op">&gt;&gt;</span> <span class="ident">content</span>: <span class="macro">many_till</span><span class="macro">!</span>(<span class="macro">call</span><span class="macro">!</span>(<span class="ident">nom</span>::<span class="ident">anychar</span>), <span class="macro">call</span><span class="macro">!</span>(<span class="ident">heredoc_end</span>, <span class="kw-2">&amp;</span><span class="ident">identifier</span>))
+                <span class="op">&gt;&gt;</span> (<span class="ident">content</span>.<span class="number">0</span>)
+            )
+        )
+        <span class="op">&gt;&gt;</span> (<span class="ident">strings</span>.<span class="ident">into_iter</span>().<span class="ident">collect</span>())
     )
 );
 
@@ -690,6 +741,7 @@
                     <span class="ident">identifier</span>: <span class="ident">CompleteStr</span>(<span class="string">&quot;EOF&quot;</span>),
                     <span class="ident">indented</span>: <span class="bool-val">false</span>,
                 },
+                <span class="string">&quot;\n&quot;</span>,
             ),
             (
                 <span class="string">&quot;&lt;&lt;-EOH\n&quot;</span>,
@@ -697,19 +749,22 @@
                     <span class="ident">identifier</span>: <span class="ident">CompleteStr</span>(<span class="string">&quot;EOH&quot;</span>),
                     <span class="ident">indented</span>: <span class="bool-val">true</span>,
                 },
+                <span class="string">&quot;\n&quot;</span>,
             ),
             (
-                <span class="string">&quot;&lt;&lt;藏_\n&quot;</span>,
+                <span class="string">&quot;&lt;&lt;藏_\r\n&quot;</span>,
                 <span class="ident">HereDoc</span> {
                     <span class="ident">identifier</span>: <span class="ident">CompleteStr</span>(<span class="string">&quot;藏_&quot;</span>),
                     <span class="ident">indented</span>: <span class="bool-val">false</span>,
                 },
+                <span class="string">&quot;\r\n&quot;</span>,
             ),
         ];
 
-        <span class="kw">for</span> (<span class="ident">input</span>, <span class="ident">expected</span>) <span class="kw">in</span> <span class="ident">test_cases</span>.<span class="ident">iter</span>() {
+        <span class="kw">for</span> (<span class="ident">input</span>, <span class="ident">expected</span>, <span class="ident">expected_remaining</span>) <span class="kw">in</span> <span class="ident">test_cases</span>.<span class="ident">iter</span>() {
             <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;Testing {}&quot;</span>, <span class="ident">input</span>);
-            <span class="kw">let</span> (<span class="kw">_</span>, <span class="ident">actual</span>) <span class="op">=</span> <span class="ident">heredoc_begin</span>(<span class="ident">CompleteStr</span>(<span class="ident">input</span>)).<span class="ident">unwrap</span>();
+            <span class="kw">let</span> (<span class="ident">remaining</span>, <span class="ident">actual</span>) <span class="op">=</span> <span class="ident">heredoc_begin</span>(<span class="ident">CompleteStr</span>(<span class="ident">input</span>)).<span class="ident">unwrap</span>();
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="kw-2">&amp;</span><span class="ident">remaining</span>.<span class="number">0</span>, <span class="ident">expected_remaining</span>);
             <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="kw-2">&amp;</span><span class="ident">actual</span>, <span class="ident">expected</span>);
         }
     }
@@ -723,6 +778,7 @@
                     <span class="ident">identifier</span>: <span class="ident">CompleteStr</span>(<span class="string">&quot;EOF&quot;</span>),
                     <span class="ident">indented</span>: <span class="bool-val">false</span>,
                 },
+                <span class="string">&quot;\n&quot;</span>,
             ),
             (
                 <span class="string">&quot;\n    EOH\n&quot;</span>,
@@ -730,12 +786,26 @@
                     <span class="ident">identifier</span>: <span class="ident">CompleteStr</span>(<span class="string">&quot;EOH&quot;</span>),
                     <span class="ident">indented</span>: <span class="bool-val">true</span>,
                 },
+                <span class="string">&quot;\n&quot;</span>,
+            ),
+            (
+                <span class="string">&quot;\r\nEOF\r\n&quot;</span>,
+                <span class="ident">HereDoc</span> {
+                    <span class="ident">identifier</span>: <span class="ident">CompleteStr</span>(<span class="string">&quot;EOF&quot;</span>),
+                    <span class="ident">indented</span>: <span class="bool-val">false</span>,
+                },
+                <span class="string">&quot;\r\n&quot;</span>,
             ),
         ];
 
-        <span class="kw">for</span> (<span class="ident">input</span>, <span class="ident">identifier</span>) <span class="kw">in</span> <span class="ident">test_cases</span>.<span class="ident">iter</span>() {
+        <span class="kw">for</span> (<span class="ident">input</span>, <span class="ident">identifier</span>, <span class="ident">expected_remaining</span>) <span class="kw">in</span> <span class="ident">test_cases</span>.<span class="ident">iter</span>() {
             <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;Testing {}&quot;</span>, <span class="ident">input</span>);
-            <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">heredoc_end</span>(<span class="ident">CompleteStr</span>(<span class="ident">input</span>), <span class="kw-2">&amp;</span><span class="ident">identifier</span>).<span class="ident">unwrap</span>();
+            <span class="kw">let</span> (<span class="ident">remaining</span>, ()) <span class="op">=</span> <span class="ident">heredoc_end</span>(<span class="ident">CompleteStr</span>(<span class="ident">input</span>), <span class="kw-2">&amp;</span><span class="ident">identifier</span>).<span class="ident">unwrap</span>();
+            <span class="macro">assert_eq</span><span class="macro">!</span>(
+                <span class="kw-2">&amp;</span><span class="ident">remaining</span>.<span class="number">0</span>, <span class="ident">expected_remaining</span>,
+                <span class="string">&quot;Input: {}; Remaining: {}&quot;</span>,
+                <span class="ident">input</span>, <span class="ident">remaining</span>
+            );
         }
     }
 
@@ -744,7 +814,8 @@
         <span class="kw">let</span> <span class="ident">test_cases</span> <span class="op">=</span> [
             (
                 <span class="string">r#&quot;&lt;&lt;EOF
-EOF&quot;#</span>,
+EOF
+&quot;#</span>,
                 <span class="string">&quot;&quot;</span>,
             ),
             (
@@ -771,37 +842,40 @@ and quotes &quot;&quot;#</span>,
 
         <span class="kw">for</span> (<span class="ident">input</span>, <span class="ident">expected</span>) <span class="kw">in</span> <span class="ident">test_cases</span>.<span class="ident">iter</span>() {
             <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;Testing {}&quot;</span>, <span class="ident">input</span>);
-            <span class="macro">assert_eq</span><span class="macro">!</span>(
-                <span class="ident">heredoc_string</span>(<span class="ident">CompleteStr</span>(<span class="ident">input</span>)).<span class="ident">unwrap</span>().<span class="number">1</span>,
-                <span class="ident">expected</span>.<span class="ident">to_string</span>()
-            );
+            <span class="kw">let</span> (<span class="ident">remaining</span>, <span class="ident">actual</span>) <span class="op">=</span> <span class="ident">heredoc_string</span>(<span class="ident">CompleteStr</span>(<span class="ident">input</span>)).<span class="ident">unwrap</span>();
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">remaining</span>.<span class="number">0</span>, <span class="string">&quot;\n&quot;</span>);
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">actual</span>, <span class="ident">expected</span>.<span class="ident">to_string</span>());
         }
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">strings_are_parsed_correctly</span>() {
         <span class="kw">let</span> <span class="ident">test_cases</span> <span class="op">=</span> [
-            (<span class="string">r#&quot;&quot;&quot;&quot;#</span>, <span class="string">&quot;&quot;</span>),
-            (<span class="string">r#&quot;&quot;abcd&quot;&quot;#</span>, <span class="string">r#&quot;abcd&quot;#</span>),
-            (<span class="string">r#&quot;&quot;ab\&quot;cd&quot;&quot;#</span>, <span class="string">r#&quot;ab&quot;cd&quot;#</span>),
-            (<span class="string">r#&quot;&quot;ab \\ cd&quot;&quot;#</span>, <span class="string">r#&quot;ab \ cd&quot;#</span>),
-            (<span class="string">r#&quot;&quot;ab \n cd&quot;&quot;#</span>, <span class="string">&quot;ab \n cd&quot;</span>),
-            (<span class="string">r#&quot;&quot;ab \? cd&quot;&quot;#</span>, <span class="string">&quot;ab ? cd&quot;</span>),
+            (<span class="string">r#&quot;&quot;&quot;&quot;#</span>, <span class="string">&quot;&quot;</span>, <span class="string">&quot;&quot;</span>),
+            (<span class="string">r#&quot;&quot;abcd&quot;&quot;#</span>, <span class="string">r#&quot;abcd&quot;#</span>, <span class="string">&quot;&quot;</span>),
+            (<span class="string">r#&quot;&quot;ab\&quot;cd&quot;&quot;#</span>, <span class="string">r#&quot;ab&quot;cd&quot;#</span>, <span class="string">&quot;&quot;</span>),
+            (<span class="string">r#&quot;&quot;ab \\ cd&quot;&quot;#</span>, <span class="string">r#&quot;ab \ cd&quot;#</span>, <span class="string">&quot;&quot;</span>),
+            (<span class="string">r#&quot;&quot;ab \n cd&quot;&quot;#</span>, <span class="string">&quot;ab \n cd&quot;</span>, <span class="string">&quot;&quot;</span>),
+            (<span class="string">r#&quot;&quot;ab \? cd&quot;&quot;#</span>, <span class="string">&quot;ab ? cd&quot;</span>, <span class="string">&quot;&quot;</span>),
             (
                 <span class="string">r#&quot;&lt;&lt;EOF
-    EOF&quot;#</span>,
+    EOF
+&quot;#</span>,
                 <span class="string">&quot;&quot;</span>,
+                <span class="string">&quot;\n&quot;</span>,
             ),
             (
                 <span class="string">r#&quot;&quot;ab \xff \251 \uD000 \U29000&quot;&quot;#</span>,
                 <span class="string">&quot;ab ÿ © \u{D000} \u{29000}&quot;</span>,
+                <span class="string">&quot;&quot;</span>,
             ),
             (
                 <span class="string">r#&quot;&lt;&lt;EOF
 something
     EOF
-    &quot;#</span>,
+&quot;#</span>,
                 <span class="string">&quot;something&quot;</span>,
+                <span class="string">&quot;\n&quot;</span>,
             ),
             (
                 <span class="string">r#&quot;&lt;&lt;EOH
@@ -810,18 +884,20 @@ with
 new lines
 and quotes &quot;
                         EOH
-    &quot;#</span>,
+&quot;#</span>,
                 <span class="string">r#&quot;something
 with
 new lines
 and quotes &quot;&quot;#</span>,
+                <span class="string">&quot;\n&quot;</span>,
             ),
         ];
 
-        <span class="kw">for</span> (<span class="ident">input</span>, <span class="ident">expected</span>) <span class="kw">in</span> <span class="ident">test_cases</span>.<span class="ident">iter</span>() {
+        <span class="kw">for</span> (<span class="ident">input</span>, <span class="ident">expected</span>, <span class="ident">expected_remaining</span>) <span class="kw">in</span> <span class="ident">test_cases</span>.<span class="ident">iter</span>() {
             <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;Testing {}&quot;</span>, <span class="ident">input</span>);
-            <span class="kw">let</span> <span class="ident">actual</span> <span class="op">=</span> <span class="ident">ResultUtilsString</span>::<span class="ident">unwrap_output</span>(<span class="ident">string</span>(<span class="ident">CompleteStr</span>(<span class="ident">input</span>)));
-            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="kw-2">&amp;</span><span class="ident">actual</span>, <span class="ident">expected</span>);
+            <span class="kw">let</span> (<span class="ident">remaining</span>, <span class="ident">actual</span>) <span class="op">=</span> <span class="ident">string</span>(<span class="ident">CompleteStr</span>(<span class="ident">input</span>)).<span class="ident">unwrap</span>();
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="kw-2">&amp;</span><span class="ident">remaining</span>.<span class="number">0</span>, <span class="ident">expected_remaining</span>);
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="kw-2">&amp;</span><span class="ident">actual</span>, <span class="ident">expected</span>, <span class="string">&quot;Input: {}&quot;</span>, <span class="ident">input</span>);
         }
     }
 }

@@ -1477,6 +1477,25 @@
 <span id="1477">1477</span>
 <span id="1478">1478</span>
 <span id="1479">1479</span>
+<span id="1480">1480</span>
+<span id="1481">1481</span>
+<span id="1482">1482</span>
+<span id="1483">1483</span>
+<span id="1484">1484</span>
+<span id="1485">1485</span>
+<span id="1486">1486</span>
+<span id="1487">1487</span>
+<span id="1488">1488</span>
+<span id="1489">1489</span>
+<span id="1490">1490</span>
+<span id="1491">1491</span>
+<span id="1492">1492</span>
+<span id="1493">1493</span>
+<span id="1494">1494</span>
+<span id="1495">1495</span>
+<span id="1496">1496</span>
+<span id="1497">1497</span>
+<span id="1498">1498</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">borrow</span>::<span class="ident">Cow</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">collections</span>::<span class="ident">HashMap</span>;
@@ -1484,13 +1503,13 @@
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">string</span>::<span class="ident">ToString</span>;
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">constants</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">literals</span>::{<span class="self">self</span>, <span class="ident">Key</span>};
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">literals</span>::{<span class="self">self</span>, <span class="ident">newline</span>, <span class="ident">Key</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">AsOwned</span>, <span class="ident">Error</span>, <span class="ident">KeyValuePairs</span>, <span class="ident">ScalarLength</span>};
 
 <span class="kw">use</span> <span class="ident">nom</span>::<span class="ident">types</span>::<span class="ident">CompleteStr</span>;
 <span class="kw">use</span> <span class="ident">nom</span>::{
-    <span class="ident">alt</span>, <span class="ident">alt_complete</span>, <span class="ident">call</span>, <span class="ident">char</span>, <span class="ident">complete</span>, <span class="ident">do_parse</span>, <span class="ident">eof</span>, <span class="ident">many0</span>, <span class="ident">many1</span>, <span class="ident">map</span>, <span class="ident">named</span>, <span class="ident">opt</span>,
-    <span class="ident">preceded</span>, <span class="ident">tag</span>, <span class="ident">terminated</span>, <span class="ident">ws</span>,
+    <span class="ident">alt</span>, <span class="ident">alt_complete</span>, <span class="ident">call</span>, <span class="ident">char</span>, <span class="ident">complete</span>, <span class="ident">do_parse</span>, <span class="ident">eof</span>, <span class="ident">many0</span>, <span class="ident">named</span>, <span class="ident">opt</span>, <span class="ident">preceded</span>, <span class="ident">tag</span>,
+    <span class="ident">terminated</span>,
 };
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">PartialEq</span>, <span class="ident">Clone</span>)]</span>
@@ -2300,21 +2319,31 @@
     }
 }
 
+<span class="macro">named</span><span class="macro">!</span>(
+    <span class="ident">list_begin</span>(<span class="ident">CompleteStr</span>) <span class="op">-&gt;</span> <span class="ident">char</span>,
+    <span class="macro">char</span><span class="macro">!</span>(<span class="string">&#39;[&#39;</span>)
+);
+
+<span class="macro">named</span><span class="macro">!</span>(
+    <span class="ident">list_separator</span>(<span class="ident">CompleteStr</span>) <span class="op">-&gt;</span> <span class="ident">char</span>,
+    <span class="macro">char</span><span class="macro">!</span>(<span class="string">&#39;,&#39;</span>)
+);
+
 <span class="comment">// From https://github.com/Geal/nom/issues/14#issuecomment-158788226</span>
 <span class="comment">// whitespace! Must not be captured after `]`!</span>
 <span class="macro">named</span><span class="macro">!</span>(
     <span class="kw">pub</span> <span class="ident">list</span>(<span class="ident">CompleteStr</span>) <span class="op">-&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span>,
     <span class="macro">preceded</span><span class="macro">!</span>(
-        <span class="macro">whitespace</span><span class="macro">!</span>(<span class="macro">char</span><span class="macro">!</span>(<span class="string">&#39;[&#39;</span>)),
+        <span class="ident">list_begin</span>,
         <span class="macro">terminated</span><span class="macro">!</span>(
             <span class="macro">whitespace</span><span class="macro">!</span>(
                 <span class="macro">separated_list</span><span class="macro">!</span>(
-                    <span class="macro">char</span><span class="macro">!</span>(<span class="string">&#39;,&#39;</span>),
+                    <span class="ident">list_separator</span>,
                     <span class="ident">single_value</span>
                 )
             ),
             <span class="macro">terminated</span><span class="macro">!</span>(
-                <span class="macro">whitespace</span><span class="macro">!</span>(<span class="macro">opt</span><span class="macro">!</span>(<span class="macro">char</span><span class="macro">!</span>(<span class="string">&#39;,&#39;</span>))),
+                <span class="macro">whitespace</span><span class="macro">!</span>(<span class="macro">opt</span><span class="macro">!</span>(<span class="ident">list_separator</span>)),
                 <span class="macro">char</span><span class="macro">!</span>(<span class="string">&#39;]&#39;</span>)
             )
         )
@@ -2346,7 +2375,7 @@
 <span class="comment">// `&quot;key&quot; = ... | [&quot;...&quot;] | {...}`</span>
 <span class="macro">named</span><span class="macro">!</span>(
     <span class="kw">pub</span> <span class="ident">key_value</span>(<span class="ident">CompleteStr</span>) <span class="op">-&gt;</span> (<span class="ident">Key</span>, <span class="ident">Value</span>),
-    <span class="macro">space_tab</span><span class="macro">!</span>(
+    <span class="macro">inline_whitespace</span><span class="macro">!</span>(
         <span class="macro">alt</span><span class="macro">!</span>(
             <span class="macro">do_parse</span><span class="macro">!</span>(
                 <span class="ident">key</span>: <span class="macro">call</span><span class="macro">!</span>(<span class="ident">literals</span>::<span class="ident">key</span>)
@@ -2378,7 +2407,7 @@
                         <span class="macro">call</span><span class="macro">!</span>(<span class="ident">key_value</span>),
                         <span class="macro">alt</span><span class="macro">!</span>(
                             <span class="macro">whitespace</span><span class="macro">!</span>(<span class="macro">tag</span><span class="macro">!</span>(<span class="string">&quot;,&quot;</span>))
-                            <span class="op">|</span> <span class="macro">map</span><span class="macro">!</span>(<span class="macro">many1</span><span class="macro">!</span>(<span class="ident">nom</span>::<span class="ident">eol</span>), <span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">CompleteStr</span>(<span class="string">&quot;&quot;</span>))
+                            <span class="op">|</span> <span class="macro">call</span><span class="macro">!</span>(<span class="ident">newline</span>) <span class="op">=&gt;</span> { <span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">CompleteStr</span>(<span class="string">&quot;&quot;</span>) }
                             <span class="op">|</span> <span class="macro">eof</span><span class="macro">!</span>()
                         )
                     )
@@ -2442,13 +2471,13 @@
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">single_values_are_parsed_successfully</span>() {
         <span class="kw">let</span> <span class="ident">test_cases</span> <span class="op">=</span> [
-            (<span class="string">r#&quot;123&quot;#</span>, <span class="ident">Value</span>::<span class="ident">Integer</span>(<span class="number">123</span>)),
-            (<span class="string">&quot;123&quot;</span>, <span class="ident">Value</span>::<span class="ident">Integer</span>(<span class="number">123</span>)),
-            (<span class="string">&quot;123&quot;</span>, <span class="ident">Value</span>::<span class="ident">Integer</span>(<span class="number">123</span>)),
-            (<span class="string">&quot;true&quot;</span>, <span class="ident">Value</span>::<span class="ident">Boolean</span>(<span class="bool-val">true</span>)),
-            (<span class="string">&quot;123.456&quot;</span>, <span class="ident">Value</span>::<span class="ident">Float</span>(<span class="number">123.456</span>)),
-            (<span class="string">&quot;123&quot;</span>, <span class="ident">Value</span>::<span class="ident">Integer</span>(<span class="number">123</span>)),
-            (<span class="string">r#&quot;&quot;foobar&quot;&quot;#</span>, <span class="ident">Value</span>::<span class="ident">String</span>(<span class="string">&quot;foobar&quot;</span>.<span class="ident">to_string</span>())),
+            (<span class="string">r#&quot;123&quot;#</span>, <span class="ident">Value</span>::<span class="ident">Integer</span>(<span class="number">123</span>), <span class="string">&quot;&quot;</span>),
+            (<span class="string">&quot;123&quot;</span>, <span class="ident">Value</span>::<span class="ident">Integer</span>(<span class="number">123</span>), <span class="string">&quot;&quot;</span>),
+            (<span class="string">&quot;123&quot;</span>, <span class="ident">Value</span>::<span class="ident">Integer</span>(<span class="number">123</span>), <span class="string">&quot;&quot;</span>),
+            (<span class="string">&quot;true&quot;</span>, <span class="ident">Value</span>::<span class="ident">Boolean</span>(<span class="bool-val">true</span>), <span class="string">&quot;&quot;</span>),
+            (<span class="string">&quot;123.456&quot;</span>, <span class="ident">Value</span>::<span class="ident">Float</span>(<span class="number">123.456</span>), <span class="string">&quot;&quot;</span>),
+            (<span class="string">&quot;123&quot;</span>, <span class="ident">Value</span>::<span class="ident">Integer</span>(<span class="number">123</span>), <span class="string">&quot;&quot;</span>),
+            (<span class="string">r#&quot;&quot;foobar&quot;&quot;#</span>, <span class="ident">Value</span>::<span class="ident">String</span>(<span class="string">&quot;foobar&quot;</span>.<span class="ident">to_string</span>()), <span class="string">&quot;&quot;</span>),
             (
                 <span class="string">r#&quot;&lt;&lt;EOF
 new
@@ -2456,6 +2485,7 @@ line
 EOF
 &quot;#</span>,
                 <span class="ident">Value</span>::<span class="ident">String</span>(<span class="string">&quot;new\nline&quot;</span>.<span class="ident">to_string</span>()),
+                <span class="string">&quot;\n&quot;</span>,
             ),
             (
                 <span class="string">r#&quot;[true, false, 123, -123.456, &quot;foobar&quot;]&quot;#</span>,
@@ -2466,18 +2496,21 @@ EOF
                     <span class="ident">Value</span>::<span class="ident">from</span>(<span class="op">-</span><span class="number">123.456</span>),
                     <span class="ident">Value</span>::<span class="ident">from</span>(<span class="string">&quot;foobar&quot;</span>),
                 ]),
+                <span class="string">&quot;&quot;</span>,
             ),
             (
                 <span class="string">r#&quot;{
         test = 123
 }&quot;#</span>,
                 <span class="ident">Value</span>::<span class="ident">new_map</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="macro">vec</span><span class="macro">!</span>[(<span class="ident">Key</span>::<span class="ident">new_identifier</span>(<span class="string">&quot;test&quot;</span>), <span class="ident">Value</span>::<span class="ident">from</span>(<span class="number">123</span>))]]),
+                <span class="string">&quot;&quot;</span>,
             ),
         ];
 
-        <span class="kw">for</span> (<span class="ident">input</span>, <span class="ident">expected_value</span>) <span class="kw">in</span> <span class="ident">test_cases</span>.<span class="ident">iter</span>() {
+        <span class="kw">for</span> (<span class="ident">input</span>, <span class="ident">expected_value</span>, <span class="ident">expected_remaining</span>) <span class="kw">in</span> <span class="ident">test_cases</span>.<span class="ident">iter</span>() {
             <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;Testing {}&quot;</span>, <span class="ident">input</span>);
-            <span class="kw">let</span> <span class="ident">actual_value</span> <span class="op">=</span> <span class="ident">single_value</span>(<span class="ident">CompleteStr</span>(<span class="ident">input</span>)).<span class="ident">unwrap_output</span>();
+            <span class="kw">let</span> (<span class="ident">remaining</span>, <span class="ident">actual_value</span>) <span class="op">=</span> <span class="ident">single_value</span>(<span class="ident">CompleteStr</span>(<span class="ident">input</span>)).<span class="ident">unwrap</span>();
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="kw-2">&amp;</span><span class="ident">remaining</span>.<span class="number">0</span>, <span class="ident">expected_remaining</span>);
             <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">actual_value</span>, <span class="kw-2">*</span><span class="ident">expected_value</span>);
         }
     }
@@ -2517,14 +2550,15 @@ foo = &quot;bar&quot;
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">key_value_pairs_are_parsed_successfully</span>() {
         <span class="kw">let</span> <span class="ident">test_cases</span> <span class="op">=</span> [
-            (<span class="string">&quot;test = 123&quot;</span>, (<span class="string">&quot;test&quot;</span>, <span class="ident">Value</span>::<span class="ident">Integer</span>(<span class="number">123</span>))),
-            (<span class="string">&quot;test = 123&quot;</span>, (<span class="string">&quot;test&quot;</span>, <span class="ident">Value</span>::<span class="ident">Integer</span>(<span class="number">123</span>))),
-            (<span class="string">&quot;test = true&quot;</span>, (<span class="string">&quot;test&quot;</span>, <span class="ident">Value</span>::<span class="ident">Boolean</span>(<span class="bool-val">true</span>))),
-            (<span class="string">&quot;test = 123.456&quot;</span>, (<span class="string">&quot;test&quot;</span>, <span class="ident">Value</span>::<span class="ident">Float</span>(<span class="number">123.456</span>))),
-            (<span class="string">&quot;   test   =   123  &quot;</span>, (<span class="string">&quot;test&quot;</span>, <span class="ident">Value</span>::<span class="ident">Integer</span>(<span class="number">123</span>))), <span class="comment">// Random spaces</span>
+            (<span class="string">&quot;test = 123&quot;</span>, (<span class="string">&quot;test&quot;</span>, <span class="ident">Value</span>::<span class="ident">Integer</span>(<span class="number">123</span>)), <span class="string">&quot;&quot;</span>),
+            (<span class="string">&quot;test = 123&quot;</span>, (<span class="string">&quot;test&quot;</span>, <span class="ident">Value</span>::<span class="ident">Integer</span>(<span class="number">123</span>)), <span class="string">&quot;&quot;</span>),
+            (<span class="string">&quot;test = true&quot;</span>, (<span class="string">&quot;test&quot;</span>, <span class="ident">Value</span>::<span class="ident">Boolean</span>(<span class="bool-val">true</span>)), <span class="string">&quot;&quot;</span>),
+            (<span class="string">&quot;test = 123.456&quot;</span>, (<span class="string">&quot;test&quot;</span>, <span class="ident">Value</span>::<span class="ident">Float</span>(<span class="number">123.456</span>)), <span class="string">&quot;&quot;</span>),
+            (<span class="string">&quot;   test   =   123  &quot;</span>, (<span class="string">&quot;test&quot;</span>, <span class="ident">Value</span>::<span class="ident">Integer</span>(<span class="number">123</span>)), <span class="string">&quot;&quot;</span>), <span class="comment">// Random spaces</span>
             (
                 <span class="string">r#&quot;&quot;a/b/c&quot; = &quot;foobar&quot;,&quot;#</span>,
                 (<span class="string">&quot;a/b/c&quot;</span>, <span class="ident">Value</span>::<span class="ident">String</span>(<span class="string">&quot;foobar&quot;</span>.<span class="ident">to_string</span>())),
+                <span class="string">&quot;,&quot;</span>,
             ),
             (
                 <span class="string">r#&quot;test = &lt;&lt;EOF
@@ -2533,11 +2567,13 @@ line
 EOF
 &quot;#</span>,
                 (<span class="string">&quot;test&quot;</span>, <span class="ident">Value</span>::<span class="ident">String</span>(<span class="string">&quot;new\nline&quot;</span>.<span class="ident">to_string</span>())),
+                <span class="string">&quot;\n&quot;</span>,
             ),
-            (<span class="string">r#&quot;test = [],&quot;#</span>, (<span class="string">&quot;test&quot;</span>, <span class="ident">Value</span>::<span class="ident">List</span>(<span class="macro">vec</span><span class="macro">!</span>[]))),
+            (<span class="string">r#&quot;test = [],&quot;#</span>, (<span class="string">&quot;test&quot;</span>, <span class="ident">Value</span>::<span class="ident">List</span>(<span class="macro">vec</span><span class="macro">!</span>[])), <span class="string">&quot;,&quot;</span>),
             (
                 <span class="string">r#&quot;test = [1,]&quot;#</span>,
                 (<span class="string">&quot;test&quot;</span>, <span class="ident">Value</span>::<span class="ident">new_list</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">Value</span>::<span class="ident">from</span>(<span class="number">1</span>)])),
+                <span class="string">&quot;&quot;</span>,
             ),
             (
                 <span class="string">r#&quot;test = [true, false, 123, -123.456, &quot;foobar&quot;],&quot;#</span>,
@@ -2551,12 +2587,14 @@ EOF
                         <span class="ident">Value</span>::<span class="ident">from</span>(<span class="string">&quot;foobar&quot;</span>),
                     ]),
                 ),
+                <span class="string">&quot;,&quot;</span>,
             ),
         ];
 
-        <span class="kw">for</span> (<span class="ident">input</span>, (<span class="ident">expected_key</span>, <span class="ident">expected_value</span>)) <span class="kw">in</span> <span class="ident">test_cases</span>.<span class="ident">iter</span>() {
+        <span class="kw">for</span> (<span class="ident">input</span>, (<span class="ident">expected_key</span>, <span class="ident">expected_value</span>), <span class="ident">expected_remaining</span>) <span class="kw">in</span> <span class="ident">test_cases</span>.<span class="ident">iter</span>() {
             <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;Testing {}&quot;</span>, <span class="ident">input</span>);
-            <span class="kw">let</span> (<span class="ident">actual_key</span>, <span class="ident">actual_value</span>) <span class="op">=</span> <span class="ident">key_value</span>(<span class="ident">CompleteStr</span>(<span class="ident">input</span>)).<span class="ident">unwrap_output</span>();
+            <span class="kw">let</span> (<span class="ident">remaining</span>, (<span class="ident">actual_key</span>, <span class="ident">actual_value</span>)) <span class="op">=</span> <span class="ident">key_value</span>(<span class="ident">CompleteStr</span>(<span class="ident">input</span>)).<span class="ident">unwrap</span>();
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="kw-2">&amp;</span><span class="ident">remaining</span>.<span class="number">0</span>, <span class="ident">expected_remaining</span>);
             <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">actual_key</span>.<span class="ident">unwrap</span>(), <span class="kw-2">*</span><span class="ident">expected_key</span>);
             <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">actual_value</span>, <span class="kw-2">*</span><span class="ident">expected_value</span>);
         }

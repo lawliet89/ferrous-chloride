@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["heredoc_begin",""],["heredoc_end",""],["heredoc_string",""],["quoted_single_line_string",""],["quoted_single_line_string_content",""],["string",""]],"struct":[["HereDoc","Heredoc marker"]]});
