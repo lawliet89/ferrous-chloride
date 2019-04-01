@@ -162,7 +162,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     }
 
     forward_to_deserialize_any! {
-        newtype_struct seq tuple
+        seq tuple
         tuple_struct map struct enum identifier ignored_any
     }
 
@@ -250,6 +250,17 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: de::Visitor<'de>,
     {
         self.deserialize_unit(visitor)
+    }
+
+    fn deserialize_newtype_struct<V>(
+        self,
+        _name: &'static str,
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        visitor.visit_newtype_struct(self)
     }
 }
 
@@ -427,5 +438,15 @@ and quotes ""#,
 
         let mut deserializer = Deserializer::from_str("null");
         let _unit = Unit::deserialize(&mut deserializer).unwrap();
+    }
+
+    #[test]
+    fn deserialize_newtype_struct() {
+        #[derive(Deserialize)]
+        struct Newtype(pub bool);
+
+        let mut deserializer = Deserializer::from_str("true");
+        let newtype = Newtype::deserialize(&mut deserializer).unwrap();
+        assert!(newtype.0);
     }
 }
