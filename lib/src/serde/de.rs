@@ -114,7 +114,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     }
 
     forward_to_deserialize_any! {
-        char
         bytes byte_buf option unit unit_struct newtype_struct seq tuple
         tuple_struct map struct enum identifier ignored_any
     }
@@ -146,6 +145,20 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         visitor.visit_str(&self.parse_string()?)
+    }
+
+    fn deserialize_char<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        let parsed = self.parse_string()?;
+        let parsed = if parsed.len() != 1 {
+            Err(Error::ExpectedCharacterGotString(parsed))?
+        } else {
+            parsed
+        };
+        let character = parsed.chars().next().expect("to have one character");
+        visitor.visit_char(character)
     }
 }
 
@@ -186,6 +199,13 @@ mod tests {
         let mut deserializer = Deserializer::from_str("-12345");
         let deserialized = i32::deserialize(&mut deserializer).unwrap();
         assert_eq!(deserialized, -12345);
+    }
+
+    #[test]
+    #[should_panic(expected = "Overflow")]
+    fn deserialize_integer_checks_for_overflow() {
+        let mut deserializer = Deserializer::from_str("12345");
+        let _ = u8::deserialize(&mut deserializer).unwrap();
     }
 
     #[test]
@@ -247,5 +267,19 @@ and quotes ""#,
             let deserialized = String::deserialize(&mut deserializer).unwrap();
             assert_eq!(&deserialized, expected);
         }
+    }
+
+    #[test]
+    fn deserialize_char() {
+        let mut deserializer = Deserializer::from_str("\"c\"");
+        let deserialized = char::deserialize(&mut deserializer).unwrap();
+        assert_eq!(deserialized, 'c');
+    }
+
+    #[test]
+    #[should_panic(expected = "ExpectedCharacterGotString")]
+    fn deserialize_char_should_error_on_strings() {
+        let mut deserializer = Deserializer::from_str("\"foobar\"");
+        let _ = char::deserialize(&mut deserializer).unwrap();
     }
 }

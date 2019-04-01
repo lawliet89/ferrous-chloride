@@ -15,6 +15,8 @@ pub enum Error {
     UnexpectedFloat,
     #[fail(display = "Overflow when trying to convert to {}", _0)]
     Overflow(&'static str),
+    #[fail(display = "Expected single character string, got {}", _0)]
+    ExpectedCharacterGotString(String),
     #[fail(display = "{}", _0)]
     Custom(String),
 }
