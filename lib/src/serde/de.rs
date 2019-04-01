@@ -162,7 +162,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     }
 
     forward_to_deserialize_any! {
-        unit_struct newtype_struct seq tuple
+        newtype_struct seq tuple
         tuple_struct map struct enum identifier ignored_any
     }
 
@@ -240,6 +240,17 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             _ => visitor.visit_some(self),
         }
     }
+
+    fn deserialize_unit_struct<V>(
+        self,
+        _name: &'static str,
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        self.deserialize_unit(visitor)
+    }
 }
 
 pub fn from_str<'a, T>(s: &'a str) -> Result<T, Compat>
@@ -259,6 +270,7 @@ where
 mod tests {
     use super::*;
 
+    use serde::Deserialize;
     use serde_bytes::ByteBuf;
 
     #[test]
@@ -406,5 +418,14 @@ and quotes ""#,
         let mut deserializer = Deserializer::from_str("42");
         let deserialized: Option<u32> = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(deserialized, Some(42));
+    }
+
+    #[test]
+    fn deserialize_unit_struct() {
+        #[derive(Deserialize)]
+        struct Unit;
+
+        let mut deserializer = Deserializer::from_str("null");
+        let _unit = Unit::deserialize(&mut deserializer).unwrap();
     }
 }
