@@ -15,6 +15,7 @@ pub struct Deserializer<'de> {
 
 macro_rules! parse_integer {
     ($name:ident, $target:ty) => {
+        #[allow(clippy::cast_lossless)]
         fn $name(&mut self) -> Result<$target, Error> {
             match self.parse_number()? {
                 literals::Number::Float(_) => Err(Error::UnexpectedFloat)?,
