@@ -118,7 +118,7 @@ impl<'de> Deserializer<'de> {
     }
 
     fn parse_null(&mut self) -> Result<(), Error> {
-        let (remaining, list) = literals::null(self.input)?;
+        let (remaining, ()) = literals::null(self.input)?;
         self.input = remaining;
         Ok(())
     }
