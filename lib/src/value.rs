@@ -16,6 +16,7 @@ use nom::{
 #[derive(Debug, PartialEq, Clone)]
 /// Value in HCL
 pub enum Value<'a> {
+    Null,
     Integer(i128),
     Float(f64),
     Boolean(bool),
@@ -76,6 +77,7 @@ impl<'a> Value<'a> {
 
     pub fn variant_name(&self) -> &'static str {
         match self {
+            Value::Null => NULL,
             Value::Integer(_) => INTEGER,
             Value::Float(_) => FLOAT,
             Value::Boolean(_) => BOOLEAN,
@@ -401,7 +403,8 @@ impl<'a> Value<'a> {
     /// Recursively merge value
     pub fn merge(self) -> Result<Self, Error> {
         match self {
-            no_op @ Value::Integer(_)
+            no_op @ Value::Null
+            | no_op @ Value::Integer(_)
             | no_op @ Value::Float(_)
             | no_op @ Value::Boolean(_)
             | no_op @ Value::String(_) => Ok(no_op),
@@ -533,6 +536,7 @@ impl<'a> AsOwned for Value<'a> {
 
     fn as_owned(&self) -> Self::Output {
         match self {
+            Value::Null => Value::Null,
             Value::Integer(i) => Value::Integer(*i),
             Value::Float(f) => Value::Float(*f),
             Value::Boolean(b) => Value::Boolean(*b),
@@ -730,7 +734,8 @@ impl<'a> MapValues<'a> {
                 Entry::Occupied(mut occupied) => {
                     let key = occupied.key().to_string();
                     match occupied.get_mut() {
-                        illegal @ Value::Integer(_)
+                        illegal @ Value::Null
+                        | illegal @ Value::Integer(_)
                         | illegal @ Value::Float(_)
                         | illegal @ Value::Boolean(_)
                         | illegal @ Value::String(_)
@@ -854,7 +859,8 @@ named!(
 named!(
     pub single_value(CompleteStr) -> Value,
     alt_complete!(
-        call!(literals::number) => { |v| From::from(v) }
+        call!(literals::null) => { |_| Value::Null }
+        | call!(literals::number) => { |v| From::from(v) }
         | call!(literals::boolean) => { |v| Value::Boolean(v) }
         | literals::string => { |v| Value::String(v) }
         | list => { |v| Value::List(v) }
@@ -972,6 +978,7 @@ mod tests {
     #[test]
     fn single_values_are_parsed_successfully() {
         let test_cases = [
+            ("null", Value::Null, ""),
             (r#"123"#, Value::Integer(123), ""),
             ("123", Value::Integer(123), ""),
             ("123", Value::Integer(123), ""),

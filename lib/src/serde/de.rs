@@ -116,6 +116,12 @@ impl<'de> Deserializer<'de> {
 
         Ok(numbers)
     }
+
+    fn parse_null(&mut self) -> Result<(), Error> {
+        let (remaining, list) = literals::null(self.input)?;
+        self.input = remaining;
+        Ok(())
+    }
 }
 
 macro_rules! deserialize_scalars {
@@ -140,7 +146,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     }
 
     forward_to_deserialize_any! {
-        option unit unit_struct newtype_struct seq tuple
+        option unit_struct newtype_struct seq tuple
         tuple_struct map struct enum identifier ignored_any
     }
 
@@ -199,6 +205,14 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.deserialize_bytes(visitor)
+    }
+
+    fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        self.parse_null()?;
+        visitor.visit_unit()
     }
 }
 
@@ -349,5 +363,11 @@ and quotes ""#,
     fn deserialize_bytes_errors_on_overflow() {
         let mut deserializer = Deserializer::from_str("[1, 999]");
         let _ = ByteBuf::deserialize(&mut deserializer).unwrap();
+    }
+
+    #[test]
+    fn deserializes_unit() {
+        let mut deserializer = Deserializer::from_str("null");
+        Deserialize::deserialize(&mut deserializer).unwrap()
     }
 }
