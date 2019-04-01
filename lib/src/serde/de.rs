@@ -122,6 +122,12 @@ impl<'de> Deserializer<'de> {
         self.input = remaining;
         Ok(())
     }
+
+    fn peek(&mut self) -> Result<value::Value, Error> {
+        let (remaining, peek) = value::peek(self.input)?;
+        self.input = remaining;
+        Ok(peek)
+    }
 }
 
 macro_rules! deserialize_scalars {
@@ -138,7 +144,7 @@ macro_rules! deserialize_scalars {
 impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     type Error = Compat;
 
-    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    fn deserialize_any<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
@@ -146,7 +152,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     }
 
     forward_to_deserialize_any! {
-        option unit_struct newtype_struct seq tuple
+        unit_struct newtype_struct seq tuple
         tuple_struct map struct enum identifier ignored_any
     }
 
@@ -213,6 +219,16 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         self.parse_null()?;
         visitor.visit_unit()
+    }
+
+    fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        match self.peek()? {
+            value::Value::Null => visitor.visit_none(),
+            _ => visitor.visit_some(self),
+        }
     }
 }
 
@@ -369,5 +385,16 @@ and quotes ""#,
     fn deserializes_unit() {
         let mut deserializer = Deserializer::from_str("null");
         Deserialize::deserialize(&mut deserializer).unwrap()
+    }
+
+    #[test]
+    fn deserialize_option() {
+        let mut deserializer = Deserializer::from_str("null");
+        let deserialized: Option<u32> = Deserialize::deserialize(&mut deserializer).unwrap();
+        assert_eq!(deserialized, None);
+
+        let mut deserializer = Deserializer::from_str("42");
+        let deserialized: Option<u32> = Deserialize::deserialize(&mut deserializer).unwrap();
+        assert_eq!(deserialized, Some(42));
     }
 }
