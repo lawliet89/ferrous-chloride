@@ -8,6 +8,7 @@ use serde::Deserialize;
 
 use super::{Compat, Error};
 use crate::literals;
+use crate::value;
 
 pub struct Deserializer<'de> {
     input: CompleteStr<'de>,
@@ -90,6 +91,31 @@ impl<'de> Deserializer<'de> {
         self.input = remaining;
         Ok(output)
     }
+
+    fn parse_bytes(&mut self) -> Result<Vec<u8>, Error> {
+        let (remaining, list) = value::list(self.input)?;
+        self.input = remaining;
+        // Check that we are all numbers and fits within u8
+        let numbers = list
+            .into_iter()
+            .map(|value| {
+                value.integer().map_err(Error::from).and_then(|integer| {
+                    #[allow(clippy::cast_lossless)]
+                    let min = u8::min_value() as i128;
+                    #[allow(clippy::cast_lossless)]
+                    let max = u8::max_value() as i128;
+
+                    if integer < min || integer > max {
+                        Err(Error::Overflow(stringify!(u8)))
+                    } else {
+                        Ok(integer as u8)
+                    }
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(numbers)
+    }
 }
 
 macro_rules! deserialize_scalars {
@@ -114,7 +140,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     }
 
     forward_to_deserialize_any! {
-        bytes byte_buf option unit unit_struct newtype_struct seq tuple
+        option unit unit_struct newtype_struct seq tuple
         tuple_struct map struct enum identifier ignored_any
     }
 
@@ -144,7 +170,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        visitor.visit_str(&self.parse_string()?)
+        visitor.visit_string(self.parse_string()?)
     }
 
     fn deserialize_char<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -159,6 +185,20 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         };
         let character = parsed.chars().next().expect("to have one character");
         visitor.visit_char(character)
+    }
+
+    fn deserialize_bytes<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        visitor.visit_byte_buf(self.parse_bytes()?)
+    }
+
+    fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        self.deserialize_bytes(visitor)
     }
 }
 
@@ -178,6 +218,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use serde_bytes::ByteBuf;
 
     #[test]
     fn deserialize_boolean() {
@@ -281,5 +323,31 @@ and quotes ""#,
     fn deserialize_char_should_error_on_strings() {
         let mut deserializer = Deserializer::from_str("\"foobar\"");
         let _ = char::deserialize(&mut deserializer).unwrap();
+    }
+
+    #[test]
+    fn deserialize_bytes() {
+        let string = b"hello world";
+        let byte_string = format!("{:?}", string);
+
+        let mut deserializer = Deserializer::from_str(&byte_string);
+        let deserialized = ByteBuf::deserialize(&mut deserializer).unwrap();
+
+        let actual: &[u8] = deserialized.as_ref();
+        assert_eq!(actual, string);
+    }
+
+    #[test]
+    #[should_panic(expected = "UnexpectedVariant")]
+    fn deserialize_bytes_errors_on_invalid_entries() {
+        let mut deserializer = Deserializer::from_str("[1, false]");
+        let _ = ByteBuf::deserialize(&mut deserializer).unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "Overflow")]
+    fn deserialize_bytes_errors_on_overflow() {
+        let mut deserializer = Deserializer::from_str("[1, 999]");
+        let _ = ByteBuf::deserialize(&mut deserializer).unwrap();
     }
 }
