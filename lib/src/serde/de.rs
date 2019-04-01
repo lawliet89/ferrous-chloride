@@ -34,6 +34,7 @@ macro_rules! parse_integer {
 }
 
 impl<'de> Deserializer<'de> {
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(input: &'de str) -> Self {
         Deserializer {
             input: CompleteStr(input),
@@ -83,6 +84,12 @@ impl<'de> Deserializer<'de> {
             literals::Number::Float(f) => Ok(f),
         }
     }
+
+    fn parse_string(&mut self) -> Result<String, Error> {
+        let (remaining, output) = literals::string(self.input)?;
+        self.input = remaining;
+        Ok(output)
+    }
 }
 
 macro_rules! deserialize_scalars {
@@ -107,7 +114,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     }
 
     forward_to_deserialize_any! {
-        char str
+        char
         bytes byte_buf option unit unit_struct newtype_struct seq tuple
         tuple_struct map struct enum identifier ignored_any
     }
@@ -132,6 +139,14 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         self.deserialize_str(visitor)
     }
+
+    // TODO: Borrowed string?
+    fn deserialize_str<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        visitor.visit_str(&self.parse_string()?)
+    }
 }
 
 pub fn from_str<'a, T>(s: &'a str) -> Result<T, Compat>
@@ -154,33 +169,83 @@ mod tests {
     #[test]
     fn deserialize_boolean() {
         let mut deserializer = Deserializer::from_str("true");
-        let deserialized: bool = bool::deserialize(&mut deserializer).unwrap();
+        let deserialized = bool::deserialize(&mut deserializer).unwrap();
         assert_eq!(deserialized, true);
 
         let mut deserializer = Deserializer::from_str("false");
-        let deserialized: bool = bool::deserialize(&mut deserializer).unwrap();
+        let deserialized = bool::deserialize(&mut deserializer).unwrap();
         assert_eq!(deserialized, false);
     }
 
     #[test]
     fn deserialize_integer() {
         let mut deserializer = Deserializer::from_str("12345");
-        let deserialized: u32 = u32::deserialize(&mut deserializer).unwrap();
+        let deserialized = u32::deserialize(&mut deserializer).unwrap();
         assert_eq!(deserialized, 12345);
 
         let mut deserializer = Deserializer::from_str("-12345");
-        let deserialized: i32 = i32::deserialize(&mut deserializer).unwrap();
+        let deserialized = i32::deserialize(&mut deserializer).unwrap();
         assert_eq!(deserialized, -12345);
     }
 
     #[test]
+    #[allow(clippy::float_cmp)] // Don't be a pedant!
     fn deserialize_float() {
         let mut deserializer = Deserializer::from_str("12345");
-        let deserialized: f64 = f64::deserialize(&mut deserializer).unwrap();
+        let deserialized = f64::deserialize(&mut deserializer).unwrap();
         assert_eq!(deserialized, 12345.);
 
         let mut deserializer = Deserializer::from_str("-12345.12");
-        let deserialized: f32 = f32::deserialize(&mut deserializer).unwrap();
+        let deserialized = f32::deserialize(&mut deserializer).unwrap();
         assert_eq!(deserialized, -12345.12);
+    }
+
+    #[test]
+    fn deserialize_string() {
+        let test_cases = [
+            (r#""""#, ""),
+            (r#""abcd""#, r#"abcd"#),
+            (r#""ab\"cd""#, r#"ab"cd"#),
+            (r#""ab \\ cd""#, r#"ab \ cd"#),
+            (r#""ab \n cd""#, "ab \n cd"),
+            (r#""ab \? cd""#, "ab ? cd"),
+            (
+                r#"<<EOF
+    EOF
+"#,
+                "",
+            ),
+            (
+                r#""ab \xff \251 \uD000 \U29000""#,
+                "ab ÿ © \u{D000} \u{29000}",
+            ),
+            (
+                r#"<<EOF
+something
+    EOF
+"#,
+                "something",
+            ),
+            (
+                r#"<<EOH
+something
+with
+new lines
+and quotes "
+                        EOH
+"#,
+                r#"something
+with
+new lines
+and quotes ""#,
+            ),
+        ];
+
+        for (input, expected) in test_cases.iter() {
+            println!("Testing {}", input);
+            let mut deserializer = Deserializer::from_str(input);
+            let deserialized = String::deserialize(&mut deserializer).unwrap();
+            assert_eq!(&deserialized, expected);
+        }
     }
 }
