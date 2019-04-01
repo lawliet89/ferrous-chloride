@@ -1,3 +1,5 @@
+mod list;
+
 use nom::types::CompleteStr;
 use serde::de::{
     self, DeserializeSeed, EnumAccess, IntoDeserializer, MapAccess, SeqAccess, VariantAccess,
@@ -198,6 +200,12 @@ impl<'de> Deserializer<'de> {
         Ok(())
     }
 
+    fn parse_list(&mut self) -> Result<value::List, Error> {
+        let (remaining, list) = value::list(self.input)?;
+        self.input = remaining;
+        Ok(list)
+    }
+
     fn peek(&mut self) -> Result<value::Value, Error> {
         let (remaining, peek) = value::peek(self.input)?;
         self.input = remaining;
@@ -237,8 +245,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     }
 
     forward_to_deserialize_any! {
-        seq tuple
-        tuple_struct map struct enum identifier ignored_any
+        tuple tuple_struct map struct enum identifier ignored_any
     }
 
     deserialize_scalars!(deserialize_bool, visit_bool, parse_bool);
@@ -336,6 +343,14 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         visitor.visit_newtype_struct(self)
+    }
+
+    fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        let list = self.parse_list()?;
+        visitor.visit_seq(list::ListAccess::new(list))
     }
 }
 
@@ -523,5 +538,12 @@ and quotes ""#,
         let mut deserializer = Deserializer::from_str("true");
         let newtype = Newtype::deserialize(&mut deserializer).unwrap();
         assert!(newtype.0);
+    }
+
+    #[test]
+    fn deserialize_list_of_scalars() {
+        let mut deserializer = Deserializer::from_str("[1, 2, 3, 4, 5]");
+        let deserialized: Vec<u32> = Deserialize::deserialize(&mut deserializer).unwrap();
+        assert_eq!(deserialized, &[1, 2, 3, 4, 5]);
     }
 }
