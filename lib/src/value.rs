@@ -428,6 +428,66 @@ impl<'a> Value<'a> {
             }
         }
     }
+
+    pub fn is_null(&self) -> bool {
+        match self {
+            Value::Null => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_integer(&self) -> bool {
+        match self {
+            Value::Integer(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_float(&self) -> bool {
+        match self {
+            Value::Float(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_boolean(&self) -> bool {
+        match self {
+            Value::Boolean(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_string(&self) -> bool {
+        match self {
+            Value::String(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_list(&self) -> bool {
+        match self {
+            Value::List(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_map(&self) -> bool {
+        match self {
+            Value::Map(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_block(&self) -> bool {
+        match self {
+            Value::Block(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_body(&self) -> bool {
+        self.is_map()
+    }
 }
 
 impl<'a> ScalarLength for Value<'a> {
@@ -926,7 +986,12 @@ named!(
 // TODO: Make this more efficient.
 named!(
     pub peek(CompleteStr) -> Value,
-    peek!(call!(single_value))
+    peek!(
+        alt!(
+            call!(single_value)
+            | call!(key_value) => { |pair| Value::new_map(vec![vec![pair]])}
+        )
+    )
 );
 
 #[cfg(test)]
@@ -1552,5 +1617,13 @@ EOF
             assert_eq!(&remaining.0, input);
             assert_eq!(actual_value, *expected_value);
         }
+    }
+
+    #[test]
+    fn peek_works_on_body() {
+        let example = fixtures::MAP;
+        let (remaining, actual_value) = peek(CompleteStr(example)).unwrap();
+        assert_eq!(&remaining.0, &example);
+        assert!(actual_value.is_body());
     }
 }

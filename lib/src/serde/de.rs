@@ -144,11 +144,21 @@ macro_rules! deserialize_scalars {
 impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     type Error = Compat;
 
-    fn deserialize_any<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        Err(Error::Custom("Not implemented".to_string()))?
+        use value::Value::*;
+        match self.peek()? {
+            Null => self.deserialize_unit(visitor),
+            Boolean(_) => self.deserialize_bool(visitor),
+            Integer(_) => self.deserialize_i128(visitor),
+            Float(_) => self.deserialize_f64(visitor),
+            String(_) => self.deserialize_string(visitor),
+            List(_) => self.deserialize_seq(visitor),
+            Map(_) => self.deserialize_map(visitor),
+            Block(_) => self.deserialize_map(visitor),
+        }
     }
 
     forward_to_deserialize_any! {
