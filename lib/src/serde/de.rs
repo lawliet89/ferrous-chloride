@@ -275,7 +275,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     }
 
     forward_to_deserialize_any! {
-        struct enum
+        enum
     }
 
     deserialize_scalars!(deserialize_bool, visit_bool, parse_bool);
@@ -429,6 +429,18 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         let map = self.parse_map()?;
         visitor.visit_map(map::MapAccess::new(map)?)
+    }
+
+    fn deserialize_struct<V>(
+        self,
+        _name: &'static str,
+        _fields: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        self.deserialize_map(visitor)
     }
 }
 
@@ -701,4 +713,63 @@ and quotes ""#,
 
         assert_eq!(deserialized, expected);
     }
+
+    #[test]
+    fn deserialize_simple_structs() {
+        #[derive(Deserialize, PartialEq, Debug)]
+        struct DeserializeMe {
+            name: String,
+            allow: bool,
+            index: usize,
+            list: Vec<String>,
+            nothing: Option<f64>,
+        }
+
+        let input = r#"
+{
+    name = "second"
+    allow = false
+    index = 1
+    list = ["foo", "bar", "baz"]
+}"#;
+        let mut deserializer = Deserializer::from_str(input);
+        let deserialized: DeserializeMe = Deserialize::deserialize(&mut deserializer).unwrap();
+
+        let expected = DeserializeMe {
+            name: "second".to_string(),
+            allow: false,
+            index: 1,
+            list: vec!["foo".to_string(), "bar".to_string(), "baz".to_string()],
+            nothing: None,
+        };
+
+        assert_eq!(expected, deserialized);
+    }
+
+//     #[test]
+//     fn deserialize_nested_structs() {
+//         #[derive(Deserialize, PartialEq, Debug)]
+//         struct SecurityGroup {
+//             name: String,
+//             allow: Allow,
+//         }
+
+//         #[derive(Deserialize, PartialEq, Debug)]
+//         struct Allow {
+//             name: String,
+//             cidrs: Vec<String>,
+//         }
+
+//         let input = r#"
+// {
+//   name = "second"
+
+//   allow {
+//     name = "all"
+//     cidrs = ["0.0.0.0/0"]
+//   }
+// }"#;
+//         let mut deserializer = Deserializer::from_str(input);
+//         let deserialized: SecurityGroup = Deserialize::deserialize(&mut deserializer).unwrap();
+//     }
 }

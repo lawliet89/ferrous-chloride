@@ -1,7 +1,7 @@
 use serde::de::{Deserializer, Visitor};
 use serde::forward_to_deserialize_any;
 
-use crate::serde::de::Compat;
+use crate::serde::de::{self, Compat};
 use crate::Value;
 
 impl<'de, 'a> Deserializer<'de> for Value<'a> {
@@ -19,7 +19,8 @@ impl<'de, 'a> Deserializer<'de> for Value<'a> {
             Float(float) => visitor.visit_f64(float),
             Boolean(boolean) => visitor.visit_bool(boolean),
             String(string) => visitor.visit_string(string),
-            List(list) => visitor.visit_seq(crate::serde::de::list::ListAccess::new(list)),
+            List(list) => visitor.visit_seq(de::list::ListAccess::new(list)),
+            // Map(map) => visitor.visit_map(de::map::MapAccess::new(map)?),
             Map(_map) => unimplemented!("Not yet"),
             Block(_block) => unimplemented!("Not yet"),
         }
