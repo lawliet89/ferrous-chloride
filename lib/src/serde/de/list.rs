@@ -1,5 +1,4 @@
-use serde::de::{Deserialize, DeserializeSeed, Deserializer, SeqAccess, Visitor};
-use serde::forward_to_deserialize_any;
+use serde::de::{DeserializeSeed, SeqAccess};
 
 use super::Compat;
 use crate::value;
@@ -9,7 +8,7 @@ pub struct ListAccess<'a> {
     list: value::List<'a>,
 }
 
-impl<'de, 'a> ListAccess<'a> {
+impl<'a> ListAccess<'a> {
     pub(crate) fn new(mut list: value::List<'a>) -> Self {
         list.reverse();
         Self { list }
@@ -29,25 +28,7 @@ impl<'de, 'a> SeqAccess<'de> for ListAccess<'a> {
         }
 
         // Deserialize an array element.
-        seed.deserialize(&mut *self).map(Some)
-    }
-}
-
-impl<'de, 'a> Deserializer<'de> for &mut ListAccess<'a> {
-    type Error = Compat;
-
-    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        // FIXME: Is this OK?
         let item = self.list.pop().expect("to not be empty");
-        item.deserialize_any(visitor)
-    }
-
-    forward_to_deserialize_any! {
-        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
-        bytes byte_buf option unit unit_struct newtype_struct seq tuple
-        tuple_struct map struct enum identifier ignored_any
+        seed.deserialize(item).map(Some)
     }
 }

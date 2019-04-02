@@ -5,6 +5,9 @@ use std::ops::Deref;
 use nom::types::CompleteStr;
 use nom::{alt_complete, call, named};
 
+#[cfg(feature = "serde")]
+pub use self::serde::*;
+
 /// A "key" in a map
 #[derive(Eq, PartialEq, Debug, Clone)]
 pub enum Key<'a> {
@@ -99,6 +102,35 @@ named!(
         | super::string::quoted_single_line_string => { |s| Key::String(Cow::Owned(s)) }
     )
 );
+
+#[cfg(feature = "serde")]
+mod serde {
+    use ::serde::de::{Deserializer, Visitor};
+    use ::serde::forward_to_deserialize_any;
+
+    use super::*;
+    use crate::serde::de::Compat;
+
+    impl<'de, 'a> Deserializer<'de> for Key<'a> {
+        type Error = Compat;
+
+        fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+        where
+            V: Visitor<'de>,
+        {
+            match self {
+                Key::Identifier(cow) | Key::String(cow) => visitor.visit_str(&cow),
+            }
+        }
+
+        forward_to_deserialize_any! {
+            bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
+            bytes byte_buf option unit unit_struct newtype_struct seq tuple
+            tuple_struct map struct enum identifier ignored_any
+        }
+    }
+
+}
 
 #[cfg(test)]
 mod tests {

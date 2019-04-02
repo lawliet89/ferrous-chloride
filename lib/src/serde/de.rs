@@ -1,4 +1,5 @@
 pub(crate) mod list;
+pub(crate) mod map;
 
 use nom::types::CompleteStr;
 use serde::de::{
@@ -19,7 +20,7 @@ mod error {
 
     use failure::{self, Fail};
 
-    /// Error type for serialization or deserialization
+    /// Error type for deserialization
     #[derive(Debug, Fail)]
     pub enum Error {
         #[fail(display = "HCL parse error: {}", _0)]
@@ -87,6 +88,12 @@ mod error {
     impl From<Error> for Compat {
         fn from(e: Error) -> Self {
             Compat(e.compat())
+        }
+    }
+
+    impl From<Compat> for Error {
+        fn from(e: Compat) -> Self {
+            e.0.into_inner()
         }
     }
 
@@ -223,6 +230,12 @@ impl<'de> Deserializer<'de> {
         Ok(list)
     }
 
+    fn parse_map(&mut self) -> Result<value::MapValues, Error> {
+        let (remaining, map) = value::map_expression(self.input)?;
+        self.input = remaining;
+        Ok(map)
+    }
+
     fn peek(&mut self) -> Result<value::Value, Error> {
         let (remaining, peek) = value::peek(self.input)?;
         self.input = remaining;
@@ -262,7 +275,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     }
 
     forward_to_deserialize_any! {
-        map struct enum identifier ignored_any
+        struct enum
     }
 
     deserialize_scalars!(deserialize_bool, visit_bool, parse_bool);
@@ -395,9 +408,31 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         self.deserialize_tuple(len, visitor)
     }
+
+    fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        self.deserialize_str(visitor)
+    }
+
+    fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        self.deserialize_any(visitor)
+    }
+
+    fn deserialize_map<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        let map = self.parse_map()?;
+        visitor.visit_map(map::MapAccess::new(map)?)
+    }
 }
 
-pub fn from_str<'a, T>(s: &'a str) -> Result<T, Compat>
+pub fn from_str<'a, T>(s: &'a str) -> Result<T, Error>
 where
     T: Deserialize<'a>,
 {
@@ -413,6 +448,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use std::collections::HashMap;
 
     use serde::Deserialize;
     use serde_bytes::ByteBuf;
@@ -643,5 +680,25 @@ and quotes ""#,
         let mut deserializer = Deserializer::from_str("[1, true, \"null\"]");
         let deserialized: TupleTwo = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(deserialized, TupleTwo(1., true, "null".to_string()));
+    }
+
+    #[test]
+    fn deserialize_simple_maps() {
+        let input = r#"
+{
+    test = "foo"
+    bar  = "baz"
+}"#;
+        let mut deserializer = Deserializer::from_str(input);
+        let deserialized: HashMap<String, String> =
+            Deserialize::deserialize(&mut deserializer).unwrap();
+
+        let expected: HashMap<_, _> = [("test", "foo"), ("bar", "baz")]
+            .iter()
+            .cloned()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+
+        assert_eq!(deserialized, expected);
     }
 }
