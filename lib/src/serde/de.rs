@@ -98,8 +98,8 @@ macro_rules! parse_integer {
             match self.parse_number()? {
                 literals::Number::Float(_) => Err(Error::UnexpectedFloat)?,
                 literals::Number::Integer(u) => {
-                    let min = <$target>::min_value() as i128;
-                    let max = <$target>::max_value() as i128;
+                    let min = <$target>::min_value() as i64;
+                    let max = <$target>::max_value() as i64;
                     if u < min || u > max {
                         Err(Error::Overflow(stringify!($target)))
                     } else {
@@ -134,17 +134,29 @@ impl<'de> Deserializer<'de> {
     parse_integer!(parse_i8, i8);
     parse_integer!(parse_i16, i16);
     parse_integer!(parse_i32, i32);
-    parse_integer!(parse_i64, i64);
     parse_integer!(parse_u8, u8);
     parse_integer!(parse_u16, u16);
     parse_integer!(parse_u32, u32);
     parse_integer!(parse_u64, u64);
-    parse_integer!(parse_u128, u128);
+
+    fn parse_i64(&mut self) -> Result<i64, Error> {
+        match self.parse_number()? {
+            literals::Number::Float(_) => Err(Error::UnexpectedFloat)?,
+            literals::Number::Integer(u) => Ok(u),
+        }
+    }
 
     fn parse_i128(&mut self) -> Result<i128, Error> {
         match self.parse_number()? {
             literals::Number::Float(_) => Err(Error::UnexpectedFloat)?,
-            literals::Number::Integer(u) => Ok(u),
+            literals::Number::Integer(u) => Ok(u as i128),
+        }
+    }
+
+    fn parse_u128(&mut self) -> Result<u128, Error> {
+        match self.parse_number()? {
+            literals::Number::Float(_) => Err(Error::UnexpectedFloat)?,
+            literals::Number::Integer(u) => Ok(u as u128),
         }
     }
 
@@ -178,9 +190,9 @@ impl<'de> Deserializer<'de> {
             .map(|value| {
                 value.integer().map_err(Error::from).and_then(|integer| {
                     #[allow(clippy::cast_lossless)]
-                    let min = u8::min_value() as i128;
+                    let min = u8::min_value() as i64;
                     #[allow(clippy::cast_lossless)]
-                    let max = u8::max_value() as i128;
+                    let max = u8::max_value() as i64;
 
                     if integer < min || integer > max {
                         Err(Error::Overflow(stringify!(u8)))

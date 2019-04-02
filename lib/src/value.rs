@@ -17,7 +17,7 @@ use nom::{
 /// Value in HCL
 pub enum Value<'a> {
     Null,
-    Integer(i128),
+    Integer(i64),
     Float(f64),
     Boolean(bool),
     String(String),
@@ -118,7 +118,7 @@ impl<'a> Value<'a> {
         self.len() == 0
     }
 
-    pub fn integer(&self) -> Result<i128, Error> {
+    pub fn integer(&self) -> Result<i64, Error> {
         if let Value::Integer(i) = self {
             Ok(*i)
         } else {
@@ -132,7 +132,7 @@ impl<'a> Value<'a> {
 
     /// # Panics
     /// Panics if the variant is not an integer
-    pub fn unwrap_integer(&self) -> i128 {
+    pub fn unwrap_integer(&self) -> i64 {
         self.integer().unwrap()
     }
 
@@ -552,7 +552,7 @@ where
     }
 }
 
-impl_from_value!(Integer, i128);
+impl_from_value!(Integer, i64);
 impl_from_value!(Float, f64);
 impl_from_value!(Boolean, bool);
 impl_from_value!(String, String);

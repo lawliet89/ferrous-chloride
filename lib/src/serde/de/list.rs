@@ -50,7 +50,7 @@ impl<'de, 'a> Deserializer<'de> for &mut ListAccess<'a> {
         let item = self.list.pop().expect("to not be empty");
         match item {
             Null => visitor.visit_unit(),
-            Integer(integer) => integer.deserialize_any(visitor),
+            Integer(integer) => visitor.visit_i64(integer),
             Float(float) => visitor.visit_f64(float),
             Boolean(boolean) => visitor.visit_bool(boolean),
             String(string) => visitor.visit_string(string),
