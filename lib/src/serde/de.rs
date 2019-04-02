@@ -262,7 +262,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     }
 
     forward_to_deserialize_any! {
-        tuple_struct map struct enum identifier ignored_any
+        map struct enum identifier ignored_any
     }
 
     deserialize_scalars!(deserialize_bool, visit_bool, parse_bool);
@@ -382,6 +382,18 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             })?;
         }
         visitor.visit_seq(list::ListAccess::new(list))
+    }
+
+    fn deserialize_tuple_struct<V>(
+        self,
+        _name: &'static str,
+        len: usize,
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        self.deserialize_tuple(len, visitor)
     }
 }
 
@@ -614,5 +626,22 @@ and quotes ""#,
     fn deserialize_tuples_errors_on_invalid_length() {
         let mut deserializer = Deserializer::from_str("[1, 2, 3, 4]");
         let _: (u32, i32, i16) = Deserialize::deserialize(&mut deserializer).unwrap();
+    }
+
+    #[test]
+    fn deserialize_tuple_structs_of_scalars() {
+        #[derive(Deserialize, Eq, PartialEq, Debug)]
+        struct TupleOne(u32, i32, i16);
+
+        let mut deserializer = Deserializer::from_str("[1, 2, 3]");
+        let deserialized: TupleOne = Deserialize::deserialize(&mut deserializer).unwrap();
+        assert_eq!(deserialized, TupleOne(1, 2, 3));
+
+        #[derive(Deserialize, PartialEq, Debug)]
+        struct TupleTwo(f32, bool, String);
+
+        let mut deserializer = Deserializer::from_str("[1, true, \"null\"]");
+        let deserialized: TupleTwo = Deserialize::deserialize(&mut deserializer).unwrap();
+        assert_eq!(deserialized, TupleTwo(1., true, "null".to_string()));
     }
 }
