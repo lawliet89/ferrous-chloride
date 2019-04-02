@@ -1629,4 +1629,12 @@ EOF
         assert_eq!(&remaining.0, &example);
         assert!(actual_value.is_body());
     }
+
+    #[test]
+    fn test() {
+        let input = r#"
+test = "foo"
+bar  = "baz""#;
+        map_values(CompleteStr(input)).unwrap_output();
+    }
 }

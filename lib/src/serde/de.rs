@@ -231,7 +231,7 @@ impl<'de> Deserializer<'de> {
     }
 
     fn parse_map(&mut self) -> Result<value::MapValues, Error> {
-        let (remaining, map) = value::map_expression(self.input)?;
+        let (remaining, map) = value::map_values(self.input)?;
         self.input = remaining;
         Ok(map)
     }
@@ -697,10 +697,8 @@ and quotes ""#,
     #[test]
     fn deserialize_simple_maps() {
         let input = r#"
-{
-    test = "foo"
-    bar  = "baz"
-}"#;
+test = "foo"
+bar  = "baz""#;
         let mut deserializer = Deserializer::from_str(input);
         let deserialized: HashMap<String, String> =
             Deserialize::deserialize(&mut deserializer).unwrap();
@@ -726,12 +724,10 @@ and quotes ""#,
         }
 
         let input = r#"
-{
-    name = "second"
-    allow = false
-    index = 1
-    list = ["foo", "bar", "baz"]
-}"#;
+name = "second"
+allow = false
+index = 1
+list = ["foo", "bar", "baz"]"#;
         let mut deserializer = Deserializer::from_str(input);
         let deserialized: DeserializeMe = Deserialize::deserialize(&mut deserializer).unwrap();
 
@@ -761,14 +757,13 @@ and quotes ""#,
 //         }
 
 //         let input = r#"
-// {
 //   name = "second"
 
 //   allow {
 //     name = "all"
 //     cidrs = ["0.0.0.0/0"]
 //   }
-// }"#;
+// "#;
 //         let mut deserializer = Deserializer::from_str(input);
 //         let deserialized: SecurityGroup = Deserialize::deserialize(&mut deserializer).unwrap();
 //     }
