@@ -1,4 +1,4 @@
-mod list;
+pub(crate) mod list;
 
 use nom::types::CompleteStr;
 use serde::de::{
@@ -11,7 +11,7 @@ use serde::Deserialize;
 use crate::literals;
 use crate::value;
 
-use self::error::*;
+pub use self::error::*;
 
 mod error {
     use std::fmt::Display;
@@ -149,7 +149,7 @@ impl<'de> Deserializer<'de> {
     fn parse_i128(&mut self) -> Result<i128, Error> {
         match self.parse_number()? {
             literals::Number::Float(_) => Err(Error::UnexpectedFloat)?,
-            literals::Number::Integer(u) => Ok(u as i128),
+            literals::Number::Integer(u) => Ok(i128::from(u)),
         }
     }
 
@@ -554,8 +554,26 @@ and quotes ""#,
 
     #[test]
     fn deserialize_list_of_scalars() {
+        use std::collections::HashSet;
+
         let mut deserializer = Deserializer::from_str("[1, 2, 3, 4, 5]");
         let deserialized: Vec<u32> = Deserialize::deserialize(&mut deserializer).unwrap();
         assert_eq!(deserialized, &[1, 2, 3, 4, 5]);
+
+        let mut deserializer = Deserializer::from_str("[null, null, null, null]");
+        let deserialized: Vec<()> = Deserialize::deserialize(&mut deserializer).unwrap();
+        assert_eq!(deserialized, &[(), (), (), ()]);
+
+        let mut deserializer = Deserializer::from_str("[true, false]");
+        let deserialized: HashSet<bool> = Deserialize::deserialize(&mut deserializer).unwrap();
+        assert_eq!(deserialized, [true, false].iter().cloned().collect());
+
+        let mut deserializer = Deserializer::from_str("[[1, 2, 9], [3, 4, 5]]");
+        let deserialized: Vec<Vec<u32>> = Deserialize::deserialize(&mut deserializer).unwrap();
+        assert_eq!(deserialized, &[&[1, 2, 9], &[3, 4, 5]]);
+
+        // let mut deserializer = Deserializer::from_str("[1, \"string\", true, null, 5.2]");
+        // let deserialized: Vec<value::Value> = Deserialize::deserialize(&mut deserializer).unwrap();
+        // assert_eq!(deserialized, &[1, 2, 3, 4, 5]);
     }
 }

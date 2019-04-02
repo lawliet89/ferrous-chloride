@@ -1,12 +1,8 @@
-use serde::de::{
-    self, DeserializeSeed, EnumAccess, IntoDeserializer, MapAccess, SeqAccess, VariantAccess,
-    Visitor,
-};
-use serde::de::Deserializer;
+use serde::de::{Deserialize, DeserializeSeed, Deserializer, SeqAccess, Visitor};
 use serde::forward_to_deserialize_any;
 
-use crate::value;
 use super::Compat;
+use crate::value;
 
 pub struct ListAccess<'a> {
     // List is reversed!
@@ -44,20 +40,9 @@ impl<'de, 'a> Deserializer<'de> for &mut ListAccess<'a> {
     where
         V: Visitor<'de>,
     {
-        use value::Value::*;
-
         // FIXME: Is this OK?
         let item = self.list.pop().expect("to not be empty");
-        match item {
-            Null => visitor.visit_unit(),
-            Integer(integer) => visitor.visit_i64(integer),
-            Float(float) => visitor.visit_f64(float),
-            Boolean(boolean) => visitor.visit_bool(boolean),
-            String(string) => visitor.visit_string(string),
-            List(list) => unimplemented!("Not yet"),
-            Map(map) => unimplemented!("Not yet"),
-            Block(block) => unimplemented!("Not yet"),
-        }
+        item.deserialize_any(visitor)
     }
 
     forward_to_deserialize_any! {

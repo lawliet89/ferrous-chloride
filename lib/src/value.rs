@@ -1,3 +1,6 @@
+#[cfg(feature = "serde")]
+pub mod de;
+
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::iter::FromIterator;
