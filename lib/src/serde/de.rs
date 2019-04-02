@@ -32,6 +32,11 @@ mod error {
         Overflow(&'static str),
         #[fail(display = "Expected single character string, got {}", _0)]
         ExpectedCharacterGotString(String),
+        #[fail(
+            display = "Invalid tuple length. Expected {}, got {}",
+            expected, actual
+        )]
+        InvalidTupleLength { expected: usize, actual: usize },
         #[fail(display = "{}", _0)]
         Custom(String),
     }
@@ -257,7 +262,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     }
 
     forward_to_deserialize_any! {
-        tuple tuple_struct map struct enum identifier ignored_any
+        tuple_struct map struct enum identifier ignored_any
     }
 
     deserialize_scalars!(deserialize_bool, visit_bool, parse_bool);
@@ -362,6 +367,20 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         let list = self.parse_list()?;
+        visitor.visit_seq(list::ListAccess::new(list))
+    }
+
+    fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        let list = self.parse_list()?;
+        if list.len() != len {
+            Err(Error::InvalidTupleLength {
+                expected: len,
+                actual: list.len(),
+            })?;
+        }
         visitor.visit_seq(list::ListAccess::new(list))
     }
 }
@@ -575,5 +594,25 @@ and quotes ""#,
         // let mut deserializer = Deserializer::from_str("[1, \"string\", true, null, 5.2]");
         // let deserialized: Vec<value::Value> = Deserialize::deserialize(&mut deserializer).unwrap();
         // assert_eq!(deserialized, &[1, 2, 3, 4, 5]);
+    }
+
+    // TODO: Deserialize more complicated nested things
+
+    #[test]
+    fn deserialize_tuples_of_scalars() {
+        let mut deserializer = Deserializer::from_str("[1, 2, 3]");
+        let deserialized: (u32, i32, i16) = Deserialize::deserialize(&mut deserializer).unwrap();
+        assert_eq!(deserialized, (1, 2, 3));
+
+        let mut deserializer = Deserializer::from_str("[1, true, null]");
+        let deserialized: (f32, bool, ()) = Deserialize::deserialize(&mut deserializer).unwrap();
+        assert_eq!(deserialized, (1., true, ()));
+    }
+
+    #[test]
+    #[should_panic(expected = "InvalidTupleLength { expected: 3, actual: 4 }")]
+    fn deserialize_tuples_errors_on_invalid_length() {
+        let mut deserializer = Deserializer::from_str("[1, 2, 3, 4]");
+        let _: (u32, i32, i16) = Deserialize::deserialize(&mut deserializer).unwrap();
     }
 }
