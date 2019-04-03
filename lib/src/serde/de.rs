@@ -1,3 +1,8 @@
+//! Deserializer Implementation
+//!
+//! This module contains the types and trait implementation to allow deserialization from a HCL
+//! string to Rust types that you can usually disregard. To find out more
+//! about _using_ them, head to [`serde` documentation](https://serde.rs/).
 pub(crate) mod list;
 pub(crate) mod map;
 
@@ -441,6 +446,29 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     }
 }
 
+/// Deserialize a type `T` from a provided HCL String
+///
+/// ```rust
+/// # use ferrous_chloride::serde::from_str;
+/// use serde::Deserialize;
+///
+/// #[derive(Deserialize, PartialEq, Debug)]
+/// struct DeserializeMe {
+///     name: String,
+///     allow: bool,
+///     index: usize,
+///     list: Vec<String>,
+///     nothing: Option<f64>,
+/// }
+///
+/// let input = r#"
+/// name = "second"
+/// allow = false
+/// index = 1
+/// list = ["foo", "bar", "baz"]"#;
+///
+/// let deserialized: DeserializeMe = from_str(input).unwrap();
+/// ```
 pub fn from_str<'a, T>(s: &'a str) -> Result<T, Error>
 where
     T: Deserialize<'a>,

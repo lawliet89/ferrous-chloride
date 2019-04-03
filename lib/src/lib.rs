@@ -6,14 +6,14 @@ pub mod literals;
 mod errors;
 mod utils;
 
-mod constants;
+pub mod constants;
 pub mod iter;
 pub mod value;
 
 #[cfg(feature = "serde")]
 pub mod serde;
 
-pub use constants::*;
+#[doc(inline)]
 pub use errors::Error;
 #[doc(inline)]
 pub use value::Value;
