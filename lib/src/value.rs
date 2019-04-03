@@ -972,16 +972,18 @@ named!(
 named!(
     pub map_values(CompleteStr) -> MapValues,
     do_parse!(
-        values: many0!(
-                    terminated!(
-                        call!(key_value),
-                        alt!(
-                            whitespace!(tag!(","))
-                            | call!(newline) => { |_| CompleteStr("") }
-                            | eof!()
-                        )
+        values: whitespace!(
+            many0!(
+                terminated!(
+                    call!(key_value),
+                    alt!(
+                        whitespace!(tag!(","))
+                        | call!(newline) => { |_| CompleteStr("") }
+                        | eof!()
                     )
                 )
+            )
+        )
         >> (values.into_iter().collect())
     )
 );
@@ -1628,13 +1630,5 @@ EOF
         let (remaining, actual_value) = peek(CompleteStr(example)).unwrap();
         assert_eq!(&remaining.0, &example);
         assert!(actual_value.is_body());
-    }
-
-    #[test]
-    fn test() {
-        let input = r#"
-test = "foo"
-bar  = "baz""#;
-        map_values(CompleteStr(input)).unwrap_output();
     }
 }
