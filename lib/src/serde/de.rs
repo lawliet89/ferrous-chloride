@@ -2,10 +2,7 @@ pub(crate) mod list;
 pub(crate) mod map;
 
 use nom::types::CompleteStr;
-use serde::de::{
-    self, DeserializeSeed, EnumAccess, IntoDeserializer, MapAccess, SeqAccess, VariantAccess,
-    Visitor,
-};
+use serde::de::{self, Visitor};
 use serde::forward_to_deserialize_any;
 use serde::Deserialize;
 
@@ -742,29 +739,29 @@ list = ["foo", "bar", "baz"]"#;
         assert_eq!(expected, deserialized);
     }
 
-//     #[test]
-//     fn deserialize_nested_structs() {
-//         #[derive(Deserialize, PartialEq, Debug)]
-//         struct SecurityGroup {
-//             name: String,
-//             allow: Allow,
-//         }
+    //     #[test]
+    //     fn deserialize_nested_structs() {
+    //         #[derive(Deserialize, PartialEq, Debug)]
+    //         struct SecurityGroup {
+    //             name: String,
+    //             allow: Allow,
+    //         }
 
-//         #[derive(Deserialize, PartialEq, Debug)]
-//         struct Allow {
-//             name: String,
-//             cidrs: Vec<String>,
-//         }
+    //         #[derive(Deserialize, PartialEq, Debug)]
+    //         struct Allow {
+    //             name: String,
+    //             cidrs: Vec<String>,
+    //         }
 
-//         let input = r#"
-//   name = "second"
+    //         let input = r#"
+    //   name = "second"
 
-//   allow {
-//     name = "all"
-//     cidrs = ["0.0.0.0/0"]
-//   }
-// "#;
-//         let mut deserializer = Deserializer::from_str(input);
-//         let deserialized: SecurityGroup = Deserialize::deserialize(&mut deserializer).unwrap();
-//     }
+    //   allow {
+    //     name = "all"
+    //     cidrs = ["0.0.0.0/0"]
+    //   }
+    // "#;
+    //         let mut deserializer = Deserializer::from_str(input);
+    //         let deserialized: SecurityGroup = Deserialize::deserialize(&mut deserializer).unwrap();
+    //     }
 }

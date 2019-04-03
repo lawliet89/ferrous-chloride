@@ -12,7 +12,7 @@ use crate::{AsOwned, Error, KeyValuePairs, ScalarLength};
 
 use nom::types::CompleteStr;
 use nom::{
-    alt, alt_complete, call, char, complete, do_parse, eof, many0, named, opt, peek, preceded, tag,
+    alt, alt_complete, call, char, complete, do_parse, eof, named, opt, peek, preceded, tag,
     terminated,
 };
 
