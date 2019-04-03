@@ -133,6 +133,10 @@ impl<'de> Deserializer<'de> {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.input.is_empty()
+    }
+
     fn parse_bool(&mut self) -> Result<bool, Error> {
         let (remaining, output) = literals::boolean(self.input)?;
         self.input = remaining;
@@ -475,7 +479,7 @@ where
 {
     let mut deserializer = Deserializer::from_str(s);
     let t = T::deserialize(&mut deserializer)?;
-    if deserializer.input.is_empty() {
+    if deserializer.is_empty() {
         Ok(t)
     } else {
         Err(Error::TrailingCharacters)?
