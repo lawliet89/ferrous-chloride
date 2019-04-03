@@ -17,6 +17,8 @@ ALIASES["nom"] = {"/=":[{'crate':'nom','ty':8,'name':'DivAssign','desc':'The div
 ALIASES["proc_macro2"] = {};
 ALIASES["quote"] = {};
 ALIASES["rustc_demangle"] = {};
+ALIASES["serde"] = {};
+ALIASES["serde_derive"] = {};
 ALIASES["strsim"] = {};
 ALIASES["syn"] = {};
 ALIASES["synstructure"] = {};
