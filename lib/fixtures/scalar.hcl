@@ -5,7 +5,7 @@ test_float = -1.23
 bool_true = true
 bool_false = false
 
-comma_separed = /*inline comment */ "oh my, a rebel!",
+comma_separed = /*inline comment */ "oh my, a rebel!", # a comment
 
 string = "Hello World!"
 

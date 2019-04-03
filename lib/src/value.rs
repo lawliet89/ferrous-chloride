@@ -1,3 +1,6 @@
+#[cfg(feature = "serde")]
+pub mod de;
+
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::iter::FromIterator;
@@ -9,13 +12,14 @@ use crate::{AsOwned, Error, KeyValuePairs, ScalarLength};
 
 use nom::types::CompleteStr;
 use nom::{
-    alt, alt_complete, call, char, complete, do_parse, eof, many0, named, opt, preceded, tag,
+    alt, alt_complete, call, char, complete, do_parse, eof, named, opt, peek, preceded, tag,
     terminated,
 };
 
 #[derive(Debug, PartialEq, Clone)]
 /// Value in HCL
 pub enum Value<'a> {
+    Null,
     Integer(i64),
     Float(f64),
     Boolean(bool),
@@ -76,6 +80,7 @@ impl<'a> Value<'a> {
 
     pub fn variant_name(&self) -> &'static str {
         match self {
+            Value::Null => NULL,
             Value::Integer(_) => INTEGER,
             Value::Float(_) => FLOAT,
             Value::Boolean(_) => BOOLEAN,
@@ -401,7 +406,8 @@ impl<'a> Value<'a> {
     /// Recursively merge value
     pub fn merge(self) -> Result<Self, Error> {
         match self {
-            no_op @ Value::Integer(_)
+            no_op @ Value::Null
+            | no_op @ Value::Integer(_)
             | no_op @ Value::Float(_)
             | no_op @ Value::Boolean(_)
             | no_op @ Value::String(_) => Ok(no_op),
@@ -424,6 +430,66 @@ impl<'a> Value<'a> {
                 Ok(Value::Block(merged))
             }
         }
+    }
+
+    pub fn is_null(&self) -> bool {
+        match self {
+            Value::Null => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_integer(&self) -> bool {
+        match self {
+            Value::Integer(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_float(&self) -> bool {
+        match self {
+            Value::Float(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_boolean(&self) -> bool {
+        match self {
+            Value::Boolean(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_string(&self) -> bool {
+        match self {
+            Value::String(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_list(&self) -> bool {
+        match self {
+            Value::List(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_map(&self) -> bool {
+        match self {
+            Value::Map(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_block(&self) -> bool {
+        match self {
+            Value::Block(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_body(&self) -> bool {
+        self.is_map()
     }
 }
 
@@ -533,6 +599,7 @@ impl<'a> AsOwned for Value<'a> {
 
     fn as_owned(&self) -> Self::Output {
         match self {
+            Value::Null => Value::Null,
             Value::Integer(i) => Value::Integer(*i),
             Value::Float(f) => Value::Float(*f),
             Value::Boolean(b) => Value::Boolean(*b),
@@ -730,7 +797,8 @@ impl<'a> MapValues<'a> {
                 Entry::Occupied(mut occupied) => {
                     let key = occupied.key().to_string();
                     match occupied.get_mut() {
-                        illegal @ Value::Integer(_)
+                        illegal @ Value::Null
+                        | illegal @ Value::Integer(_)
                         | illegal @ Value::Float(_)
                         | illegal @ Value::Boolean(_)
                         | illegal @ Value::String(_)
@@ -854,7 +922,8 @@ named!(
 named!(
     pub single_value(CompleteStr) -> Value,
     alt_complete!(
-        call!(literals::number) => { |v| From::from(v) }
+        call!(literals::null) => { |_| Value::Null }
+        | call!(literals::number) => { |v| From::from(v) }
         | call!(literals::boolean) => { |v| Value::Boolean(v) }
         | literals::string => { |v| Value::String(v) }
         | list => { |v| Value::List(v) }
@@ -903,17 +972,30 @@ named!(
 named!(
     pub map_values(CompleteStr) -> MapValues,
     do_parse!(
-        values: many0!(
-                    terminated!(
-                        call!(key_value),
-                        alt!(
-                            whitespace!(tag!(","))
-                            | call!(newline) => { |_| CompleteStr("") }
-                            | eof!()
-                        )
+        values: whitespace!(
+            many0!(
+                terminated!(
+                    call!(key_value),
+                    alt!(
+                        whitespace!(tag!(","))
+                        | call!(newline) => { |_| CompleteStr("") }
+                        | eof!()
                     )
                 )
+            )
+        )
         >> (values.into_iter().collect())
+    )
+);
+
+// TODO: Make this more efficient.
+named!(
+    pub peek(CompleteStr) -> Value,
+    peek!(
+        alt!(
+            call!(single_value)
+            | call!(key_value) => { |pair| Value::new_map(vec![vec![pair]])}
+        )
     )
 );
 
@@ -972,6 +1054,7 @@ mod tests {
     #[test]
     fn single_values_are_parsed_successfully() {
         let test_cases = [
+            ("null", Value::Null, ""),
             (r#"123"#, Value::Integer(123), ""),
             ("123", Value::Integer(123), ""),
             ("123", Value::Integer(123), ""),
@@ -1494,5 +1577,58 @@ foo = "bar"
         ])
         .unwrap();
         assert_eq!(&expected_resources, resource);
+    }
+
+    #[test]
+    fn peek_works_correctly() {
+        let test_cases = [
+            ("null", Value::Null),
+            (r#"123"#, Value::Integer(123)),
+            ("123", Value::Integer(123)),
+            ("123", Value::Integer(123)),
+            ("true", Value::Boolean(true)),
+            ("123.456", Value::Float(123.456)),
+            ("123", Value::Integer(123)),
+            (r#""foobar""#, Value::String("foobar".to_string())),
+            (
+                r#"<<EOF
+new
+line
+EOF
+"#,
+                Value::String("new\nline".to_string()),
+            ),
+            (
+                r#"[true, false, 123, -123.456, "foobar"]"#,
+                Value::new_list(vec![
+                    Value::from(true),
+                    Value::from(false),
+                    Value::from(123),
+                    Value::from(-123.456),
+                    Value::from("foobar"),
+                ]),
+            ),
+            (
+                r#"{
+        test = 123
+}"#,
+                Value::new_map(vec![vec![(Key::new_identifier("test"), Value::from(123))]]),
+            ),
+        ];
+
+        for (input, expected_value) in test_cases.iter() {
+            println!("Testing {}", input);
+            let (remaining, actual_value) = peek(CompleteStr(input)).unwrap();
+            assert_eq!(&remaining.0, input);
+            assert_eq!(actual_value, *expected_value);
+        }
+    }
+
+    #[test]
+    fn peek_works_on_body() {
+        let example = fixtures::MAP;
+        let (remaining, actual_value) = peek(CompleteStr(example)).unwrap();
+        assert_eq!(&remaining.0, &example);
+        assert!(actual_value.is_body());
     }
 }
