@@ -765,7 +765,40 @@
 <span id="765">765</span>
 <span id="766">766</span>
 <span id="767">767</span>
+<span id="768">768</span>
+<span id="769">769</span>
+<span id="770">770</span>
+<span id="771">771</span>
+<span id="772">772</span>
+<span id="773">773</span>
+<span id="774">774</span>
+<span id="775">775</span>
+<span id="776">776</span>
+<span id="777">777</span>
+<span id="778">778</span>
+<span id="779">779</span>
+<span id="780">780</span>
+<span id="781">781</span>
+<span id="782">782</span>
+<span id="783">783</span>
+<span id="784">784</span>
+<span id="785">785</span>
+<span id="786">786</span>
+<span id="787">787</span>
+<span id="788">788</span>
+<span id="789">789</span>
+<span id="790">790</span>
+<span id="791">791</span>
+<span id="792">792</span>
+<span id="793">793</span>
+<span id="794">794</span>
+<span id="795">795</span>
 </pre><div class="example-wrap"><pre class="rust ">
+<span class="doccomment">//! Deserializer Implementation</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! This module contains the types and trait implementation to allow deserialization from a HCL</span>
+<span class="doccomment">//! string to Rust types that you can usually disregard. To find out more</span>
+<span class="doccomment">//! about _using_ them, head to [`serde` documentation](https://serde.rs/).</span>
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">list</span>;
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">map</span>;
 
@@ -1209,6 +1242,29 @@
     }
 }
 
+<span class="doccomment">/// Deserialize a type `T` from a provided HCL String</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// ```rust</span>
+<span class="doccomment">/// # use ferrous_chloride::serde::from_str;</span>
+<span class="doccomment">/// use serde::Deserialize;</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// #[derive(Deserialize, PartialEq, Debug)]</span>
+<span class="doccomment">/// struct DeserializeMe {</span>
+<span class="doccomment">///     name: String,</span>
+<span class="doccomment">///     allow: bool,</span>
+<span class="doccomment">///     index: usize,</span>
+<span class="doccomment">///     list: Vec&lt;String&gt;,</span>
+<span class="doccomment">///     nothing: Option&lt;f64&gt;,</span>
+<span class="doccomment">/// }</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// let input = r#&quot;</span>
+<span class="doccomment">/// name = &quot;second&quot;</span>
+<span class="doccomment">/// allow = false</span>
+<span class="doccomment">/// index = 1</span>
+<span class="doccomment">/// list = [&quot;foo&quot;, &quot;bar&quot;, &quot;baz&quot;]&quot;#;</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// let deserialized: DeserializeMe = from_str(input).unwrap();</span>
+<span class="doccomment">/// ```</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_str</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">str</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">Error</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">T</span>: <span class="ident">Deserialize</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>,

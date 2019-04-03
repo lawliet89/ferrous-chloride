@@ -1,0 +1,1 @@
+initSidebarItems({"static":[["BLOCK",""],["BOOLEAN",""],["FLOAT",""],["INTEGER",""],["LIST",""],["MAP",""],["MAP_VALUES",""],["MERGED",""],["NULL",""],["STRING",""],["UNMERGED",""],["VALUE",""]]});
