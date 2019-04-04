@@ -58,7 +58,15 @@ named!(
         | literals::string => { |v| Value::String(v) }
         // CollectionValue -> tuple
         | tuple => { |v| Value::List(v) }
-        | map_expression => { |m| Value::Object(vec![m]) }
+        // CollectionValue -> object
+        // | map_expression => { |m| Value::Object(vec![m]) }
+        // VariableExpr
+        // FunctionCall
+        // ForExpr
+        // ExprTerm Index
+        // ExprTerm GetAttr
+        // ExprTerm Splat
+        // "(" Expression ")"
     )
 );
 
