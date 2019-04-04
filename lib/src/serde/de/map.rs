@@ -3,7 +3,7 @@ use std::collections::hash_map::IntoIter;
 use serde::de::{self, DeserializeSeed};
 
 use super::{Compat, Error};
-use crate::literals::Key;
+use crate::parser::literals::Key;
 use crate::value::{MapValues, Value};
 
 #[derive(Debug)]

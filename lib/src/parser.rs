@@ -1,3 +1,6 @@
+#[macro_use]
+pub mod literals;
+
 use crate::value;
 use crate::{AsOwned, Error, MergeBehaviour};
 

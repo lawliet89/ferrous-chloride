@@ -7,7 +7,7 @@ use std::iter::FromIterator;
 use std::string::ToString;
 
 use crate::constants::*;
-use crate::literals::{self, newline, Key};
+use crate::parser::literals::{self, newline, Key};
 use crate::{AsOwned, Error, KeyValuePairs, ScalarLength};
 
 use nom::types::CompleteStr;
@@ -683,7 +683,7 @@ impl<'a> Block<'a> {
     /// # Usage
     ///
     /// ```rust
-    /// use ferrous_chloride::literals::Key;
+    /// use ferrous_chloride::parser::literals::Key;
     /// use ferrous_chloride::value::*;
     ///
     /// let block = Block::new_unmerged(vec![(
