@@ -2,6 +2,8 @@
 //!
 //! [Reference](https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md#expressions)
 
+use std::borrow::Cow;
+
 use nom::types::CompleteStr;
 use nom::{alt_complete, call, named};
 
@@ -44,6 +46,18 @@ use crate::value::Value;
 /// - Numeric literals represent values of type number.
 pub type Expression<'a> = Value<'a>;
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ExpressionWip<'a> {
+    expression: ExpressionType,
+    tokens: Cow<'a, str>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ExpressionType {
+    /// LiteralValue -> "null"
+    Null,
+}
+
 named!(
     pub expression(CompleteStr) -> Expression,
     alt_complete!(
@@ -59,7 +73,7 @@ named!(
         // CollectionValue -> tuple
         | tuple => { |v| Value::List(v) }
         // CollectionValue -> object
-        // | map_expression => { |m| Value::Object(vec![m]) }
+        | map_expression => { |m| Value::Object(vec![m]) }
         // VariableExpr
         // FunctionCall
         // ForExpr
