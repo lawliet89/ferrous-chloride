@@ -18,7 +18,7 @@ pub enum Value<'a> {
     Boolean(bool),
     String(String),
     List(List<'a>),
-    Map(Map<'a>),
+    Object(Object<'a>),
     Block(Block<'a>),
 }
 
@@ -26,7 +26,7 @@ pub enum Value<'a> {
 /// differentiating each Block from each other.
 pub type Block<'a> = KeyValuePairs<Vec<String>, MapValues<'a>>;
 
-pub type Map<'a> = Vec<MapValues<'a>>;
+pub type Object<'a> = Vec<MapValues<'a>>;
 
 pub type MapValues<'a> = KeyValuePairs<Key<'a>, Value<'a>>;
 
@@ -45,7 +45,7 @@ impl<'a> Value<'a> {
         I: IntoIterator<Item = T>,
         T: IntoIterator<Item = (Key<'a>, Value<'a>)>,
     {
-        Value::Map(
+        Value::Object(
             iterator
                 .into_iter()
                 .map(|iter| iter.into_iter().collect())
@@ -57,7 +57,7 @@ impl<'a> Value<'a> {
     where
         T: IntoIterator<Item = (Key<'a>, Value<'a>)>,
     {
-        Value::Map(vec![iterator.into_iter().collect()])
+        Value::Object(vec![iterator.into_iter().collect()])
     }
 
     pub fn new_block<S, T>(keys: &'a [S], iterator: T) -> Self
@@ -79,7 +79,7 @@ impl<'a> Value<'a> {
             Value::Boolean(_) => BOOLEAN,
             Value::String(_) => STRING,
             Value::List(_) => LIST,
-            Value::Map(_) => MAP,
+            Value::Object(_) => OBJECT,
             Value::Block(_) => BLOCK,
         }
     }
@@ -102,7 +102,7 @@ impl<'a> Value<'a> {
         } else {
             match self {
                 Value::List(vector) => vector.len(),
-                Value::Map(vectors) => vectors.len(),
+                Value::Object(vectors) => vectors.len(),
                 Value::Block(block) => block.len(),
                 _ => unreachable!("Impossible to reach this. This is a bug."),
             }
@@ -282,13 +282,13 @@ impl<'a> Value<'a> {
         self.list().unwrap()
     }
 
-    pub fn borrow_map(&self) -> Result<&Map<'a>, Error> {
-        if let Value::Map(v) = self {
+    pub fn borrow_map(&self) -> Result<&Object<'a>, Error> {
+        if let Value::Object(v) = self {
             Ok(v)
         } else {
             Err(Error::UnexpectedVariant {
                 enum_type: VALUE,
-                expected: MAP,
+                expected: OBJECT,
                 actual: self.variant_name(),
             })
         }
@@ -296,17 +296,17 @@ impl<'a> Value<'a> {
 
     /// # Panics
     /// Panics if the variant is not a string
-    pub fn unwrap_borrow_map(&self) -> &Map<'_> {
+    pub fn unwrap_borrow_map(&self) -> &Object<'_> {
         self.borrow_map().unwrap()
     }
 
-    pub fn borrow_map_mut(&mut self) -> Result<&mut Map<'a>, Error> {
-        if let Value::Map(ref mut v) = self {
+    pub fn borrow_map_mut(&mut self) -> Result<&mut Object<'a>, Error> {
+        if let Value::Object(ref mut v) = self {
             Ok(v)
         } else {
             Err(Error::UnexpectedVariant {
                 enum_type: VALUE,
-                expected: MAP,
+                expected: OBJECT,
                 actual: self.variant_name(),
             })
         }
@@ -314,18 +314,18 @@ impl<'a> Value<'a> {
 
     /// # Panics
     /// Panics if the variant is not a map
-    pub fn unwrap_borrow_map_mut(&mut self) -> &mut Map<'a> {
+    pub fn unwrap_borrow_map_mut(&mut self) -> &mut Object<'a> {
         self.borrow_map_mut().unwrap()
     }
 
-    pub fn map(self) -> Result<Map<'a>, (Error, Self)> {
-        if let Value::Map(v) = self {
+    pub fn map(self) -> Result<Object<'a>, (Error, Self)> {
+        if let Value::Object(v) = self {
             Ok(v)
         } else {
             Err((
                 Error::UnexpectedVariant {
                     enum_type: VALUE,
-                    expected: MAP,
+                    expected: OBJECT,
                     actual: self.variant_name(),
                 },
                 self,
@@ -335,7 +335,7 @@ impl<'a> Value<'a> {
 
     /// # Panics
     /// Panics if the variant is not a map
-    pub fn unwrap_map(self) -> Map<'a> {
+    pub fn unwrap_map(self) -> Object<'a> {
         self.map().unwrap()
     }
 
@@ -409,7 +409,7 @@ impl<'a> Value<'a> {
                     .map(Value::merge)
                     .collect::<Result<_, _>>()?,
             )),
-            Value::Map(maps) => Ok(Value::Map(
+            Value::Object(maps) => Ok(Value::Object(
                 maps.into_iter()
                     .map(MapValues::merge)
                     .collect::<Result<_, _>>()?,
@@ -469,7 +469,7 @@ impl<'a> Value<'a> {
 
     pub fn is_map(&self) -> bool {
         match self {
-            Value::Map(_) => true,
+            Value::Object(_) => true,
             _ => false,
         }
     }
@@ -493,7 +493,7 @@ impl<'a> ScalarLength for Value<'a> {
         } else {
             match self {
                 Value::List(vector) => vector.len_scalar(),
-                Value::Map(vectors) => vectors.len_scalar(),
+                Value::Object(vectors) => vectors.len_scalar(),
                 Value::Block(block) => block.len_scalar(),
                 _ => unreachable!("Impossible to reach this. This is a bug."),
             }
@@ -508,7 +508,7 @@ impl<'a> crate::Mergeable for Value<'a> {
         } else {
             match self {
                 Value::List(vector) => vector.is_merged(),
-                Value::Map(vectors) => vectors.is_merged(),
+                Value::Object(vectors) => vectors.is_merged(),
                 Value::Block(block) => block.is_merged(),
                 _ => unreachable!("Impossible to reach this. This is a bug."),
             }
@@ -521,7 +521,7 @@ impl<'a> crate::Mergeable for Value<'a> {
         } else {
             match self {
                 Value::List(vector) => vector.is_unmerged(),
-                Value::Map(vectors) => vectors.is_unmerged(),
+                Value::Object(vectors) => vectors.is_unmerged(),
                 Value::Block(block) => block.is_unmerged(),
                 _ => unreachable!("Impossible to reach this. This is a bug."),
             }
@@ -552,7 +552,7 @@ impl_from_value!(Integer, i64);
 impl_from_value!(Float, f64);
 impl_from_value!(Boolean, bool);
 impl_from_value!(String, String);
-impl_from_value!(Map, Vec<MapValues<'a>>);
+impl_from_value!(Object, Vec<MapValues<'a>>);
 impl_from_value!(Block, Block<'a>);
 
 /// Special Snowflake treatment for &str and friends
@@ -598,7 +598,7 @@ impl<'a> AsOwned for Value<'a> {
             Value::Boolean(b) => Value::Boolean(*b),
             Value::String(ref string) => Value::String(string.clone()),
             Value::List(ref vec) => Value::List(vec.as_owned()),
-            Value::Map(ref map) => Value::Map(map.as_owned()),
+            Value::Object(ref map) => Value::Object(map.as_owned()),
             Value::Block(ref block) => Value::Block(block.as_owned()),
         }
     }
@@ -799,14 +799,14 @@ impl<'a> MapValues<'a> {
                             key,
                             variant: illegal.variant_name(),
                         })?,
-                        Value::Map(ref mut map) => {
-                            // Check that the incoming value is also a Map
-                            if let Value::Map(ref mut incoming) = value {
+                        Value::Object(ref mut map) => {
+                            // Check that the incoming value is also a Object
+                            if let Value::Object(ref mut incoming) = value {
                                 map.append(incoming);
                             } else {
                                 Err(Error::ErrorMergingKeys {
                                     key,
-                                    existing_variant: MAP,
+                                    existing_variant: OBJECT,
                                     incoming_variant: value.variant_name(),
                                 })?;
                             }

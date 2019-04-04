@@ -276,7 +276,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             Float(_) => self.deserialize_f64(visitor),
             String(_) => self.deserialize_string(visitor),
             List(_) => self.deserialize_seq(visitor),
-            Map(_) => self.deserialize_map(visitor),
+            Object(_) => self.deserialize_map(visitor),
             Block(_) => self.deserialize_map(visitor),
         }
     }

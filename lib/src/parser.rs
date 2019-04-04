@@ -63,7 +63,7 @@ named!(
         | call!(literals::boolean) => { |v| Value::Boolean(v) }
         | literals::string => { |v| Value::String(v) }
         | list => { |v| Value::List(v) }
-        | map_expression => { |m| Value::Map(vec![m]) }
+        | map_expression => { |m| Value::Object(vec![m]) }
     )
 );
 
@@ -597,7 +597,7 @@ foo = "bar"
                     (Key::new_identifier("name"), Value::from("foobar")),
                     (
                         Key::new_identifier("allow"),
-                        Value::Map(vec![MapValues::new_unmerged(vec![
+                        Value::Object(vec![MapValues::new_unmerged(vec![
                             (Key::new_identifier("name"), Value::from("localhost")),
                             (
                                 Key::new_identifier("cidrs"),
@@ -607,7 +607,7 @@ foo = "bar"
                     ),
                     (
                         Key::new_identifier("allow"),
-                        Value::Map(vec![MapValues::new_unmerged(vec![
+                        Value::Object(vec![MapValues::new_unmerged(vec![
                             (Key::new_identifier("name"), Value::from("lan")),
                             (
                                 Key::new_identifier("cidrs"),
@@ -617,7 +617,7 @@ foo = "bar"
                     ),
                     (
                         Key::new_identifier("deny"),
-                        Value::Map(vec![MapValues::new_unmerged(vec![
+                        Value::Object(vec![MapValues::new_unmerged(vec![
                             (Key::new_identifier("name"), Value::from("internet")),
                             (
                                 Key::new_identifier("cidrs"),
@@ -633,7 +633,7 @@ foo = "bar"
                     (Key::new_identifier("name"), Value::from("second")),
                     (
                         Key::new_identifier("allow"),
-                        Value::Map(vec![MapValues::new_unmerged(vec![
+                        Value::Object(vec![MapValues::new_unmerged(vec![
                             (Key::new_identifier("name"), Value::from("all")),
                             (
                                 Key::new_identifier("cidrs"),
@@ -713,7 +713,7 @@ foo = "bar"
                     (Key::new_identifier("name"), Value::from("foobar")),
                     (
                         Key::new_identifier("allow"),
-                        Value::Map(vec![MapValues::new_merged(vec![
+                        Value::Object(vec![MapValues::new_merged(vec![
                             (Key::new_identifier("name"), Value::from("localhost")),
                             (
                                 Key::new_identifier("cidrs"),
@@ -724,7 +724,7 @@ foo = "bar"
                     ),
                     (
                         Key::new_identifier("allow"),
-                        Value::Map(vec![MapValues::new_merged(vec![
+                        Value::Object(vec![MapValues::new_merged(vec![
                             (Key::new_identifier("name"), Value::from("lan")),
                             (
                                 Key::new_identifier("cidrs"),
@@ -735,7 +735,7 @@ foo = "bar"
                     ),
                     (
                         Key::new_identifier("deny"),
-                        Value::Map(vec![MapValues::new_merged(vec![
+                        Value::Object(vec![MapValues::new_merged(vec![
                             (Key::new_identifier("name"), Value::from("internet")),
                             (
                                 Key::new_identifier("cidrs"),
@@ -753,7 +753,7 @@ foo = "bar"
                     (Key::new_identifier("name"), Value::from("second")),
                     (
                         Key::new_identifier("allow"),
-                        Value::Map(vec![MapValues::new_merged(vec![
+                        Value::Object(vec![MapValues::new_merged(vec![
                             (Key::new_identifier("name"), Value::from("all")),
                             (
                                 Key::new_identifier("cidrs"),
