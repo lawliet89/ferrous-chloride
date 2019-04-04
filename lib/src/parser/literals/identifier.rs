@@ -25,7 +25,7 @@
 
 use nom::types::CompleteStr;
 use nom::{call, do_parse, named_attr, verify};
-use unic_ucd_ident::{is_id_start, is_id_continue};
+use unic_ucd_ident::{is_id_continue, is_id_start};
 
 // Parse an identifier
 named_attr!(#[allow(clippy::block_in_if_condition_stmt)], pub identifier(CompleteStr) -> &str,

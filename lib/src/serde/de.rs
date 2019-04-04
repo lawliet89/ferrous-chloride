@@ -11,6 +11,7 @@ use serde::de::{self, Visitor};
 use serde::forward_to_deserialize_any;
 use serde::Deserialize;
 
+use crate::parser;
 use crate::parser::literals;
 use crate::value;
 
@@ -200,7 +201,7 @@ impl<'de> Deserializer<'de> {
     }
 
     fn parse_bytes(&mut self) -> Result<Vec<u8>, Error> {
-        let (remaining, list) = value::list(self.input)?;
+        let (remaining, list) = parser::list(self.input)?;
         self.input = remaining;
         // Check that we are all numbers and fits within u8
         let numbers = list
@@ -231,19 +232,19 @@ impl<'de> Deserializer<'de> {
     }
 
     fn parse_list(&mut self) -> Result<value::List, Error> {
-        let (remaining, list) = value::list(self.input)?;
+        let (remaining, list) = parser::list(self.input)?;
         self.input = remaining;
         Ok(list)
     }
 
     fn parse_map(&mut self) -> Result<value::MapValues, Error> {
-        let (remaining, map) = value::map_values(self.input)?;
+        let (remaining, map) = parser::map_values(self.input)?;
         self.input = remaining;
         Ok(map)
     }
 
     fn peek(&mut self) -> Result<value::Value, Error> {
-        let (remaining, peek) = value::peek(self.input)?;
+        let (remaining, peek) = parser::peek(self.input)?;
         self.input = remaining;
         Ok(peek)
     }
