@@ -143,7 +143,7 @@ mod tests {
         let test_cases = [
             ("abcd123", Key::Identifier(From::from("abcd123"))),
             ("_abc", Key::Identifier(From::from("_abc"))),
-            ("藏_①", Key::Identifier(From::from("藏_①"))),
+            ("゛藏_a", Key::Identifier(From::from("゛藏_a"))),
             (r#""123""#, Key::String(From::from("123"))),
             (r#""a/b/c""#, Key::String(From::from("a/b/c"))),
         ];
