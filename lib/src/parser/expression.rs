@@ -6,6 +6,7 @@ use nom::types::CompleteStr;
 use nom::{alt_complete, call, named};
 
 use super::literals;
+use super::tuple::tuple;
 use super::{list, map_expression};
 use crate::value::Value;
 
@@ -39,17 +40,24 @@ use crate::value::Value;
 ///   "null"
 /// );
 /// ```
+///
 /// - Numeric literals represent values of type number.
 pub type Expression<'a> = Value<'a>;
 
 named!(
     pub expression(CompleteStr) -> Expression,
     alt_complete!(
+        // LiteralValue -> "null"
         call!(literals::null) => { |_| Value::Null }
+        // LiteralValue -> NumericLit
         | call!(literals::number) => { |v| From::from(v) }
+        // LiteralValue -> "true" | "false"
         | call!(literals::boolean) => { |v| Value::Boolean(v) }
+        // TemplateExpr
+        // https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md#template-expressions
         | literals::string => { |v| Value::String(v) }
-        | list => { |v| Value::List(v) }
+        // CollectionValue -> tuple
+        | tuple => { |v| Value::List(v) }
         | map_expression => { |m| Value::Object(vec![m]) }
     )
 );

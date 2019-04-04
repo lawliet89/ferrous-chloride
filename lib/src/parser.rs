@@ -3,6 +3,8 @@ pub mod literals;
 pub mod attribute;
 pub mod body;
 pub mod expression;
+pub mod object;
+pub mod tuple;
 
 #[doc(inline)]
 pub use attribute::Attribute;

@@ -22,6 +22,9 @@ pub enum Value<'a> {
     Block(Block<'a>),
 }
 
+// TODO: Make Value Generic over type of
+// Merged/unmerged object
+
 /// Contains a list of HCL Blocks sharing the same identifier with one or more labels
 /// differentiating each Block from each other.
 pub type Block<'a> = KeyValuePairs<Vec<String>, MapValues<'a>>;
