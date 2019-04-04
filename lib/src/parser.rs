@@ -1,5 +1,9 @@
 #[macro_use]
 pub mod literals;
+pub mod attribute;
+pub mod expression;
+
+pub use expression::{expression, Expression};
 
 use std::borrow::Cow;
 
@@ -9,8 +13,7 @@ use crate::{AsOwned, Error, MergeBehaviour};
 
 use nom::types::CompleteStr;
 use nom::{
-    alt, alt_complete, call, char, complete, do_parse, eof, exact, named, opt, peek, preceded, tag,
-    terminated,
+    alt, call, char, complete, do_parse, eof, exact, named, opt, peek, preceded, tag, terminated,
 };
 
 /// A HCL document body
@@ -44,7 +47,7 @@ named!(
             whitespace!(
                 separated_list!(
                     list_separator,
-                    single_value
+                    expression
                 )
             ),
             terminated!(
@@ -52,18 +55,6 @@ named!(
                 char!(']')
             )
         )
-    )
-);
-
-named!(
-    pub single_value(CompleteStr) -> Value,
-    alt_complete!(
-        call!(literals::null) => { |_| Value::Null }
-        | call!(literals::number) => { |v| From::from(v) }
-        | call!(literals::boolean) => { |v| Value::Boolean(v) }
-        | literals::string => { |v| Value::String(v) }
-        | list => { |v| Value::List(v) }
-        | map_expression => { |m| Value::Object(vec![m]) }
     )
 );
 
@@ -86,7 +77,7 @@ named!(
             do_parse!(
                 key: call!(literals::key)
                 >> char!('=')
-                >> value: call!(single_value)
+                >> value: call!(expression)
                 >> (key, value)
             )
             | do_parse!(
@@ -134,7 +125,7 @@ named!(
     pub peek(CompleteStr) -> Value,
     peek!(
         alt!(
-            call!(single_value)
+            call!(expression)
             | call!(attribute) => { |pair| Value::new_map(vec![vec![pair]])}
         )
     )
@@ -260,54 +251,6 @@ mod tests {
         for (input, expected_value) in test_cases.iter() {
             println!("Testing {}", input);
             let actual_value = list(CompleteStr(input)).unwrap_output();
-            assert_eq!(actual_value, *expected_value);
-        }
-    }
-
-    #[test]
-    fn single_values_are_parsed_successfully() {
-        let test_cases = [
-            ("null", Value::Null, ""),
-            (r#"123"#, Value::Integer(123), ""),
-            ("123", Value::Integer(123), ""),
-            ("123", Value::Integer(123), ""),
-            ("true", Value::Boolean(true), ""),
-            ("123.456", Value::Float(123.456), ""),
-            ("123", Value::Integer(123), ""),
-            (r#""foobar""#, Value::String("foobar".to_string()), ""),
-            (
-                r#"<<EOF
-new
-line
-EOF
-"#,
-                Value::String("new\nline".to_string()),
-                "\n",
-            ),
-            (
-                r#"[true, false, 123, -123.456, "foobar"]"#,
-                Value::new_list(vec![
-                    Value::from(true),
-                    Value::from(false),
-                    Value::from(123),
-                    Value::from(-123.456),
-                    Value::from("foobar"),
-                ]),
-                "",
-            ),
-            (
-                r#"{
-        test = 123
-}"#,
-                Value::new_map(vec![vec![(Key::new_identifier("test"), Value::from(123))]]),
-                "",
-            ),
-        ];
-
-        for (input, expected_value, expected_remaining) in test_cases.iter() {
-            println!("Testing {}", input);
-            let (remaining, actual_value) = single_value(CompleteStr(input)).unwrap();
-            assert_eq!(&remaining.0, expected_remaining);
             assert_eq!(actual_value, *expected_value);
         }
     }
