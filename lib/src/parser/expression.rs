@@ -1,3 +1,7 @@
+//! Expressions
+//!
+//! [Reference](https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md#expressions)
+
 use nom::types::CompleteStr;
 use nom::{alt_complete, call, named};
 
@@ -6,10 +10,40 @@ use super::{list, map_expression};
 use crate::value::Value;
 
 // FIXME: For now
+/// An Expression
+///
+/// ```enbf
+/// Expression = (
+///     ExprTerm |
+///     Operation |  # Not supported
+///     Conditional # Not supported
+/// );
+///
+/// ExprTerm = (
+///     LiteralValue |
+///     CollectionValue |
+///     TemplateExpr |
+///     VariableExpr |
+///     FunctionCall |
+///     ForExpr |
+///     ExprTerm Index |
+///     ExprTerm GetAttr |
+///     ExprTerm Splat |
+///     "(" Expression ")"
+/// );
+///
+/// LiteralValue = (
+///   NumericLit |
+///   "true" |
+///   "false" |
+///   "null"
+/// );
+/// ```
+/// - Numeric literals represent values of type number.
 pub type Expression<'a> = Value<'a>;
 
 named!(
-    pub expression(CompleteStr) -> Value,
+    pub expression(CompleteStr) -> Expression,
     alt_complete!(
         call!(literals::null) => { |_| Value::Null }
         | call!(literals::number) => { |v| From::from(v) }
