@@ -1,8 +1,12 @@
 #[macro_use]
 pub mod literals;
 pub mod attribute;
+pub mod body;
 pub mod expression;
 
+#[doc(inline)]
+pub use attribute::Attribute;
+#[doc(inline)]
 pub use expression::{expression, Expression};
 
 use std::borrow::Cow;
@@ -385,6 +389,8 @@ foo = "bar"
         }
     }
 
+    // map_values
+
     #[test]
     fn empty_map_values_are_parsed_correctly() {
         let hcl = "";
@@ -422,7 +428,6 @@ foo = "bar"
             ("test_float", Value::from(-1.23)),
             ("bool_true", Value::from(true)),
             ("bool_false", Value::from(false)),
-            ("comma_separed", Value::from("oh my, a rebel!")),
             ("string", Value::from("Hello World!")),
             ("long_string", Value::from("hihi\nanother line!")),
             ("string_escaped", Value::from("\" Hello World!")),

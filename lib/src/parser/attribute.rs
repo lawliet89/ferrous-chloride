@@ -10,11 +10,7 @@ use super::literals;
 /// ```ebnf
 /// Attribute = Identifier "=" Expression Newline;
 /// ```
-#[derive(Debug, PartialEq, Clone)]
-pub struct Attribute<'a> {
-    pub identifier: Cow<'a, str>,
-    pub expression: Expression<'a>,
-}
+pub type Attribute<'a> = (Cow<'a, str>, Expression<'a>);
 
 named!(
     pub attribute(CompleteStr) -> Attribute,
@@ -23,11 +19,7 @@ named!(
             identifier: call!(literals::identifier)
             >> char!('=')
             >> expression: call!(expression)
-            >> (Attribute {
-                    identifier: Cow::Borrowed(identifier),
-                    expression
-                }
-            )
+            >> (Cow::Borrowed(identifier), expression)
         )
     )
 );
@@ -79,13 +71,8 @@ EOF
 
         for (input, (expected_key, expected_value), expected_remaining) in test_cases.iter() {
             println!("Testing {}", input);
-            let (
-                remaining,
-                Attribute {
-                    identifier: actual_identifier,
-                    expression: actual_expression,
-                },
-            ) = attribute(CompleteStr(input)).unwrap();
+            let (remaining, (actual_identifier, actual_expression)) =
+                attribute(CompleteStr(input)).unwrap();
             assert_eq!(&remaining.0, expected_remaining);
             assert_eq!(actual_identifier, *expected_key);
             assert_eq!(actual_expression, *expected_value);
