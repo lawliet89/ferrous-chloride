@@ -77,8 +77,8 @@ pub type Body<'a> = value::MapValues<'a>;
 mod tests {
     use super::*;
 
-    use crate::Mergeable;
     use crate::fixtures;
+    use crate::Mergeable;
 
     #[test]
     fn strings_are_parsed_correctly_unmerged() {

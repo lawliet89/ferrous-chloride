@@ -944,7 +944,7 @@ named!(
 // Parse single key value pair in the form of
 // `"key" = ... | ["..."] | {...}`
 named!(
-    pub key_value(CompleteStr) -> (Key, Value),
+    pub attribute(CompleteStr) -> (Key, Value),
     inline_whitespace!(
         alt!(
             do_parse!(
@@ -975,7 +975,7 @@ named!(
         values: whitespace!(
             many0!(
                 terminated!(
-                    call!(key_value),
+                    call!(attribute),
                     alt!(
                         whitespace!(tag!(","))
                         | call!(newline) => { |_| CompleteStr("") }
@@ -994,7 +994,7 @@ named!(
     peek!(
         alt!(
             call!(single_value)
-            | call!(key_value) => { |pair| Value::new_map(vec![vec![pair]])}
+            | call!(attribute) => { |pair| Value::new_map(vec![vec![pair]])}
         )
     )
 );
@@ -1132,7 +1132,7 @@ foo = "bar"
     }
 
     #[test]
-    fn key_value_pairs_are_parsed_successfully() {
+    fn attribute_pairs_are_parsed_successfully() {
         let test_cases = [
             ("test = 123", ("test", Value::Integer(123)), ""),
             ("test = 123", ("test", Value::Integer(123)), ""),
@@ -1177,7 +1177,7 @@ EOF
 
         for (input, (expected_key, expected_value), expected_remaining) in test_cases.iter() {
             println!("Testing {}", input);
-            let (remaining, (actual_key, actual_value)) = key_value(CompleteStr(input)).unwrap();
+            let (remaining, (actual_key, actual_value)) = attribute(CompleteStr(input)).unwrap();
             assert_eq!(&remaining.0, expected_remaining);
             assert_eq!(actual_key.unwrap(), *expected_key);
             assert_eq!(actual_value, *expected_value);
@@ -1223,7 +1223,7 @@ foo = "bar"
 
         for (input, (expected_key, expected_value)) in test_cases.iter() {
             println!("Testing {}", input);
-            let (actual_key, actual_value) = key_value(CompleteStr(input)).unwrap_output();
+            let (actual_key, actual_value) = attribute(CompleteStr(input)).unwrap_output();
             assert_eq!(actual_key.unwrap(), *expected_key);
             assert_eq!(actual_value, *expected_value);
         }
