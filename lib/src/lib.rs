@@ -23,6 +23,7 @@ pub use parser::{parse_reader, parse_slice, parse_str};
 #[doc(inline)]
 pub use value::Value;
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::hash::{BuildHasher, Hash};
 
@@ -494,6 +495,26 @@ impl AsOwned for String {
     type Output = String;
     fn as_owned(&self) -> Self::Output {
         self.clone()
+    }
+}
+
+impl AsOwned for str {
+    type Output = String;
+    fn as_owned(&self) -> Self::Output {
+        self.to_string()
+    }
+}
+
+impl<'a, B> AsOwned for Cow<'a, B>
+where
+    B: ToOwned + AsOwned,
+    <B as AsOwned>::Output: Clone,
+{
+    type Output = Cow<'static, <B as AsOwned>::Output>;
+
+    fn as_owned(&self) -> Self::Output {
+        use std::ops::Deref;
+        Cow::Owned(self.deref().as_owned())
     }
 }
 
