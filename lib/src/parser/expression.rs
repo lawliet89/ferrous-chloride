@@ -4,6 +4,7 @@
 
 use std::borrow::Cow;
 use std::hash::{Hash, Hasher};
+use std::str::FromStr;
 
 use nom::types::CompleteStr;
 use nom::{alt_complete, call, named, IResult};
@@ -146,6 +147,20 @@ impl_from_expr_type!(Number, f32);
 impl_from_expr_type!(Number, f64);
 impl_from_expr_type!(Boolean, bool);
 impl_from_expr_type!(String, String);
+
+impl<'a> From<&'a str> for ExpressionType<'a> {
+    fn from(s: &'a str) -> Self {
+        ExpressionType::String(s.to_string())
+    }
+}
+
+impl<'a> FromStr for ExpressionType<'a> {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(ExpressionType::String(s.to_string()))
+    }
+}
 
 // named!(
 //     pub expression(CompleteStr) -> Expression,
