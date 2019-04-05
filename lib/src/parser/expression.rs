@@ -10,6 +10,7 @@ use nom::{alt_complete, call, named};
 use super::literals;
 use super::tuple::tuple;
 use super::{list, map_expression};
+use super::number::Number;
 use crate::value::Value;
 
 // FIXME: For now
@@ -48,14 +49,18 @@ pub type Expression<'a> = Value<'a>;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ExpressionWip<'a> {
-    expression: ExpressionType,
+    expression: ExpressionType<'a>,
     tokens: Cow<'a, str>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ExpressionType {
+pub enum ExpressionType<'a> {
     /// LiteralValue -> "null"
     Null,
+    Number(Number<'a>),
+    Boolean(bool),
+    String(String),
+    // Tuple(List),
 }
 
 named!(

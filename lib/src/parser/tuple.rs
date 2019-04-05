@@ -14,6 +14,8 @@ use nom::{char, named, opt, preceded, terminated};
 
 use super::expression::{expression, Expression};
 
+pub type Tuple<'a> = Vec<Expression<'a>>;
+
 named!(
     tuple_begin(CompleteStr) -> char,
     char!('[')
@@ -29,7 +31,7 @@ named!(
 
 // TODO: Deal with for syntax ambiguity when implementing later
 named!(
-    pub tuple(CompleteStr) -> Vec<Expression>,
+    pub tuple(CompleteStr) -> Tuple,
     preceded!(
         tuple_begin,
         terminated!(
