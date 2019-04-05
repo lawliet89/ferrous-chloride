@@ -63,25 +63,26 @@ EOF
                 ("test", ExpressionType::String("new\nline".to_string())),
                 "\n",
             ),
-            (r#"test = [],"#, ("test", ExpressionType::List(vec![])), ","),
+            (
+                r#"test = [],"#,
+                ("test", ExpressionType::Tuple(vec![])),
+                ",",
+            ),
             (
                 r#"test = [1,]"#,
-                (
-                    "test",
-                    ExpressionType::new_list(vec![ExpressionType::from(1)]),
-                ),
+                ("test", ExpressionType::new_tuple(vec![From::from(1)])),
                 "",
             ),
             (
                 r#"test = [true, false, 123, -123.456, "foobar"],"#,
                 (
                     "test",
-                    ExpressionType::new_list(vec![
-                        ExpressionType::from(true),
-                        ExpressionType::from(false),
-                        ExpressionType::from(123),
-                        ExpressionType::from(-123.456),
-                        ExpressionType::from("foobar"),
+                    ExpressionType::new_tuple(vec![
+                        From::from(true),
+                        From::from(false),
+                        From::from(123),
+                        From::from(-123.456),
+                        From::from("foobar"),
                     ]),
                 ),
                 ",",

@@ -43,42 +43,44 @@ impl<'a> Body<'a> {
                 Entry::Occupied(mut occupied) => {
                     let key = occupied.key().to_string();
                     let Expression {
-                        ref mut expression, tokens: ref mut _tokens
+                        ref mut expression,
+                        tokens: ref mut _tokens,
                     } = occupied.get_mut();
                     match expression {
                         illegal @ ExpressionType::Null
                         | illegal @ ExpressionType::Number(_)
                         | illegal @ ExpressionType::Boolean(_)
                         | illegal @ ExpressionType::String(_)
-                        | illegal @ ExpressionType::Tuple(_) => Err(Error::IllegalMultipleEntries {
-                            key,
-                            variant: illegal.variant_name(),
-                        })?,
-                        // Value::Object(ref mut map) => {
-                        //     // Check that the incoming value is also a Object
-                        //     if let Value::Object(ref mut incoming) = value {
-                        //         map.append(incoming);
-                        //     } else {
-                        //         Err(Error::ErrorMergingKeys {
-                        //             key,
-                        //             existing_variant: OBJECT,
-                        //             incoming_variant: value.variant_name(),
-                        //         })?;
-                        //     }
-                        // }
-                        // Value::Block(ref mut block) => {
-                        //     let value = value;
-                        //     // Check that the incoming value is also a Block
-                        //     if let Value::Block(incoming) = value {
-                        //         block.extend(incoming);
-                        //     } else {
-                        //         Err(Error::ErrorMergingKeys {
-                        //             key,
-                        //             existing_variant: BLOCK,
-                        //             incoming_variant: value.variant_name(),
-                        //         })?;
-                        //     }
-                        // }
+                        | illegal @ ExpressionType::Tuple(_) => {
+                            Err(Error::IllegalMultipleEntries {
+                                key,
+                                variant: illegal.variant_name(),
+                            })?
+                        } // Value::Object(ref mut map) => {
+                          //     // Check that the incoming value is also a Object
+                          //     if let Value::Object(ref mut incoming) = value {
+                          //         map.append(incoming);
+                          //     } else {
+                          //         Err(Error::ErrorMergingKeys {
+                          //             key,
+                          //             existing_variant: OBJECT,
+                          //             incoming_variant: value.variant_name(),
+                          //         })?;
+                          //     }
+                          // }
+                          // Value::Block(ref mut block) => {
+                          //     let value = value;
+                          //     // Check that the incoming value is also a Block
+                          //     if let Value::Block(incoming) = value {
+                          //         block.extend(incoming);
+                          //     } else {
+                          //         Err(Error::ErrorMergingKeys {
+                          //             key,
+                          //             existing_variant: BLOCK,
+                          //             incoming_variant: value.variant_name(),
+                          //         })?;
+                          //     }
+                          // }
                     };
                 }
             };
@@ -181,7 +183,7 @@ mod tests {
         let parsed = body(CompleteStr(hcl)).unwrap_output();
 
         assert_eq!(1, parsed.len());
-        assert_eq!(parsed["test"], Value::from(true));
+        assert_eq!(parsed["test"], ExpressionType::from(true));
     }
 
     #[test]
@@ -190,7 +192,7 @@ mod tests {
         let parsed = body(CompleteStr(hcl)).unwrap_output();
 
         assert_eq!(1, parsed.len());
-        assert_eq!(parsed["foo"], Value::from("bar"));
+        assert_eq!(parsed["foo"], ExpressionType::from("bar"));
     }
 
     #[test]
@@ -199,14 +201,14 @@ mod tests {
         let parsed = body(CompleteStr(hcl)).unwrap_output();
 
         let expected: HashMap<_, _> = vec![
-            ("test_unsigned_int", Value::from(123)),
-            ("test_signed_int", Value::from(-123)),
-            ("test_float", Value::from(-1.23)),
-            ("bool_true", Value::from(true)),
-            ("bool_false", Value::from(false)),
-            ("string", Value::from("Hello World!")),
-            ("long_string", Value::from("hihi\nanother line!")),
-            ("string_escaped", Value::from("\" Hello World!")),
+            ("test_unsigned_int", ExpressionType::from(123)),
+            ("test_signed_int", ExpressionType::from(-123)),
+            ("test_float", ExpressionType::from(-1.23)),
+            ("bool_true", ExpressionType::from(true)),
+            ("bool_false", ExpressionType::from(false)),
+            ("string", ExpressionType::from("Hello World!")),
+            ("long_string", ExpressionType::from("hihi\nanother line!")),
+            ("string_escaped", ExpressionType::from("\" Hello World!")),
         ]
         .into_iter()
         .collect();
@@ -228,41 +230,41 @@ mod tests {
         let expected: HashMap<_, _> = vec![
             (
                 "list",
-                Value::new_list(vec![
-                    Value::from(true),
-                    Value::from(false),
-                    Value::from(123),
-                    Value::from(-123.456),
-                    Value::from("foobar"),
+                ExpressionType::new_tuple(vec![
+                    From::from(true),
+                    From::from(false),
+                    From::from(123),
+                    From::from(-123.456),
+                    From::from("foobar"),
                 ]),
             ),
             (
                 "list_multi",
-                Value::new_list(vec![
-                    Value::from(true),
-                    Value::from(false),
-                    Value::from(123),
-                    Value::from(-123.456),
-                    Value::from("foobar"),
+                ExpressionType::new_tuple(vec![
+                    From::from(true),
+                    From::from(false),
+                    From::from(123),
+                    From::from(-123.456),
+                    From::from("foobar"),
                 ]),
             ),
             (
                 "list_in_list",
-                Value::new_list(vec![
-                    Value::new_list(vec![Value::from("test"), Value::from("foobar")]),
-                    Value::from(1),
-                    Value::from(2),
-                    Value::from(-3),
+                ExpressionType::new_tuple(vec![
+                    ExpressionType::new_tuple(vec![From::from("test"), From::from("foobar")]),
+                    From::from(1),
+                    From::from(2),
+                    From::from(-3),
                 ]),
             ),
-            (
-                "map_in_list",
-                Value::new_list(vec![
-                    Value::new_map(vec![vec![(Key::new_identifier("test"), Value::from(123))]]),
-                    Value::new_map(vec![vec![(Key::new_identifier("foo"), Value::from("bar"))]]),
-                    Value::new_map(vec![vec![(Key::new_identifier("baz"), Value::from(false))]]),
-                ]),
-            ),
+            // (
+            //     "map_in_list",
+            //     ExpressionType::new_tuple(vec![
+            //         Value::new_map(vec![vec![(Key::new_identifier("test"), From::from(123))]]),
+            //         Value::new_map(vec![vec![(Key::new_identifier("foo"), From::from("bar"))]]),
+            //         Value::new_map(vec![vec![(Key::new_identifier("baz"), From::from(false))]]),
+            //     ]),
+            // ),
         ]
         .into_iter()
         .collect();

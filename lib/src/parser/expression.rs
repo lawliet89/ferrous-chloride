@@ -4,6 +4,7 @@
 
 use std::borrow::Cow;
 use std::hash::{Hash, Hasher};
+use std::iter::FromIterator;
 use std::str::FromStr;
 
 use nom::types::CompleteStr;
@@ -50,10 +51,10 @@ use crate::Error;
 ///
 /// - Numeric literals represent values of type number.
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Eq)]
 pub struct Expression<'a> {
     pub expression: ExpressionType<'a>,
-    pub tokens: Cow<'a, str>,
+    pub(crate) tokens: Cow<'a, str>,
 }
 
 impl<'a> Expression<'a> {
@@ -65,9 +66,75 @@ impl<'a> Expression<'a> {
     }
 }
 
+macro_rules! impl_from_expr (
+    ($variant: ident, $type: ty) => (
+        impl<'a> From<$type> for Expression<'a> {
+            fn from(v: $type) -> Self {
+                let tokens = Cow::Owned(v.to_string());
+                Expression {
+                    expression: ExpressionType::$variant(From::from(v)),
+                    tokens
+                }
+            }
+        }
+    )
+);
+
+impl_from_expr!(Number, Number<'a>);
+impl_from_expr!(Number, u8);
+impl_from_expr!(Number, u16);
+impl_from_expr!(Number, u32);
+impl_from_expr!(Number, u64);
+impl_from_expr!(Number, u128);
+impl_from_expr!(Number, i8);
+impl_from_expr!(Number, i16);
+impl_from_expr!(Number, i32);
+impl_from_expr!(Number, i64);
+impl_from_expr!(Number, i128);
+impl_from_expr!(Number, f32);
+impl_from_expr!(Number, f64);
+impl_from_expr!(Boolean, bool);
+impl_from_expr!(String, String);
+
+impl<'a> From<&'a str> for Expression<'a> {
+    fn from(s: &'a str) -> Self {
+        Expression {
+            expression: ExpressionType::String(s.to_string()),
+            tokens: Cow::Borrowed(s),
+        }
+    }
+}
+
+impl<'a> PartialEq for Expression<'a> {
+    fn eq(&self, other: &Expression<'a>) -> bool {
+        self.expression.eq(&other.expression)
+    }
+}
+
+impl<'a> PartialEq<ExpressionType<'a>> for Expression<'a> {
+    fn eq(&self, other: &ExpressionType<'a>) -> bool {
+        self.expression.eq(other)
+    }
+}
+
 impl<'a> Hash for Expression<'a> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         state.write(self.tokens.as_bytes())
+    }
+}
+
+impl<'a> FromIterator<Expression<'a>> for Expression<'a> {
+    fn from_iter<T>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = Expression<'a>>,
+    {
+        let (expressions, tokens): (Vec<_>, Vec<_>) = iter
+            .into_iter()
+            .map(|Expression { expression, tokens }| (expression, tokens))
+            .unzip();
+        let tokens = Cow::Owned(tokens.join(","));
+        let expression = ExpressionType::Tuple(expressions.into_iter().map(From::from).collect());
+        Expression { expression, tokens }
     }
 }
 
@@ -82,6 +149,13 @@ pub enum ExpressionType<'a> {
 }
 
 impl<'a> ExpressionType<'a> {
+    pub fn new_tuple<T>(iterator: T) -> Self
+    where
+        T: IntoIterator<Item = Expression<'a>>,
+    {
+        ExpressionType::Tuple(iterator.into_iter().collect())
+    }
+
     pub fn merge(self) -> Result<Self, Error> {
         match self {
             no_op @ ExpressionType::Null
@@ -125,6 +199,15 @@ impl<'a> ExpressionType<'a> {
             // ExpressionType::Object(_) => OBJECT,
             // ExpressionType::Block(_) => BLOCK,
         }
+    }
+}
+
+impl<'a> FromIterator<Expression<'a>> for ExpressionType<'a> {
+    fn from_iter<T>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = Expression<'a>>,
+    {
+        ExpressionType::new_tuple(iter)
     }
 }
 
