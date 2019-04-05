@@ -144,6 +144,7 @@ impl_from_expr_type!(Number, f32);
 impl_from_expr_type!(Number, f64);
 impl_from_expr_type!(Boolean, bool);
 impl_from_expr_type!(String, String);
+impl_from_expr_type!(Tuple, Vec<Expression<'a>>);
 
 impl<'a> From<&'a str> for Expression<'a> {
     fn from(s: &'a str) -> Self {
@@ -172,7 +173,7 @@ named!(
         // https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md#template-expressions
         | literals::string => { |v| From::from(v) }
         // CollectionValue -> tuple
-        // | tuple => { |v| Value::List(v) }
+        | tuple => { |v| From::from(v) }
         // CollectionValue -> object
         // | map_expression => { |m| Value::Object(vec![m]) }
         // VariableExpr
