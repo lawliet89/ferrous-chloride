@@ -53,7 +53,7 @@ named!(
 mod tests {
     use super::*;
 
-    use std::collections::HashMap;
+    use crate::HashMap;
 
     use crate::fixtures;
     use crate::utils::{assert_list_eq, ResultUtilsString};

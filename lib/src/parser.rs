@@ -209,7 +209,7 @@ pub fn parse_slice(bytes: &[u8], merge: Option<MergeBehaviour>) -> Result<Body, 
 mod tests {
     use super::*;
 
-    use std::collections::HashMap;
+    use crate::HashMap;
 
     use crate::fixtures;
     use crate::utils::{assert_list_eq, ResultUtilsString};

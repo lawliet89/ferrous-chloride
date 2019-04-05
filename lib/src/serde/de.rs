@@ -491,7 +491,7 @@ where
 mod tests {
     use super::*;
 
-    use std::collections::HashMap;
+    use crate::HashMap;
 
     use serde::Deserialize;
     use serde_bytes::ByteBuf;

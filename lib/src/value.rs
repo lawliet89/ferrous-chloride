@@ -1,7 +1,7 @@
 #[cfg(feature = "serde")]
 pub mod de;
 
-use std::collections::HashMap;
+use crate::HashMap;
 use std::iter::FromIterator;
 use std::string::ToString;
 
@@ -615,7 +615,7 @@ impl<'a> Block<'a> {
         K: IntoIterator<Item = S>,
         S: ToString,
     {
-        let mut merged = HashMap::new();
+        let mut merged = HashMap::default();
         for (key, value) in iter {
             let _ = merged.insert(
                 key.into_iter().map(|s| s.to_string()).collect(),
@@ -727,7 +727,7 @@ impl<'a> Block<'a> {
     /// use std::collections::HashMap;
     /// use std::borrow::Borrow;
     ///
-    /// let mut hashmap: HashMap<Vec<String>, usize> = HashMap::new();
+    /// let mut hashmap: HashMap<Vec<String>, usize> = HashMap::default();
     /// let _ = hashmap.insert(vec!["a".to_string(), "b".to_string()], 123);
     ///
     /// // Let's try to retrieve the value
@@ -783,7 +783,7 @@ impl<'a> MapValues<'a> {
     {
         use std::collections::hash_map::Entry;
 
-        let mut map = HashMap::new();
+        let mut map = HashMap::default();
         for (key, value) in iter {
             let mut value = value.merge()?;
             match map.entry(key) {

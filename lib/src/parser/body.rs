@@ -2,7 +2,7 @@
 //!
 //! [Reference](https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md#structural-elements)
 use std::borrow::Cow;
-use std::collections::HashMap;
+use crate::HashMap;
 use std::iter::FromIterator;
 
 use nom::types::CompleteStr;
@@ -33,7 +33,7 @@ impl<'a> Body<'a> {
     {
         use std::collections::hash_map::Entry;
 
-        let mut map = HashMap::new();
+        let mut map = HashMap::default();
         for (key, value) in iter {
             let mut value = value.merge()?;
             match map.entry(key) {
@@ -154,7 +154,7 @@ named!(
 mod tests {
     use super::*;
 
-    use std::collections::HashMap;
+    use crate::HashMap;
 
     use crate::fixtures;
     use crate::parser::literals::Key;
