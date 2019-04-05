@@ -43,14 +43,14 @@ impl<'a> Body<'a> {
                 Entry::Occupied(mut occupied) => {
                     let key = occupied.key().to_string();
                     let Expression {
-                        ref mut expression, ..
+                        ref mut expression, tokens: ref mut _tokens
                     } = occupied.get_mut();
                     match expression {
                         illegal @ ExpressionType::Null
                         | illegal @ ExpressionType::Number(_)
                         | illegal @ ExpressionType::Boolean(_)
                         | illegal @ ExpressionType::String(_)
-                        /*| illegal @ Value::List(_)*/ => Err(Error::IllegalMultipleEntries {
+                        | illegal @ ExpressionType::Tuple(_) => Err(Error::IllegalMultipleEntries {
                             key,
                             variant: illegal.variant_name(),
                         })?,

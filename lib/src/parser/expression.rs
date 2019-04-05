@@ -11,7 +11,7 @@ use nom::{alt_complete, call, named, IResult};
 
 use super::literals;
 use super::number::{number, Number};
-use super::tuple::tuple;
+use super::tuple::{tuple, Tuple};
 use super::{list, map_expression};
 use crate::constants::*;
 use crate::value::Value;
@@ -78,7 +78,7 @@ pub enum ExpressionType<'a> {
     Number(Number<'a>),
     Boolean(bool),
     String(String),
-    // Tuple(List),
+    Tuple(Tuple<'a>),
 }
 
 impl<'a> ExpressionType<'a> {
@@ -88,11 +88,17 @@ impl<'a> ExpressionType<'a> {
             | no_op @ ExpressionType::Number(_)
             | no_op @ ExpressionType::Boolean(_)
             | no_op @ ExpressionType::String(_) => Ok(no_op),
-            // Value::List(list) => Ok(Value::List(
-            //     list.into_iter()
-            //         .map(Value::merge)
-            //         .collect::<Result<_, _>>()?,
-            // )),
+            ExpressionType::Tuple(tuple) => Ok(ExpressionType::Tuple(
+                tuple
+                    .into_iter()
+                    .map(|Expression { expression, tokens }| {
+                        Ok(Expression {
+                            expression: expression.merge()?,
+                            tokens,
+                        })
+                    })
+                    .collect::<Result<_, Error>>()?,
+            )),
             // Value::Object(maps) => Ok(Value::Object(
             //     maps.into_iter()
             //         .map(MapValues::merge)
@@ -115,7 +121,7 @@ impl<'a> ExpressionType<'a> {
             ExpressionType::Number(_) => NUMBER,
             ExpressionType::Boolean(_) => BOOLEAN,
             ExpressionType::String(_) => STRING,
-            // ExpressionType::List(_) => LIST,
+            ExpressionType::Tuple(_) => TUPLE,
             // ExpressionType::Object(_) => OBJECT,
             // ExpressionType::Block(_) => BLOCK,
         }
@@ -161,32 +167,6 @@ impl<'a> FromStr for ExpressionType<'a> {
         Ok(ExpressionType::String(s.to_string()))
     }
 }
-
-// named!(
-//     pub expression(CompleteStr) -> Expression,
-//     alt_complete!(
-//         // LiteralValue -> "null"
-//         call!(literals::null) => { |_| Value::Null }
-//         // LiteralValue -> NumericLit
-//         | call!(literals::number) => { |v| From::from(v) }
-//         // LiteralValue -> "true" | "false"
-//         | call!(literals::boolean) => { |v| Value::Boolean(v) }
-//         // TemplateExpr
-//         // https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md#template-expressions
-//         | literals::string => { |v| Value::String(v) }
-//         // CollectionValue -> tuple
-//         | tuple => { |v| Value::List(v) }
-//         // CollectionValue -> object
-//         | map_expression => { |m| Value::Object(vec![m]) }
-//         // VariableExpr
-//         // FunctionCall
-//         // ForExpr
-//         // ExprTerm Index
-//         // ExprTerm GetAttr
-//         // ExprTerm Splat
-//         // "(" Expression ")"
-//     )
-// );
 
 named!(
     pub expression_type(CompleteStr) -> ExpressionType,
