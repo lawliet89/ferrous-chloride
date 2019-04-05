@@ -9,7 +9,7 @@ use nom::types::CompleteStr;
 use nom::{alt, call, do_parse, eof, named, tag, terminated};
 
 use super::attribute::attribute;
-use super::expression::Expression;
+use super::expression::{Expression, ExpressionType};
 use super::literals::newline;
 use crate::constants::*;
 use crate::{Error, KeyValuePairs, Value};
@@ -42,41 +42,43 @@ impl<'a> Body<'a> {
                 }
                 Entry::Occupied(mut occupied) => {
                     let key = occupied.key().to_string();
-                    match occupied.get_mut() {
-                        illegal @ Value::Null
-                        | illegal @ Value::Integer(_)
-                        | illegal @ Value::Float(_)
-                        | illegal @ Value::Boolean(_)
-                        | illegal @ Value::String(_)
-                        | illegal @ Value::List(_) => Err(Error::IllegalMultipleEntries {
+                    let Expression {
+                        ref mut expression, ..
+                    } = occupied.get_mut();
+                    match expression {
+                        illegal @ ExpressionType::Null
+                        | illegal @ ExpressionType::Number(_)
+                        | illegal @ ExpressionType::Boolean(_)
+                        | illegal @ ExpressionType::String(_)
+                        /*| illegal @ Value::List(_)*/ => Err(Error::IllegalMultipleEntries {
                             key,
                             variant: illegal.variant_name(),
                         })?,
-                        Value::Object(ref mut map) => {
-                            // Check that the incoming value is also a Object
-                            if let Value::Object(ref mut incoming) = value {
-                                map.append(incoming);
-                            } else {
-                                Err(Error::ErrorMergingKeys {
-                                    key,
-                                    existing_variant: OBJECT,
-                                    incoming_variant: value.variant_name(),
-                                })?;
-                            }
-                        }
-                        Value::Block(ref mut block) => {
-                            let value = value;
-                            // Check that the incoming value is also a Block
-                            if let Value::Block(incoming) = value {
-                                block.extend(incoming);
-                            } else {
-                                Err(Error::ErrorMergingKeys {
-                                    key,
-                                    existing_variant: BLOCK,
-                                    incoming_variant: value.variant_name(),
-                                })?;
-                            }
-                        }
+                        // Value::Object(ref mut map) => {
+                        //     // Check that the incoming value is also a Object
+                        //     if let Value::Object(ref mut incoming) = value {
+                        //         map.append(incoming);
+                        //     } else {
+                        //         Err(Error::ErrorMergingKeys {
+                        //             key,
+                        //             existing_variant: OBJECT,
+                        //             incoming_variant: value.variant_name(),
+                        //         })?;
+                        //     }
+                        // }
+                        // Value::Block(ref mut block) => {
+                        //     let value = value;
+                        //     // Check that the incoming value is also a Block
+                        //     if let Value::Block(incoming) = value {
+                        //         block.extend(incoming);
+                        //     } else {
+                        //         Err(Error::ErrorMergingKeys {
+                        //             key,
+                        //             existing_variant: BLOCK,
+                        //             incoming_variant: value.variant_name(),
+                        //         })?;
+                        //     }
+                        // }
                     };
                 }
             };

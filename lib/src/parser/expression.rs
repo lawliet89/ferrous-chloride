@@ -6,13 +6,15 @@ use std::borrow::Cow;
 use std::hash::{Hash, Hasher};
 
 use nom::types::CompleteStr;
-use nom::{alt_complete, call, named};
+use nom::{alt_complete, call, named, IResult};
 
 use super::literals;
 use super::number::{number, Number};
 use super::tuple::tuple;
 use super::{list, map_expression};
+use crate::constants::*;
 use crate::value::Value;
+use crate::Error;
 
 // FIXME: For now
 /// An Expression
@@ -46,15 +48,23 @@ use crate::value::Value;
 /// ```
 ///
 /// - Numeric literals represent values of type number.
-pub type Expression<'a> = Value<'a>;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ExpressionWip<'a> {
-    expression: ExpressionType<'a>,
-    tokens: Cow<'a, str>,
+pub struct Expression<'a> {
+    pub expression: ExpressionType<'a>,
+    pub tokens: Cow<'a, str>,
 }
 
-impl<'a> Hash for ExpressionWip<'a> {
+impl<'a> Expression<'a> {
+    pub fn merge(self) -> Result<Self, Error> {
+        Ok(Self {
+            expression: self.expression.merge()?,
+            tokens: self.tokens,
+        })
+    }
+}
+
+impl<'a> Hash for Expression<'a> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         state.write(self.tokens.as_bytes())
     }
@@ -68,6 +78,47 @@ pub enum ExpressionType<'a> {
     Boolean(bool),
     String(String),
     // Tuple(List),
+}
+
+impl<'a> ExpressionType<'a> {
+    pub fn merge(self) -> Result<Self, Error> {
+        match self {
+            no_op @ ExpressionType::Null
+            | no_op @ ExpressionType::Number(_)
+            | no_op @ ExpressionType::Boolean(_)
+            | no_op @ ExpressionType::String(_) => Ok(no_op),
+            // Value::List(list) => Ok(Value::List(
+            //     list.into_iter()
+            //         .map(Value::merge)
+            //         .collect::<Result<_, _>>()?,
+            // )),
+            // Value::Object(maps) => Ok(Value::Object(
+            //     maps.into_iter()
+            //         .map(MapValues::merge)
+            //         .collect::<Result<_, _>>()?,
+            // )),
+            // Value::Block(block) => {
+            //     let unmerged: Block = block
+            //         .into_iter()
+            //         .map(|(key, value)| Ok((key, value.merge()?)))
+            //         .collect::<Result<_, Error>>()?;
+            //     let merged = Block::new_merged(unmerged)?;
+            //     Ok(Value::Block(merged))
+            // }
+        }
+    }
+
+    pub fn variant_name(&self) -> &'static str {
+        match self {
+            ExpressionType::Null => NULL,
+            ExpressionType::Number(_) => NUMBER,
+            ExpressionType::Boolean(_) => BOOLEAN,
+            ExpressionType::String(_) => STRING,
+            // ExpressionType::List(_) => LIST,
+            // ExpressionType::Object(_) => OBJECT,
+            // ExpressionType::Block(_) => BLOCK,
+        }
+    }
 }
 
 macro_rules! impl_from_expr_type (
@@ -96,34 +147,34 @@ impl_from_expr_type!(Number, f64);
 impl_from_expr_type!(Boolean, bool);
 impl_from_expr_type!(String, String);
 
-named!(
-    pub expression(CompleteStr) -> Expression,
-    alt_complete!(
-        // LiteralValue -> "null"
-        call!(literals::null) => { |_| Value::Null }
-        // LiteralValue -> NumericLit
-        | call!(literals::number) => { |v| From::from(v) }
-        // LiteralValue -> "true" | "false"
-        | call!(literals::boolean) => { |v| Value::Boolean(v) }
-        // TemplateExpr
-        // https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md#template-expressions
-        | literals::string => { |v| Value::String(v) }
-        // CollectionValue -> tuple
-        | tuple => { |v| Value::List(v) }
-        // CollectionValue -> object
-        | map_expression => { |m| Value::Object(vec![m]) }
-        // VariableExpr
-        // FunctionCall
-        // ForExpr
-        // ExprTerm Index
-        // ExprTerm GetAttr
-        // ExprTerm Splat
-        // "(" Expression ")"
-    )
-);
+// named!(
+//     pub expression(CompleteStr) -> Expression,
+//     alt_complete!(
+//         // LiteralValue -> "null"
+//         call!(literals::null) => { |_| Value::Null }
+//         // LiteralValue -> NumericLit
+//         | call!(literals::number) => { |v| From::from(v) }
+//         // LiteralValue -> "true" | "false"
+//         | call!(literals::boolean) => { |v| Value::Boolean(v) }
+//         // TemplateExpr
+//         // https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md#template-expressions
+//         | literals::string => { |v| Value::String(v) }
+//         // CollectionValue -> tuple
+//         | tuple => { |v| Value::List(v) }
+//         // CollectionValue -> object
+//         | map_expression => { |m| Value::Object(vec![m]) }
+//         // VariableExpr
+//         // FunctionCall
+//         // ForExpr
+//         // ExprTerm Index
+//         // ExprTerm GetAttr
+//         // ExprTerm Splat
+//         // "(" Expression ")"
+//     )
+// );
 
 named!(
-    pub expression_wip(CompleteStr) -> ExpressionType,
+    pub expression_type(CompleteStr) -> ExpressionType,
     alt_complete!(
         // LiteralValue -> "null"
         call!(literals::null) => { |_| ExpressionType::Null }
@@ -148,6 +199,17 @@ named!(
     )
 );
 
+pub fn expression(input: CompleteStr) -> IResult<CompleteStr, Expression, u32> {
+    expression_type(input).map(|(input, output)| {
+        (
+            input,
+            Expression {
+                expression: output,
+                tokens: Cow::Borrowed(input.0),
+            },
+        )
+    })
+}
 
 #[cfg(test)]
 mod tests {

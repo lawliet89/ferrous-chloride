@@ -23,7 +23,7 @@ macro_rules! impl_from_number {
 
 impl_from_number!(u8 u16 u32 u64 u128 i8 i16 i32 i64 i128 f32 f64);
 
-impl<'a> From<&'a str> for Number<'a>{
+impl<'a> From<&'a str> for Number<'a> {
     fn from(s: &'a str) -> Self {
         Number(Cow::Borrowed(s.trim_matches('+')))
     }
