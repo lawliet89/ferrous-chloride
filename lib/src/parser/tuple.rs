@@ -64,15 +64,15 @@ mod tests {
     fn simple_tuples_are_parsed_successfully() {
         let test_cases = [
             (r#"[]"#, vec![]),
-            (r#"[1,]"#, vec![Value::from(1)]),
+            (r#"[1,]"#, vec![Expression::from(1)]),
             (
                 r#"[true, false, 123, -123.456, "foobar"]"#,
                 vec![
-                    Value::from(true),
-                    Value::from(false),
-                    Value::from(123),
-                    Value::from(-123.456),
-                    Value::from("foobar"),
+                    Expression::from(true),
+                    Expression::from(false),
+                    Expression::from(123),
+                    Expression::from(-123.456),
+                    Expression::from("foobar"),
                 ],
             ),
             (
@@ -87,12 +87,15 @@ mod tests {
                         ],
                     ]"#,
                 vec![
-                    Value::from(true),
-                    Value::from(false),
-                    Value::from(123),
-                    Value::from(-123.456),
-                    Value::from("testing"),
-                    Value::new_list(vec![Value::from("inside voice!"), Value::from("lol")]),
+                    Expression::from(true),
+                    Expression::from(false),
+                    Expression::from(123),
+                    Expression::from(-123.456),
+                    Expression::from("testing"),
+                    Expression::new_tuple(vec![
+                        Expression::from("inside voice!"),
+                        Expression::from("lol"),
+                    ]),
                 ],
             ),
         ];

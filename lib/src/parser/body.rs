@@ -9,7 +9,7 @@ use nom::types::CompleteStr;
 use nom::{alt, call, do_parse, eof, named, tag, terminated};
 
 use super::attribute::attribute;
-use super::expression::{Expression, ExpressionType};
+use super::expression::Expression;
 use super::literals::newline;
 use crate::constants::*;
 use crate::{Error, KeyValuePairs, Value};
@@ -42,45 +42,39 @@ impl<'a> Body<'a> {
                 }
                 Entry::Occupied(mut occupied) => {
                     let key = occupied.key().to_string();
-                    let Expression {
-                        ref mut expression,
-                        tokens: ref mut _tokens,
-                    } = occupied.get_mut();
-                    match expression {
-                        illegal @ ExpressionType::Null
-                        | illegal @ ExpressionType::Number(_)
-                        | illegal @ ExpressionType::Boolean(_)
-                        | illegal @ ExpressionType::String(_)
-                        | illegal @ ExpressionType::Tuple(_) => {
-                            Err(Error::IllegalMultipleEntries {
-                                key,
-                                variant: illegal.variant_name(),
-                            })?
-                        } // Value::Object(ref mut map) => {
-                          //     // Check that the incoming value is also a Object
-                          //     if let Value::Object(ref mut incoming) = value {
-                          //         map.append(incoming);
-                          //     } else {
-                          //         Err(Error::ErrorMergingKeys {
-                          //             key,
-                          //             existing_variant: OBJECT,
-                          //             incoming_variant: value.variant_name(),
-                          //         })?;
-                          //     }
-                          // }
-                          // Value::Block(ref mut block) => {
-                          //     let value = value;
-                          //     // Check that the incoming value is also a Block
-                          //     if let Value::Block(incoming) = value {
-                          //         block.extend(incoming);
-                          //     } else {
-                          //         Err(Error::ErrorMergingKeys {
-                          //             key,
-                          //             existing_variant: BLOCK,
-                          //             incoming_variant: value.variant_name(),
-                          //         })?;
-                          //     }
-                          // }
+                    match occupied.get_mut() {
+                        illegal @ Expression::Null
+                        | illegal @ Expression::Number(_)
+                        | illegal @ Expression::Boolean(_)
+                        | illegal @ Expression::String(_)
+                        | illegal @ Expression::Tuple(_) => Err(Error::IllegalMultipleEntries {
+                            key,
+                            variant: illegal.variant_name(),
+                        })?, // Value::Object(ref mut map) => {
+                             //     // Check that the incoming value is also a Object
+                             //     if let Value::Object(ref mut incoming) = value {
+                             //         map.append(incoming);
+                             //     } else {
+                             //         Err(Error::ErrorMergingKeys {
+                             //             key,
+                             //             existing_variant: OBJECT,
+                             //             incoming_variant: value.variant_name(),
+                             //         })?;
+                             //     }
+                             // }
+                             // Value::Block(ref mut block) => {
+                             //     let value = value;
+                             //     // Check that the incoming value is also a Block
+                             //     if let Value::Block(incoming) = value {
+                             //         block.extend(incoming);
+                             //     } else {
+                             //         Err(Error::ErrorMergingKeys {
+                             //             key,
+                             //             existing_variant: BLOCK,
+                             //             incoming_variant: value.variant_name(),
+                             //         })?;
+                             //     }
+                             // }
                     };
                 }
             };
@@ -183,7 +177,7 @@ mod tests {
         let parsed = body(CompleteStr(hcl)).unwrap_output();
 
         assert_eq!(1, parsed.len());
-        assert_eq!(parsed["test"], ExpressionType::from(true));
+        assert_eq!(parsed["test"], Expression::from(true));
     }
 
     #[test]
@@ -192,7 +186,7 @@ mod tests {
         let parsed = body(CompleteStr(hcl)).unwrap_output();
 
         assert_eq!(1, parsed.len());
-        assert_eq!(parsed["foo"], ExpressionType::from("bar"));
+        assert_eq!(parsed["foo"], Expression::from("bar"));
     }
 
     #[test]
@@ -201,14 +195,14 @@ mod tests {
         let parsed = body(CompleteStr(hcl)).unwrap_output();
 
         let expected: HashMap<_, _> = vec![
-            ("test_unsigned_int", ExpressionType::from(123)),
-            ("test_signed_int", ExpressionType::from(-123)),
-            ("test_float", ExpressionType::from(-1.23)),
-            ("bool_true", ExpressionType::from(true)),
-            ("bool_false", ExpressionType::from(false)),
-            ("string", ExpressionType::from("Hello World!")),
-            ("long_string", ExpressionType::from("hihi\nanother line!")),
-            ("string_escaped", ExpressionType::from("\" Hello World!")),
+            ("test_unsigned_int", Expression::from(123)),
+            ("test_signed_int", Expression::from(-123)),
+            ("test_float", Expression::from(-1.23)),
+            ("bool_true", Expression::from(true)),
+            ("bool_false", Expression::from(false)),
+            ("string", Expression::from("Hello World!")),
+            ("long_string", Expression::from("hihi\nanother line!")),
+            ("string_escaped", Expression::from("\" Hello World!")),
         ]
         .into_iter()
         .collect();
@@ -230,7 +224,7 @@ mod tests {
         let expected: HashMap<_, _> = vec![
             (
                 "list",
-                ExpressionType::new_tuple(vec![
+                Expression::new_tuple(vec![
                     From::from(true),
                     From::from(false),
                     From::from(123),
@@ -240,7 +234,7 @@ mod tests {
             ),
             (
                 "list_multi",
-                ExpressionType::new_tuple(vec![
+                Expression::new_tuple(vec![
                     From::from(true),
                     From::from(false),
                     From::from(123),
@@ -250,8 +244,8 @@ mod tests {
             ),
             (
                 "list_in_list",
-                ExpressionType::new_tuple(vec![
-                    ExpressionType::new_tuple(vec![From::from("test"), From::from("foobar")]),
+                Expression::new_tuple(vec![
+                    Expression::new_tuple(vec![From::from("test"), From::from("foobar")]),
                     From::from(1),
                     From::from(2),
                     From::from(-3),
@@ -259,7 +253,7 @@ mod tests {
             ),
             // (
             //     "map_in_list",
-            //     ExpressionType::new_tuple(vec![
+            //     Expression::new_tuple(vec![
             //         Value::new_map(vec![vec![(Key::new_identifier("test"), From::from(123))]]),
             //         Value::new_map(vec![vec![(Key::new_identifier("foo"), From::from("bar"))]]),
             //         Value::new_map(vec![vec![(Key::new_identifier("baz"), From::from(false))]]),

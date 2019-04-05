@@ -28,30 +28,28 @@ named!(
 mod tests {
     use super::*;
 
-    use crate::parser::expression::ExpressionType;
-
     #[test]
     fn attribute_pairs_are_parsed_successfully() {
         let test_cases = [
             (
                 "test = 123",
-                ("test", ExpressionType::Number(From::from(123))),
+                ("test", Expression::Number(From::from(123))),
                 "",
             ),
             (
                 "test = 123",
-                ("test", ExpressionType::Number(From::from(123))),
+                ("test", Expression::Number(From::from(123))),
                 "",
             ),
-            ("test = true", ("test", ExpressionType::Boolean(true)), ""),
+            ("test = true", ("test", Expression::Boolean(true)), ""),
             (
                 "test = 123.456",
-                ("test", ExpressionType::Number(From::from(123.456))),
+                ("test", Expression::Number(From::from(123.456))),
                 "",
             ),
             (
                 "   test   =   123  ",
-                ("test", ExpressionType::Number(From::from(123))),
+                ("test", Expression::Number(From::from(123))),
                 "",
             ), // Random spaces
             (
@@ -60,24 +58,20 @@ new
 line
 EOF
 "#,
-                ("test", ExpressionType::String("new\nline".to_string())),
+                ("test", Expression::String("new\nline".to_string())),
                 "\n",
             ),
-            (
-                r#"test = [],"#,
-                ("test", ExpressionType::Tuple(vec![])),
-                ",",
-            ),
+            (r#"test = [],"#, ("test", Expression::Tuple(vec![])), ","),
             (
                 r#"test = [1,]"#,
-                ("test", ExpressionType::new_tuple(vec![From::from(1)])),
+                ("test", Expression::new_tuple(vec![From::from(1)])),
                 "",
             ),
             (
                 r#"test = [true, false, 123, -123.456, "foobar"],"#,
                 (
                     "test",
-                    ExpressionType::new_tuple(vec![
+                    Expression::new_tuple(vec![
                         From::from(true),
                         From::from(false),
                         From::from(123),
@@ -91,16 +85,8 @@ EOF
 
         for (input, (expected_key, expected_value), expected_remaining) in test_cases.iter() {
             println!("Testing {}", input);
-            let (
-                remaining,
-                (
-                    actual_identifier,
-                    Expression {
-                        expression: actual_expression,
-                        ..
-                    },
-                ),
-            ) = attribute(CompleteStr(input)).unwrap();
+            let (remaining, (actual_identifier, actual_expression)) =
+                attribute(CompleteStr(input)).unwrap();
             assert_eq!(&remaining.0, expected_remaining);
             assert_eq!(actual_identifier, *expected_key);
             assert_eq!(actual_expression, *expected_value);

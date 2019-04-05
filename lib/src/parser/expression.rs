@@ -51,95 +51,8 @@ use crate::Error;
 ///
 /// - Numeric literals represent values of type number.
 
-#[derive(Clone, Debug, Eq)]
-pub struct Expression<'a> {
-    pub expression: ExpressionType<'a>,
-    pub(crate) tokens: Cow<'a, str>,
-}
-
-impl<'a> Expression<'a> {
-    pub fn merge(self) -> Result<Self, Error> {
-        Ok(Self {
-            expression: self.expression.merge()?,
-            tokens: self.tokens,
-        })
-    }
-}
-
-macro_rules! impl_from_expr (
-    ($variant: ident, $type: ty) => (
-        impl<'a> From<$type> for Expression<'a> {
-            fn from(v: $type) -> Self {
-                let tokens = Cow::Owned(v.to_string());
-                Expression {
-                    expression: ExpressionType::$variant(From::from(v)),
-                    tokens
-                }
-            }
-        }
-    )
-);
-
-impl_from_expr!(Number, Number<'a>);
-impl_from_expr!(Number, u8);
-impl_from_expr!(Number, u16);
-impl_from_expr!(Number, u32);
-impl_from_expr!(Number, u64);
-impl_from_expr!(Number, u128);
-impl_from_expr!(Number, i8);
-impl_from_expr!(Number, i16);
-impl_from_expr!(Number, i32);
-impl_from_expr!(Number, i64);
-impl_from_expr!(Number, i128);
-impl_from_expr!(Number, f32);
-impl_from_expr!(Number, f64);
-impl_from_expr!(Boolean, bool);
-impl_from_expr!(String, String);
-
-impl<'a> From<&'a str> for Expression<'a> {
-    fn from(s: &'a str) -> Self {
-        Expression {
-            expression: ExpressionType::String(s.to_string()),
-            tokens: Cow::Borrowed(s),
-        }
-    }
-}
-
-impl<'a> PartialEq for Expression<'a> {
-    fn eq(&self, other: &Expression<'a>) -> bool {
-        self.expression.eq(&other.expression)
-    }
-}
-
-impl<'a> PartialEq<ExpressionType<'a>> for Expression<'a> {
-    fn eq(&self, other: &ExpressionType<'a>) -> bool {
-        self.expression.eq(other)
-    }
-}
-
-impl<'a> Hash for Expression<'a> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write(self.tokens.as_bytes())
-    }
-}
-
-impl<'a> FromIterator<Expression<'a>> for Expression<'a> {
-    fn from_iter<T>(iter: T) -> Self
-    where
-        T: IntoIterator<Item = Expression<'a>>,
-    {
-        let (expressions, tokens): (Vec<_>, Vec<_>) = iter
-            .into_iter()
-            .map(|Expression { expression, tokens }| (expression, tokens))
-            .unzip();
-        let tokens = Cow::Owned(tokens.join(","));
-        let expression = ExpressionType::Tuple(expressions.into_iter().map(From::from).collect());
-        Expression { expression, tokens }
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ExpressionType<'a> {
+pub enum Expression<'a> {
     /// LiteralValue -> "null"
     Null,
     Number(Number<'a>),
@@ -148,29 +61,24 @@ pub enum ExpressionType<'a> {
     Tuple(Tuple<'a>),
 }
 
-impl<'a> ExpressionType<'a> {
+impl<'a> Expression<'a> {
     pub fn new_tuple<T>(iterator: T) -> Self
     where
         T: IntoIterator<Item = Expression<'a>>,
     {
-        ExpressionType::Tuple(iterator.into_iter().collect())
+        Expression::Tuple(iterator.into_iter().collect())
     }
 
     pub fn merge(self) -> Result<Self, Error> {
         match self {
-            no_op @ ExpressionType::Null
-            | no_op @ ExpressionType::Number(_)
-            | no_op @ ExpressionType::Boolean(_)
-            | no_op @ ExpressionType::String(_) => Ok(no_op),
-            ExpressionType::Tuple(tuple) => Ok(ExpressionType::Tuple(
+            no_op @ Expression::Null
+            | no_op @ Expression::Number(_)
+            | no_op @ Expression::Boolean(_)
+            | no_op @ Expression::String(_) => Ok(no_op),
+            Expression::Tuple(tuple) => Ok(Expression::Tuple(
                 tuple
                     .into_iter()
-                    .map(|Expression { expression, tokens }| {
-                        Ok(Expression {
-                            expression: expression.merge()?,
-                            tokens,
-                        })
-                    })
+                    .map(Self::merge)
                     .collect::<Result<_, Error>>()?,
             )),
             // Value::Object(maps) => Ok(Value::Object(
@@ -191,31 +99,31 @@ impl<'a> ExpressionType<'a> {
 
     pub fn variant_name(&self) -> &'static str {
         match self {
-            ExpressionType::Null => NULL,
-            ExpressionType::Number(_) => NUMBER,
-            ExpressionType::Boolean(_) => BOOLEAN,
-            ExpressionType::String(_) => STRING,
-            ExpressionType::Tuple(_) => TUPLE,
-            // ExpressionType::Object(_) => OBJECT,
-            // ExpressionType::Block(_) => BLOCK,
+            Expression::Null => NULL,
+            Expression::Number(_) => NUMBER,
+            Expression::Boolean(_) => BOOLEAN,
+            Expression::String(_) => STRING,
+            Expression::Tuple(_) => TUPLE,
+            // Expression::Object(_) => OBJECT,
+            // Expression::Block(_) => BLOCK,
         }
     }
 }
 
-impl<'a> FromIterator<Expression<'a>> for ExpressionType<'a> {
+impl<'a> FromIterator<Expression<'a>> for Expression<'a> {
     fn from_iter<T>(iter: T) -> Self
     where
         T: IntoIterator<Item = Expression<'a>>,
     {
-        ExpressionType::new_tuple(iter)
+        Expression::new_tuple(iter)
     }
 }
 
 macro_rules! impl_from_expr_type (
     ($variant: ident, $type: ty) => (
-        impl<'a> From<$type> for ExpressionType<'a> {
+        impl<'a> From<$type> for Expression<'a> {
             fn from(v: $type) -> Self {
-                ExpressionType::$variant(From::from(v))
+                Expression::$variant(From::from(v))
             }
         }
     )
@@ -237,25 +145,25 @@ impl_from_expr_type!(Number, f64);
 impl_from_expr_type!(Boolean, bool);
 impl_from_expr_type!(String, String);
 
-impl<'a> From<&'a str> for ExpressionType<'a> {
+impl<'a> From<&'a str> for Expression<'a> {
     fn from(s: &'a str) -> Self {
-        ExpressionType::String(s.to_string())
+        Expression::String(s.to_string())
     }
 }
 
-impl<'a> FromStr for ExpressionType<'a> {
+impl<'a> FromStr for Expression<'a> {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(ExpressionType::String(s.to_string()))
+        Ok(Expression::String(s.to_string()))
     }
 }
 
 named!(
-    pub expression_type(CompleteStr) -> ExpressionType,
+    pub expression(CompleteStr) -> Expression,
     alt_complete!(
         // LiteralValue -> "null"
-        call!(literals::null) => { |_| ExpressionType::Null }
+        call!(literals::null) => { |_| Expression::Null }
         // LiteralValue -> NumericLit
         | call!(number) => { |v| From::from(v) }
         // LiteralValue -> "true" | "false"
@@ -277,18 +185,6 @@ named!(
     )
 );
 
-pub fn expression(input: CompleteStr) -> IResult<CompleteStr, Expression, u32> {
-    expression_type(input).map(|(input, output)| {
-        (
-            input,
-            Expression {
-                expression: output,
-                tokens: Cow::Borrowed(input.0),
-            },
-        )
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -298,41 +194,44 @@ mod tests {
     #[test]
     fn expressions_are_parsed_successfully() {
         let test_cases = [
-            ("null", Value::Null, ""),
-            (r#"123"#, Value::Integer(123), ""),
-            ("123", Value::Integer(123), ""),
-            ("123", Value::Integer(123), ""),
-            ("true", Value::Boolean(true), ""),
-            ("123.456", Value::Float(123.456), ""),
-            ("123", Value::Integer(123), ""),
-            (r#""foobar""#, Value::String("foobar".to_string()), ""),
+            ("null", Expression::Null, ""),
+            (r#"123"#, Expression::from(123), ""),
+            ("123", Expression::from(123), ""),
+            ("123", Expression::from(123), ""),
+            ("true", Expression::Boolean(true), ""),
+            ("123.456", Expression::from(123.456), ""),
+            ("123", Expression::from(123), ""),
+            (r#""foobar""#, Expression::String("foobar".to_string()), ""),
             (
                 r#"<<EOF
 new
 line
 EOF
 "#,
-                Value::String("new\nline".to_string()),
+                Expression::String("new\nline".to_string()),
                 "\n",
             ),
             (
                 r#"[true, false, 123, -123.456, "foobar"]"#,
-                Value::new_list(vec![
-                    Value::from(true),
-                    Value::from(false),
-                    Value::from(123),
-                    Value::from(-123.456),
-                    Value::from("foobar"),
+                Expression::new_tuple(vec![
+                    Expression::from(true),
+                    Expression::from(false),
+                    Expression::from(123),
+                    Expression::from(-123.456),
+                    Expression::from("foobar"),
                 ]),
                 "",
             ),
-            (
-                r#"{
-        test = 123
-}"#,
-                Value::new_map(vec![vec![(Key::new_identifier("test"), Value::from(123))]]),
-                "",
-            ),
+            //             (
+            //                 r#"{
+            //         test = 123
+            // }"#,
+            //                 Expression::new_map(vec![vec![(
+            //                     Key::new_identifier("test"),
+            //                     Expression::from(123),
+            //                 )]]),
+            //                 "",
+            //             ),
         ];
 
         for (input, expected_value, expected_remaining) in test_cases.iter() {
