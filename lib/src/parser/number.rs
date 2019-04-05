@@ -4,6 +4,9 @@ use std::borrow::Cow;
 use std::ops::Deref;
 use std::str::FromStr;
 
+use nom::types::CompleteStr;
+use nom::{call, map, named, recognize_float};
+
 /// A number, represented as a string for aribitrary precision
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Number<'a>(Cow<'a, str>);
@@ -19,6 +22,18 @@ macro_rules! impl_from_number {
 }
 
 impl_from_number!(u8 u16 u32 u64 u128 i8 i16 i32 i64 i128 f32 f64);
+
+impl<'a> From<&'a str> for Number<'a>{
+    fn from(s: &'a str) -> Self {
+        Number(Cow::Borrowed(s.trim_matches('+')))
+    }
+}
+
+impl<'a> From<CompleteStr<'a>> for Number<'a> {
+    fn from(s: CompleteStr<'a>) -> Self {
+        Number(Cow::Borrowed(s.0.trim_matches('+')))
+    }
+}
 
 impl<'a> Deref for Number<'a> {
     type Target = str;
@@ -55,4 +70,48 @@ impl<'a> Number<'a> {
         as_f32 => f32,
         as_f64 => f64,
     );
+}
+
+named!(
+    pub number(CompleteStr) -> Number,
+    map!(call!(recognize_float), From::from)
+);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::utils::ResultUtilsString;
+
+    #[test]
+    fn integers_are_parsed_correctly() {
+        assert_eq!(
+            number(CompleteStr("12345")).unwrap_output(),
+            From::from(12345)
+        );
+        assert_eq!(
+            number(CompleteStr("+12345")).unwrap_output(),
+            From::from(12345)
+        );
+        assert_eq!(
+            number(CompleteStr("-12345")).unwrap_output(),
+            From::from(-12345)
+        );
+    }
+
+    #[test]
+    fn floats_are_parsed_correctly() {
+        assert_eq!(
+            number(CompleteStr("12.34")).unwrap_output(),
+            From::from(12.34)
+        );
+        assert_eq!(
+            number(CompleteStr("+12.34")).unwrap_output(),
+            From::from(12.34)
+        );
+        assert_eq!(
+            number(CompleteStr("-12.34")).unwrap_output(),
+            From::from(-12.34)
+        );
+    }
 }

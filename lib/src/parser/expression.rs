@@ -3,14 +3,15 @@
 //! [Reference](https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md#expressions)
 
 use std::borrow::Cow;
+use std::hash::{Hash, Hasher};
 
 use nom::types::CompleteStr;
 use nom::{alt_complete, call, named};
 
 use super::literals;
+use super::number::{number, Number};
 use super::tuple::tuple;
 use super::{list, map_expression};
-use super::number::Number;
 use crate::value::Value;
 
 // FIXME: For now
@@ -53,6 +54,12 @@ pub struct ExpressionWip<'a> {
     tokens: Cow<'a, str>,
 }
 
+impl<'a> Hash for ExpressionWip<'a> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write(self.tokens.as_bytes())
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ExpressionType<'a> {
     /// LiteralValue -> "null"
@@ -62,6 +69,32 @@ pub enum ExpressionType<'a> {
     String(String),
     // Tuple(List),
 }
+
+macro_rules! impl_from_expr_type (
+    ($variant: ident, $type: ty) => (
+        impl<'a> From<$type> for ExpressionType<'a> {
+            fn from(v: $type) -> Self {
+                ExpressionType::$variant(From::from(v))
+            }
+        }
+    )
+);
+
+impl_from_expr_type!(Number, Number<'a>);
+impl_from_expr_type!(Number, u8);
+impl_from_expr_type!(Number, u16);
+impl_from_expr_type!(Number, u32);
+impl_from_expr_type!(Number, u64);
+impl_from_expr_type!(Number, u128);
+impl_from_expr_type!(Number, i8);
+impl_from_expr_type!(Number, i16);
+impl_from_expr_type!(Number, i32);
+impl_from_expr_type!(Number, i64);
+impl_from_expr_type!(Number, i128);
+impl_from_expr_type!(Number, f32);
+impl_from_expr_type!(Number, f64);
+impl_from_expr_type!(Boolean, bool);
+impl_from_expr_type!(String, String);
 
 named!(
     pub expression(CompleteStr) -> Expression,
@@ -88,6 +121,33 @@ named!(
         // "(" Expression ")"
     )
 );
+
+named!(
+    pub expression_wip(CompleteStr) -> ExpressionType,
+    alt_complete!(
+        // LiteralValue -> "null"
+        call!(literals::null) => { |_| ExpressionType::Null }
+        // LiteralValue -> NumericLit
+        | call!(number) => { |v| From::from(v) }
+        // LiteralValue -> "true" | "false"
+        | call!(literals::boolean) => { |v| From::from(v) }
+        // TemplateExpr
+        // https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md#template-expressions
+        | literals::string => { |v| From::from(v) }
+        // CollectionValue -> tuple
+        // | tuple => { |v| Value::List(v) }
+        // CollectionValue -> object
+        // | map_expression => { |m| Value::Object(vec![m]) }
+        // VariableExpr
+        // FunctionCall
+        // ForExpr
+        // ExprTerm Index
+        // ExprTerm GetAttr
+        // ExprTerm Splat
+        // "(" Expression ")"
+    )
+);
+
 
 #[cfg(test)]
 mod tests {
