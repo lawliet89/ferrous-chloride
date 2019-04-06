@@ -184,8 +184,7 @@ mod tests {
     use crate::HashMap;
 
     use crate::fixtures;
-    use crate::utils::{assert_list_eq, ResultUtilsString};
-    use crate::{Mergeable, ScalarLength};
+    use crate::utils::ResultUtilsString;
 
     #[test]
     fn empty_body_is_parsed_correctly() {

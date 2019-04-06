@@ -53,12 +53,7 @@ named!(
 mod tests {
     use super::*;
 
-    use crate::HashMap;
-
-    use crate::fixtures;
-    use crate::utils::{assert_list_eq, ResultUtilsString};
-    use crate::value::{Block, Value};
-    use crate::{Mergeable, ScalarLength};
+    use crate::utils::ResultUtilsString;
 
     #[test]
     fn simple_tuples_are_parsed_successfully() {
