@@ -1,13 +1,13 @@
 //! HCL Body
 //!
 //! [Reference](https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md#structural-elements)
-use crate::HashMap;
 use std::borrow::Cow;
 use std::iter::FromIterator;
 
 use nom::types::CompleteStr;
 use nom::{alt, call, do_parse, eof, named, tag, terminated};
 
+use crate::HashMap;
 use super::attribute::attribute;
 use super::expression::Expression;
 use super::literals::newline;
@@ -24,6 +24,23 @@ use crate::{Error, KeyValuePairs, Value};
 /// OneLineBlock = Identifier (StringLit|Identifier)* "{" (Identifier "=" Expression)? "}" Newline;
 /// ```
 pub type Body<'a> = KeyValuePairs<Cow<'a, str>, Expression<'a>>;
+
+/// An element of `Body`
+///
+/// ```ebnf
+/// Attribute | Block | OneLineBlock
+/// ```
+pub enum BodyElement<'a> {
+    Expression(Expression<'a>),
+    // Block
+}
+
+impl<'a> From<Expression<'a>> for BodyElement<'a> {
+    fn from(expr: Expression<'a>) -> Self {
+        BodyElement::Expression(expr)
+    }
+}
+
 
 impl<'a> Body<'a> {
     // TODO: Customise merging behaviour wrt duplicate keys
@@ -51,18 +68,7 @@ impl<'a> Body<'a> {
                         | illegal @ Expression::Object(_) => Err(Error::IllegalMultipleEntries {
                             key,
                             variant: illegal.variant_name(),
-                        })?, // Value::Object(ref mut map) => {
-                             //     // Check that the incoming value is also a Object
-                             //     if let Value::Object(ref mut incoming) = value {
-                             //         map.append(incoming);
-                             //     } else {
-                             //         Err(Error::ErrorMergingKeys {
-                             //             key,
-                             //             existing_variant: OBJECT,
-                             //             incoming_variant: value.variant_name(),
-                             //         })?;
-                             //     }
-                             // }
+                        })?,
                              // Value::Block(ref mut block) => {
                              //     let value = value;
                              //     // Check that the incoming value is also a Block
@@ -217,7 +223,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn list_in_body_are_parsed_correctly() {
         let hcl = fixtures::LIST;
         let parsed = body(CompleteStr(hcl)).unwrap_output();
@@ -252,14 +257,14 @@ mod tests {
                     From::from(-3),
                 ]),
             ),
-            // (
-            //     "object_in_list",
-            //     Expression::new_tuple(vec![
-            //         Value::new_map(vec![vec![(Key::new_identifier("test"), From::from(123))]]),
-            //         Value::new_map(vec![vec![(Key::new_identifier("foo"), From::from("bar"))]]),
-            //         Value::new_map(vec![vec![(Key::new_identifier("baz"), From::from(false))]]),
-            //     ]),
-            // ),
+            (
+                "object_in_list",
+                Expression::new_tuple(vec![
+                    Expression::new_object(vec![("test", Expression::from(123))]),
+                    Expression::new_object(vec![("foo", Expression::from("bar"))]),
+                    Expression::new_object(vec![("baz", Expression::from(false))]),
+                ]),
+            ),
         ]
         .into_iter()
         .collect();

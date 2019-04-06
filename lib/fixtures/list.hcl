@@ -15,7 +15,6 @@ list_in_list = [ // This should work
     -3,
 ]
 
-
 object_in_list = [ /* This too! */
     {
         test = 123
