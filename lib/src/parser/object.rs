@@ -13,7 +13,7 @@
 use std::borrow::{Borrow, Cow};
 
 use nom::types::CompleteStr;
-use nom::{alt, call, char, do_parse, eof, named, recognize, tag, terminated, IResult};
+use nom::{alt, call, char, do_parse, eof, named, peek, recognize, tag, terminated, IResult};
 
 use super::expression::{expression, Expression};
 use crate::parser::literals::{identifier, newline};
@@ -106,9 +106,9 @@ named!(
 named!(
     pub object_separator(CompleteStr) -> CompleteStr,
     alt!(
-        whitespace!(tag!(","))
-        | call!(newline) => { |_| CompleteStr("") }
-        | eof!()
+        tag!(",")
+        | call!(newline) => {|_| CompleteStr("") }
+        | peek!(object_end) => {|_| CompleteStr("") }
     )
 );
 
@@ -126,28 +126,6 @@ named!(
         >> (values.into_iter().collect())
     )
 );
-
-// use nom::{preceded, separated_list};
-
-// named!(
-//     pub object_expt(CompleteStr) -> Object,
-//     preceded!(
-//         tuple_begin,
-//         terminated!(
-//             whitespace!(
-//                 separated_list!(
-//                     tuple_separator,
-//                     expression
-//                 )
-//             ),
-//             terminated!(
-//                 whitespace!(opt!(tuple_separator)),
-//                 char!(']')
-//             )
-//         )
-//     )
-// );
-
 
 named!(
     pub object(CompleteStr) -> Object,
@@ -202,7 +180,7 @@ mod tests {
                 "",
             ),
             (
-                "test = 123",
+                "test /* test */ = 123",
                 ("test", Expression::Number(From::from(123))),
                 "",
             ),
@@ -276,7 +254,7 @@ EOF
 
     #[test]
     fn non_terminating_new_lines_object_bodies_are_parsed_correctly() {
-        let hcl = "test = true";
+        let hcl = "test = true,";
         let parsed = object_body(CompleteStr(hcl)).unwrap_output();
 
         assert_eq!(1, parsed.len());
@@ -310,6 +288,91 @@ EOF
         assert_eq!(parsed["foo"], Expression::from("bar"));
     }
 
+    #[test]
+    fn multiple_elements_in_body_are_parsed_correctly() {
+        let hcl = r#"foo = "bar"
+bar = "baz"
+true = false
+"#;
+        let parsed = object_body(CompleteStr(hcl)).unwrap_output();
+
+        assert_eq!(3, parsed.len());
+        assert_eq!(parsed["foo"], Expression::from("bar"));
+        assert_eq!(parsed["bar"], Expression::from("baz"));
+        assert_eq!(parsed["true"], Expression::from(false));
+    }
+
+    #[test]
+    fn multiple_elements_in_object_is_parsed_correctly() {
+        let hcl = r#"{
+foo = "bar"
+bar = "baz"
+true = false}"#;
+        let parsed = object(CompleteStr(hcl)).unwrap_output();
+
+        assert_eq!(3, parsed.len());
+        assert_eq!(parsed["foo"], Expression::from("bar"));
+        assert_eq!(parsed["bar"], Expression::from("baz"));
+        assert_eq!(parsed["true"], Expression::from(false));
+    }
+
+    #[test]
+    fn multiple_elements_in_body_with_trailing_comma_are_parsed_correctly() {
+        let hcl = r#"foo = "bar"
+bar = "baz"
+true = false,"#;
+        let parsed = object_body(CompleteStr(hcl)).unwrap_output();
+
+        assert_eq!(3, parsed.len());
+        assert_eq!(parsed["foo"], Expression::from("bar"));
+        assert_eq!(parsed["bar"], Expression::from("baz"));
+        assert_eq!(parsed["true"], Expression::from(false));
+    }
+
+    #[test]
+    fn multiple_elements_in_object_with_trailing_comma_is_parsed_correctly() {
+        let hcl = r#"{
+foo = "bar"
+bar = "baz"
+true = false,}"#;
+        let parsed = object(CompleteStr(hcl)).unwrap_output();
+
+        assert_eq!(3, parsed.len());
+        assert_eq!(parsed["foo"], Expression::from("bar"));
+        assert_eq!(parsed["bar"], Expression::from("baz"));
+        assert_eq!(parsed["true"], Expression::from(false));
+    }
+
+    #[test]
+    fn multiple_elements_in_body_with_trailing_newline_are_parsed_correctly() {
+        let hcl = r#"foo = "bar"
+bar = "baz"
+true = false
+# Hi
+"#;
+        let parsed = object_body(CompleteStr(hcl)).unwrap_output();
+
+        assert_eq!(3, parsed.len());
+        assert_eq!(parsed["foo"], Expression::from("bar"));
+        assert_eq!(parsed["bar"], Expression::from("baz"));
+        assert_eq!(parsed["true"], Expression::from(false));
+    }
+
+    #[test]
+    fn multiple_elements_in_object_with_trailing_newline_is_parsed_correctly() {
+        let hcl = r#"{
+foo = "bar"
+bar = "baz"
+true = false
+# Hi
+}"#;
+        let parsed = object(CompleteStr(hcl)).unwrap_output();
+
+        assert_eq!(3, parsed.len());
+        assert_eq!(parsed["foo"], Expression::from("bar"));
+        assert_eq!(parsed["bar"], Expression::from("baz"));
+        assert_eq!(parsed["true"], Expression::from(false));
+    }
 
     #[test]
     fn scalar_object_body_are_parsed_correctly() {
@@ -371,8 +434,10 @@ hihi
 another line!
 EOF
     string_escaped = "\" Hello World!"
-}"#;
-        let parsed = object(CompleteStr(hcl)).unwrap_output();
+}
+"#;
+        let (remaining, parsed) = object(CompleteStr(hcl)).unwrap();
+        assert_eq!("\n", remaining.0);
 
         let expected: HashMap<_, _> = vec![
             ("test_unsigned_int", Expression::from(123)),
@@ -435,7 +500,7 @@ EOF
                 ]),
             ),
             (
-                "map_in_list",
+                "object_in_list",
                 Expression::new_tuple(vec![
                     Expression::new_object(vec![("test", Expression::from(123))]),
                     Expression::new_object(vec![("foo", Expression::from("bar"))]),
@@ -452,5 +517,95 @@ EOF
             let actual_value = &parsed[expected_key];
             assert_eq!(*actual_value, expected_value);
         }
+    }
+
+    #[test]
+    fn list_object_is_parsed_correctly() {
+        let hcl = ["{", fixtures::LIST, "}"].join("");
+        let parsed = object(CompleteStr(&hcl)).unwrap_output();
+
+        let expected: HashMap<_, _> = vec![
+            (
+                "list",
+                Expression::new_tuple(vec![
+                    Expression::from(true),
+                    Expression::from(false),
+                    Expression::from(123),
+                    Expression::from(-123.456),
+                    Expression::from("foobar"),
+                ]),
+            ),
+            (
+                "list_multi",
+                Expression::new_tuple(vec![
+                    Expression::from(true),
+                    Expression::from(false),
+                    Expression::from(123),
+                    Expression::from(-123.456),
+                    Expression::from("foobar"),
+                ]),
+            ),
+            (
+                "list_in_list",
+                Expression::new_tuple(vec![
+                    Expression::new_tuple(vec![
+                        Expression::from("test"),
+                        Expression::from("foobar"),
+                    ]),
+                    Expression::from(1),
+                    Expression::from(2),
+                    Expression::from(-3),
+                ]),
+            ),
+            (
+                "object_in_list",
+                Expression::new_tuple(vec![
+                    Expression::new_object(vec![("test", Expression::from(123))]),
+                    Expression::new_object(vec![("foo", Expression::from("bar"))]),
+                    Expression::new_object(vec![("baz", Expression::from(false))]),
+                ]),
+            ),
+        ]
+        .into_iter()
+        .collect();
+
+        assert_eq!(expected.len(), parsed.len());
+        for (expected_key, expected_value) in expected {
+            println!("Checking {}", expected_key);
+            let actual_value = &parsed[expected_key];
+            assert_eq!(*actual_value, expected_value);
+        }
+    }
+
+    #[test]
+    fn nested_object_is_parsed_correctly() {
+        let hcl = r#"{
+    test_unsigned_int = 123
+    true = false
+
+    nested = {
+        false = true
+        oh_no = "reality is broken!"
+    },
+},
+"#;
+        let (remaining, parsed) = object(CompleteStr(hcl)).unwrap();
+        assert_eq!(",\n", remaining.0);
+
+        let expected: HashMap<ObjectElementIdentifier, _> = vec![
+            (From::from("test_unsigned_int"), Expression::from(123)),
+            (From::from("true"), Expression::from(false)),
+            (
+                From::from("nested"),
+                Expression::new_object(vec![
+                    ("false", Expression::from(true)),
+                    ("oh_no", Expression::from("reality is broken!")),
+                ]),
+            ),
+        ]
+        .into_iter()
+        .collect();
+
+        assert_eq!(expected, parsed);
     }
 }

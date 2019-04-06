@@ -544,7 +544,7 @@ foo = "bar"
                 ]),
             ),
             (
-                "map_in_list",
+                "object_in_list",
                 Value::new_list(vec![
                     Value::new_map(vec![vec![(Key::new_identifier("test"), Value::from(123))]]),
                     Value::new_map(vec![vec![(Key::new_identifier("foo"), Value::from("bar"))]]),

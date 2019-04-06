@@ -253,7 +253,7 @@ mod tests {
                 ]),
             ),
             // (
-            //     "map_in_list",
+            //     "object_in_list",
             //     Expression::new_tuple(vec![
             //         Value::new_map(vec![vec![(Key::new_identifier("test"), From::from(123))]]),
             //         Value::new_map(vec![vec![(Key::new_identifier("foo"), From::from("bar"))]]),

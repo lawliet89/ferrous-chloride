@@ -16,7 +16,7 @@ list_in_list = [ // This should work
 ]
 
 
-map_in_list = [ /* This too! */
+object_in_list = [ /* This too! */
     {
         test = 123
     },
