@@ -41,6 +41,18 @@ pub enum ElementIdentifier<'a> {
     Expression(Cow<'a, str>),
 }
 
+impl<'a, S> PartialEq<S> for ElementIdentifier<'a>
+where
+    S: AsRef<str>,
+{
+    fn eq(&self, other: &S) -> bool {
+        match self {
+            ElementIdentifier::Identifier(ident) => ident.eq(other.as_ref()),
+            ElementIdentifier::Expression(_) => false,
+        }
+    }
+}
+
 pub type ObjectElement<'a> = (ElementIdentifier<'a>, Expression<'a>);
 
 pub type Object<'a> = HashMap<ElementIdentifier<'a>, Expression<'a>>;
@@ -57,6 +69,18 @@ pub fn element_identifier<'a>(
             { |expr: CompleteStr<'a>| ElementIdentifier::Expression(Cow::Borrowed(expr.0)) }
     )
 }
+
+named!(
+    pub object_element(CompleteStr) -> ObjectElement,
+    inline_whitespace!(
+        do_parse!(
+            identifier: call!(element_identifier)
+            >> char!('=')
+            >> expression: call!(expression)
+            >> (identifier, expression)
+        )
+    )
+);
 
 // named!(
 //     pub object_elements(CompleteStr) -> Vec<ObjectElement>,
@@ -114,6 +138,71 @@ mod tests {
         for (input, expected_output) in &test_cases {
             let output = element_identifier(CompleteStr(input)).unwrap_output();
             assert_eq!(output, *expected_output);
+        }
+    }
+
+    #[test]
+    fn element_objects_are_parsed_successfully() {
+        let test_cases = [
+            (
+                "test = 123",
+                ("test", Expression::Number(From::from(123))),
+                "",
+            ),
+            (
+                "test = 123",
+                ("test", Expression::Number(From::from(123))),
+                "",
+            ),
+            ("test = true", ("test", Expression::Boolean(true)), ""),
+            (
+                "test = 123.456",
+                ("test", Expression::Number(From::from(123.456))),
+                "",
+            ),
+            (
+                "   test   =   123  ",
+                ("test", Expression::Number(From::from(123))),
+                "",
+            ), // Random spaces
+            (
+                r#"test = <<EOF
+new
+line
+EOF
+"#,
+                ("test", Expression::String("new\nline".to_string())),
+                "\n",
+            ),
+            (r#"test = [],"#, ("test", Expression::Tuple(vec![])), ","),
+            (
+                r#"test = [1,]"#,
+                ("test", Expression::new_tuple(vec![From::from(1)])),
+                "",
+            ),
+            (
+                r#"test = [true, false, 123, -123.456, "foobar"],"#,
+                (
+                    "test",
+                    Expression::new_tuple(vec![
+                        From::from(true),
+                        From::from(false),
+                        From::from(123),
+                        From::from(-123.456),
+                        From::from("foobar"),
+                    ]),
+                ),
+                ",",
+            ),
+        ];
+
+        for (input, (expected_key, expected_value), expected_remaining) in test_cases.iter() {
+            println!("Testing {}", input);
+            let (remaining, (actual_identifier, actual_expression)) =
+                object_element(CompleteStr(input)).unwrap();
+            assert_eq!(&remaining.0, expected_remaining);
+            assert_eq!(actual_identifier, *expected_key);
+            assert_eq!(actual_expression, *expected_value);
         }
     }
 }
