@@ -94,17 +94,32 @@ named!(
 );
 
 named!(
+    pub object_begin(CompleteStr) -> char,
+    char!('{')
+);
+
+named!(
+    pub object_end(CompleteStr) -> char,
+    char!('}')
+);
+
+named!(
+    pub object_separator(CompleteStr) -> CompleteStr,
+    alt!(
+        whitespace!(tag!(","))
+        | call!(newline) => { |_| CompleteStr("") }
+        | eof!()
+    )
+);
+
+named!(
     pub object_body(CompleteStr) -> HashMap<ObjectElementIdentifier, Expression>,
     do_parse!(
         values: whitespace!(
             many0!(
                 terminated!(
                     call!(object_element),
-                    alt!(
-                        whitespace!(tag!(","))
-                        | call!(newline) => { |_| CompleteStr("") }
-                        | eof!()
-                    )
+                    call!(object_separator)
                 )
             )
         )
@@ -112,12 +127,34 @@ named!(
     )
 );
 
+// use nom::{preceded, separated_list};
+
+// named!(
+//     pub object_expt(CompleteStr) -> Object,
+//     preceded!(
+//         tuple_begin,
+//         terminated!(
+//             whitespace!(
+//                 separated_list!(
+//                     tuple_separator,
+//                     expression
+//                 )
+//             ),
+//             terminated!(
+//                 whitespace!(opt!(tuple_separator)),
+//                 char!(']')
+//             )
+//         )
+//     )
+// );
+
+
 named!(
     pub object(CompleteStr) -> Object,
     do_parse!(
-        whitespace!(char!('{'))
+        whitespace!(call!(object_begin))
         >> values: whitespace!(call!(object_body))
-        >> char!('}')
+        >> call!(object_end)
         >> (values)
     )
 );
@@ -230,9 +267,26 @@ EOF
     }
 
     #[test]
+    fn empty_object_is_parsed_correctly() {
+        let hcl = "{}";
+        let parsed = object(CompleteStr(hcl)).unwrap_output();
+
+        assert_eq!(0, parsed.len());
+    }
+
+    #[test]
     fn non_terminating_new_lines_object_bodies_are_parsed_correctly() {
         let hcl = "test = true";
         let parsed = object_body(CompleteStr(hcl)).unwrap_output();
+
+        assert_eq!(1, parsed.len());
+        assert_eq!(parsed["test"], Expression::from(true));
+    }
+
+    #[test]
+    fn single_line_object_is_parsed_correctly() {
+        let hcl = "{ test = true }";
+        let parsed = object(CompleteStr(hcl)).unwrap_output();
 
         assert_eq!(1, parsed.len());
         assert_eq!(parsed["test"], Expression::from(true));
@@ -246,6 +300,16 @@ EOF
         assert_eq!(1, parsed.len());
         assert_eq!(parsed["foo"], Expression::from("bar"));
     }
+
+    #[test]
+    fn single_object_is_parsed_correctly() {
+        let hcl = "{\nfoo = \"bar\"\n}";
+        let parsed = object(CompleteStr(hcl)).unwrap_output();
+
+        assert_eq!(1, parsed.len());
+        assert_eq!(parsed["foo"], Expression::from("bar"));
+    }
+
 
     #[test]
     fn scalar_object_body_are_parsed_correctly() {
@@ -266,6 +330,49 @@ EOF
 string_escaped = "\" Hello World!"
 "#;
         let parsed = object_body(CompleteStr(hcl)).unwrap_output();
+
+        let expected: HashMap<_, _> = vec![
+            ("test_unsigned_int", Expression::from(123)),
+            ("test_signed_int", Expression::from(-123)),
+            ("test_float", Expression::from(-1.23)),
+            ("bool_true", Expression::from(true)),
+            ("bool_false", Expression::from(false)),
+            ("string", Expression::from("Hello World!")),
+            ("comma_separated", Expression::from("I'm special!")),
+            ("long_string", Expression::from("hihi\nanother line!")),
+            ("string_escaped", Expression::from("\" Hello World!")),
+        ]
+        .into_iter()
+        .collect();
+
+        assert_eq!(expected.len(), parsed.len());
+        for (expected_key, expected_value) in expected {
+            println!("Checking {}", expected_key);
+            let actual_value = &parsed[expected_key];
+            assert_eq!(*actual_value, expected_value);
+        }
+    }
+
+    #[test]
+    fn scalar_object_is_parsed_correctly() {
+        let hcl = r#"{
+    test_unsigned_int = 123
+    test_signed_int /*inline comment */ = -123 # Another comment
+    test_float = -1.23
+
+    bool_true = true
+    bool_false = false
+
+    string = "Hello World!"
+    comma_separated = "I'm special!",
+
+    long_string = <<EOF
+hihi
+another line!
+EOF
+    string_escaped = "\" Hello World!"
+}"#;
+        let parsed = object(CompleteStr(hcl)).unwrap_output();
 
         let expected: HashMap<_, _> = vec![
             ("test_unsigned_int", Expression::from(123)),
