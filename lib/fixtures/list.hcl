@@ -1,4 +1,4 @@
-list = [true, false, 123, -123.456, "foobar"],
+list = [true, false, 123, -123.456, "foobar"]
 list_multi = [ # hmm
     true, # Comment
     false, // Test

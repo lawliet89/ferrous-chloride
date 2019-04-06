@@ -13,10 +13,8 @@ use super::number::{number, Number};
 use super::object::{object, Object, ObjectElementIdentifier};
 use super::tuple::{tuple, Tuple};
 use crate::constants::*;
-use crate::value::Value;
 use crate::Error;
 
-// FIXME: For now
 /// An Expression
 ///
 /// ```enbf
@@ -48,7 +46,6 @@ use crate::Error;
 /// ```
 ///
 /// - Numeric literals represent values of type number.
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Expression<'a> {
     /// LiteralValue -> "null"
@@ -296,5 +293,4 @@ EOF
             assert_eq!(actual_value, *expected_value);
         }
     }
-
 }

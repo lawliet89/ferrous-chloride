@@ -13,7 +13,7 @@
 use std::borrow::{Borrow, Cow};
 
 use nom::types::CompleteStr;
-use nom::{alt, call, char, do_parse, eof, named, peek, recognize, tag, terminated, IResult};
+use nom::{alt, call, char, do_parse, named, peek, recognize, tag, terminated, IResult};
 
 use super::expression::{expression, Expression};
 use crate::parser::literals::{identifier, newline};

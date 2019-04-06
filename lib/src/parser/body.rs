@@ -5,14 +5,13 @@ use std::borrow::Cow;
 use std::iter::FromIterator;
 
 use nom::types::CompleteStr;
-use nom::{alt, call, do_parse, eof, named, tag, terminated};
+use nom::{alt, call, do_parse, eof, named_attr, terminated};
 
-use crate::HashMap;
 use super::attribute::attribute;
 use super::expression::Expression;
 use super::literals::newline;
-use crate::constants::*;
-use crate::{Error, KeyValuePairs, Value};
+use crate::HashMap;
+use crate::{Error, KeyValuePairs};
 
 /// A HCL document body
 ///
@@ -23,36 +22,19 @@ use crate::{Error, KeyValuePairs, Value};
 /// Block        = Identifier (StringLit|Identifier)* "{" Newline Body "}" Newline;
 /// OneLineBlock = Identifier (StringLit|Identifier)* "{" (Identifier "=" Expression)? "}" Newline;
 /// ```
-pub type Body<'a> = KeyValuePairs<Cow<'a, str>, Expression<'a>>;
-
-/// An element of `Body`
-///
-/// ```ebnf
-/// Attribute | Block | OneLineBlock
-/// ```
-pub enum BodyElement<'a> {
-    Expression(Expression<'a>),
-    // Block
-}
-
-impl<'a> From<Expression<'a>> for BodyElement<'a> {
-    fn from(expr: Expression<'a>) -> Self {
-        BodyElement::Expression(expr)
-    }
-}
-
+pub type Body<'a> = KeyValuePairs<Cow<'a, str>, BodyElement<'a>>;
 
 impl<'a> Body<'a> {
     // TODO: Customise merging behaviour wrt duplicate keys
     pub fn new_merged<T>(iter: T) -> Result<Self, Error>
     where
-        T: IntoIterator<Item = (Cow<'a, str>, Expression<'a>)>,
+        T: IntoIterator<Item = (Cow<'a, str>, BodyElement<'a>)>,
     {
         use std::collections::hash_map::Entry;
 
         let mut map = HashMap::default();
         for (key, value) in iter {
-            let mut value = value.merge()?;
+            let value = value.merge()?;
             match map.entry(key) {
                 Entry::Vacant(vacant) => {
                     vacant.insert(value);
@@ -60,16 +42,10 @@ impl<'a> Body<'a> {
                 Entry::Occupied(mut occupied) => {
                     let key = occupied.key().to_string();
                     match occupied.get_mut() {
-                        illegal @ Expression::Null
-                        | illegal @ Expression::Number(_)
-                        | illegal @ Expression::Boolean(_)
-                        | illegal @ Expression::String(_)
-                        | illegal @ Expression::Tuple(_)
-                        | illegal @ Expression::Object(_) => Err(Error::IllegalMultipleEntries {
+                        BodyElement::Expression(expr) => Err(Error::IllegalMultipleEntries {
                             key,
-                            variant: illegal.variant_name(),
-                        })?,
-                             // Value::Block(ref mut block) => {
+                            variant: expr.variant_name(),
+                        })?, // Value::Block(ref mut block) => {
                              //     let value = value;
                              //     // Check that the incoming value is also a Block
                              //     if let Value::Block(incoming) = value {
@@ -91,7 +67,7 @@ impl<'a> Body<'a> {
 
     pub fn new_unmerged<T>(iter: T) -> Self
     where
-        T: IntoIterator<Item = (Cow<'a, str>, Expression<'a>)>,
+        T: IntoIterator<Item = (Cow<'a, str>, BodyElement<'a>)>,
     {
         KeyValuePairs::Unmerged(iter.into_iter().collect())
     }
@@ -133,19 +109,63 @@ impl<'a> Body<'a> {
     }
 }
 
-impl<'a> FromIterator<(Cow<'a, str>, Expression<'a>)> for Body<'a> {
-    fn from_iter<T: IntoIterator<Item = (Cow<'a, str>, Expression<'a>)>>(iter: T) -> Self {
+impl<'a> FromIterator<(Cow<'a, str>, BodyElement<'a>)> for Body<'a> {
+    fn from_iter<T: IntoIterator<Item = (Cow<'a, str>, BodyElement<'a>)>>(iter: T) -> Self {
         Self::new_unmerged(iter)
     }
 }
 
-named!(
+/// An element of `Body`
+///
+/// ```ebnf
+/// Attribute | Block | OneLineBlock
+/// ```
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum BodyElement<'a> {
+    Expression(Expression<'a>),
+    // Block
+}
+
+impl<'a> BodyElement<'a> {
+    pub fn merge(self) -> Result<Self, Error> {
+        match self {
+            BodyElement::Expression(expr) => Ok(BodyElement::Expression(expr.merge()?)),
+        }
+    }
+}
+
+impl<'a> From<Expression<'a>> for BodyElement<'a> {
+    fn from(expr: Expression<'a>) -> Self {
+        BodyElement::Expression(expr)
+    }
+}
+
+named_attr!(
+    #[doc = r#"Parses a `Body` element
+
+```ebnf
+Attribute | Block | OneLineBlock
+```
+"#],
+    pub body_element(CompleteStr) -> (Cow<str>, BodyElement),
+    alt!(
+        attribute => { |(ident, expr)| (ident, BodyElement::Expression(expr))}
+    )
+);
+
+named_attr!(
+    #[doc = r#"Parses a `Body`
+
+```ebnf
+Body = (Attribute | Block | OneLineBlock)*;
+```
+"#],
     pub body(CompleteStr) -> Body,
     do_parse!(
         values: whitespace!(
             many0!(
                 terminated!(
-                    call!(attribute),
+                    call!(body_element),
                     alt!(
                         call!(newline) => { |_| CompleteStr("") }
                         | eof!()
@@ -164,10 +184,7 @@ mod tests {
     use crate::HashMap;
 
     use crate::fixtures;
-    use crate::parser::literals::Key;
     use crate::utils::{assert_list_eq, ResultUtilsString};
-    use crate::value::Block;
-    use crate::value::MapValues;
     use crate::{Mergeable, ScalarLength};
 
     #[test]
@@ -184,7 +201,7 @@ mod tests {
         let parsed = body(CompleteStr(hcl)).unwrap_output();
 
         assert_eq!(1, parsed.len());
-        assert_eq!(parsed["test"], Expression::from(true));
+        assert_eq!(parsed["test"], From::from(Expression::from(true)));
     }
 
     #[test]
@@ -193,7 +210,7 @@ mod tests {
         let parsed = body(CompleteStr(hcl)).unwrap_output();
 
         assert_eq!(1, parsed.len());
-        assert_eq!(parsed["foo"], Expression::from("bar"));
+        assert_eq!(parsed["foo"], From::from(Expression::from("bar")));
     }
 
     #[test]
@@ -218,7 +235,7 @@ mod tests {
         for (expected_key, expected_value) in expected {
             println!("Checking {}", expected_key);
             let actual_value = &parsed[expected_key];
-            assert_eq!(*actual_value, expected_value);
+            assert_eq!(*actual_value, From::from(expected_value));
         }
     }
 
@@ -273,7 +290,7 @@ mod tests {
         for (expected_key, expected_value) in expected {
             println!("Checking {}", expected_key);
             let actual_value = &parsed[expected_key];
-            assert_eq!(*actual_value, expected_value);
+            assert_eq!(*actual_value, From::from(expected_value));
         }
     }
 
