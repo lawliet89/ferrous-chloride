@@ -69,6 +69,13 @@ impl<'a> Expression<'a> {
         Expression::Tuple(iterator.into_iter().collect())
     }
 
+    /// # [Reference](https://github.com/hashicorp/hcl2/blob/master/hcl/spec.md#schema-driven-processing)
+    ///
+    /// Within a schema, it is an error to request the same attribute name twice or to request a
+    /// block type whose name is also an attribute name. While this can in principle be supported
+    /// in some syntaxes, in other syntaxes the attribute and block namespaces are combined and so
+    /// an an attribute cannot coexist with a block whose type name is identical to the attribute
+    /// name.
     pub fn merge(self) -> Result<Self, Error> {
         match self {
             no_op @ Expression::Null

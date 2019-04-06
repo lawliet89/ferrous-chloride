@@ -1,8 +1,8 @@
 //! HCL Body
 //!
 //! [Reference](https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md#structural-elements)
-use std::borrow::Cow;
 use crate::HashMap;
+use std::borrow::Cow;
 use std::iter::FromIterator;
 
 use nom::types::CompleteStr;
