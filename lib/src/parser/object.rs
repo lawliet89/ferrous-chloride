@@ -45,8 +45,7 @@ pub type ObjectElement<'a> = (ElementIdentifier<'a>, Expression<'a>);
 
 pub type Object<'a> = HashMap<ElementIdentifier<'a>, Expression<'a>>;
 
-
-// Can't use `named!` because the compiler cannot determine the lifetime
+// Cannot use `named!` because the compiler cannot determine the lifetime
 pub fn element_identifier<'a>(
     input: CompleteStr<'a>,
 ) -> IResult<CompleteStr<'a>, ElementIdentifier<'a>, u32> {
@@ -88,7 +87,6 @@ pub fn element_identifier<'a>(
 // //     )
 // // );
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -98,8 +96,19 @@ mod tests {
     #[test]
     fn element_identifiers_are_parsed_correctly() {
         let test_cases = [
-            ("foobar", ElementIdentifier::Identifier(Cow::Borrowed("foobar"))),
-            ("true", ElementIdentifier::Identifier(Cow::Borrowed("true")))
+            (
+                "foobar",
+                ElementIdentifier::Identifier(Cow::Borrowed("foobar")),
+            ),
+            ("true", ElementIdentifier::Identifier(Cow::Borrowed("true"))),
+            (
+                "(true)",
+                ElementIdentifier::Expression(Cow::Borrowed("(true)")),
+            ),
+            (
+                "(1234)",
+                ElementIdentifier::Expression(Cow::Borrowed("(1234)")),
+            ),
         ];
 
         for (input, expected_output) in &test_cases {

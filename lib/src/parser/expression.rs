@@ -8,7 +8,7 @@ use std::iter::FromIterator;
 use std::str::FromStr;
 
 use nom::types::CompleteStr;
-use nom::{alt_complete, call, named, IResult};
+use nom::{alt_complete, call, do_parse, named, tag, IResult};
 
 use super::literals;
 use super::number::{number, Number};
@@ -167,6 +167,17 @@ impl<'a> FromStr for Expression<'a> {
     }
 }
 
+// "(" Expression ")"
+named!(
+    pub bracket_expression(CompleteStr) -> Expression,
+    do_parse!(
+        whitespace!(tag!("("))
+        >> expr: whitespace!(call!(expression))
+        >> tag!(")")
+        >> (expr)
+    )
+);
+
 named!(
     pub expression(CompleteStr) -> Expression,
     alt_complete!(
@@ -190,6 +201,7 @@ named!(
         // ExprTerm GetAttr
         // ExprTerm Splat
         // "(" Expression ")"
+        | call!(bracket_expression)
     )
 );
 
@@ -198,6 +210,39 @@ mod tests {
     use super::*;
 
     use crate::parser::literals::Key;
+
+    #[test]
+    fn bracket_expression_parses_correctly() {
+        let test_cases = [
+            ("(null)", Expression::Null, ""),
+            (r#"(123)"#, Expression::from(123), ""),
+            ("((123))", Expression::from(123), ""),
+            ("(((123)))", Expression::from(123), ""),
+            ("(true)", Expression::Boolean(true), ""),
+            ("123.456", Expression::from(123.456), ""),
+            ("123", Expression::from(123), ""),
+            (r#""foobar""#, Expression::String("foobar".to_string()), ""),
+            (
+                r#"
+(
+<<EOF
+new
+line
+EOF
+)
+"#,
+                Expression::String("new\nline".to_string()),
+                "\n",
+            ),
+        ];
+
+        for (input, expected_value, expected_remaining) in test_cases.iter() {
+            println!("Testing {}", input);
+            let (remaining, actual_value) = expression(CompleteStr(input)).unwrap();
+            assert_eq!(&remaining.0, expected_remaining);
+            assert_eq!(actual_value, *expected_value);
+        }
+    }
 
     #[test]
     fn expressions_are_parsed_successfully() {
