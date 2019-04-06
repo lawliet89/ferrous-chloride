@@ -47,7 +47,8 @@ impl<'a> Body<'a> {
                         | illegal @ Expression::Number(_)
                         | illegal @ Expression::Boolean(_)
                         | illegal @ Expression::String(_)
-                        | illegal @ Expression::Tuple(_) => Err(Error::IllegalMultipleEntries {
+                        | illegal @ Expression::Tuple(_)
+                        | illegal @ Expression::Object(_) => Err(Error::IllegalMultipleEntries {
                             key,
                             variant: illegal.variant_name(),
                         })?, // Value::Object(ref mut map) => {

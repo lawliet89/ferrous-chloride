@@ -10,22 +10,18 @@
 //! ) "}";
 //! objectelem = (Identifier | Expression) "=" Expression;
 //! ```
-use std::borrow::Cow;
+use std::borrow::{Borrow, Cow};
 
 use nom::types::CompleteStr;
-use nom::{
-    alt, alt_complete, call, char, complete, do_parse, eof, exact, named, opt, peek, preceded,
-    recognize, tag, terminated, IResult,
-};
+use nom::{alt, call, char, do_parse, eof, named, recognize, tag, terminated, IResult};
 
-use super::attribute::attribute;
 use super::expression::{expression, Expression};
 use crate::parser::literals::{identifier, newline};
 use crate::HashMap;
 
 // TODO: Dealing with expressions and ambiguity. See reference
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub enum ElementIdentifier<'a> {
+pub enum ObjectElementIdentifier<'a> {
     /// A literal attribute name
     Identifier(Cow<'a, str>),
     /// An expression that must evaluate to a string
@@ -41,32 +37,47 @@ pub enum ElementIdentifier<'a> {
     Expression(Cow<'a, str>),
 }
 
-impl<'a, S> PartialEq<S> for ElementIdentifier<'a>
+impl<'a, S> PartialEq<S> for ObjectElementIdentifier<'a>
 where
     S: AsRef<str>,
 {
     fn eq(&self, other: &S) -> bool {
         match self {
-            ElementIdentifier::Identifier(ident) => ident.eq(other.as_ref()),
-            ElementIdentifier::Expression(_) => false,
+            ObjectElementIdentifier::Identifier(ident) => ident.eq(other.as_ref()),
+            ObjectElementIdentifier::Expression(_) => false,
         }
     }
 }
 
-pub type ObjectElement<'a> = (ElementIdentifier<'a>, Expression<'a>);
+impl<'a> Borrow<str> for ObjectElementIdentifier<'a> {
+    fn borrow(&self) -> &str {
+        match self {
+            ObjectElementIdentifier::Identifier(ref ident) => ident,
+            ObjectElementIdentifier::Expression(ref expr) => expr,
+        }
+    }
+}
 
-pub type Object<'a> = HashMap<ElementIdentifier<'a>, Expression<'a>>;
+impl<'a> From<&'a str> for ObjectElementIdentifier<'a> {
+    fn from(s: &'a str) -> Self {
+        ObjectElementIdentifier::Identifier(Cow::Borrowed(s))
+    }
+}
+
+pub type ObjectElement<'a> = (ObjectElementIdentifier<'a>, Expression<'a>);
+
+pub type Object<'a> = HashMap<ObjectElementIdentifier<'a>, Expression<'a>>;
 
 // Cannot use `named!` because the compiler cannot determine the lifetime
-pub fn element_identifier<'a>(
+pub fn object_element_identifier<'a>(
     input: CompleteStr<'a>,
-) -> IResult<CompleteStr<'a>, ElementIdentifier<'a>, u32> {
+) -> IResult<CompleteStr<'a>, ObjectElementIdentifier<'a>, u32> {
     alt!(
         input,
         call!(identifier) =>
-            { |ident| ElementIdentifier::Identifier(Cow::Borrowed(ident)) }
+            { |ident| ObjectElementIdentifier::Identifier(Cow::Borrowed(ident)) }
         | recognize!(call!(expression)) =>
-            { |expr: CompleteStr<'a>| ElementIdentifier::Expression(Cow::Borrowed(expr.0)) }
+            { |expr: CompleteStr<'a>| ObjectElementIdentifier::Expression(Cow::Borrowed(expr.0)) }
     )
 }
 
@@ -74,7 +85,7 @@ named!(
     pub object_element(CompleteStr) -> ObjectElement,
     inline_whitespace!(
         do_parse!(
-            identifier: call!(element_identifier)
+            identifier: call!(object_element_identifier)
             >> char!('=')
             >> expression: call!(expression)
             >> (identifier, expression)
@@ -82,61 +93,65 @@ named!(
     )
 );
 
-// named!(
-//     pub object_elements(CompleteStr) -> Vec<ObjectElement>,
-//     do_parse!(
-//         values: whitespace!(
-//             many0!(
-//                 terminated!(
-//                     call!(attribute),
-//                     alt!(
-//                         whitespace!(tag!(","))
-//                         | call!(newline) => { |_| CompleteStr("") }
-//                         | eof!()
-//                     )
-//                 )
-//             )
-//         )
-//         >> (values.into_iter().collect())
-//     )
-// );
+named!(
+    pub object_body(CompleteStr) -> HashMap<ObjectElementIdentifier, Expression>,
+    do_parse!(
+        values: whitespace!(
+            many0!(
+                terminated!(
+                    call!(object_element),
+                    alt!(
+                        whitespace!(tag!(","))
+                        | call!(newline) => { |_| CompleteStr("") }
+                        | eof!()
+                    )
+                )
+            )
+        )
+        >> (values.into_iter().collect())
+    )
+);
 
-// // named!(
-// //     pub object(CompleteStr) -> Object,
-// //     do_parse!(
-// //         whitespace!(char!('{'))
-// //         >> values: whitespace!(call!(map_values))
-// //         >> char!('}')
-// //         >> (values)
-// //     )
-// // );
+named!(
+    pub object(CompleteStr) -> Object,
+    do_parse!(
+        whitespace!(char!('{'))
+        >> values: whitespace!(call!(object_body))
+        >> char!('}')
+        >> (values)
+    )
+);
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    use crate::fixtures;
     use crate::utils::ResultUtilsString;
 
     #[test]
-    fn element_identifiers_are_parsed_correctly() {
+    fn object_element_identifiers_are_parsed_correctly() {
         let test_cases = [
             (
                 "foobar",
-                ElementIdentifier::Identifier(Cow::Borrowed("foobar")),
+                ObjectElementIdentifier::Identifier(Cow::Borrowed("foobar")),
             ),
-            ("true", ElementIdentifier::Identifier(Cow::Borrowed("true"))),
+            (
+                "true",
+                ObjectElementIdentifier::Identifier(Cow::Borrowed("true")),
+            ),
             (
                 "(true)",
-                ElementIdentifier::Expression(Cow::Borrowed("(true)")),
+                ObjectElementIdentifier::Expression(Cow::Borrowed("(true)")),
             ),
             (
                 "(1234)",
-                ElementIdentifier::Expression(Cow::Borrowed("(1234)")),
+                ObjectElementIdentifier::Expression(Cow::Borrowed("(1234)")),
             ),
         ];
 
         for (input, expected_output) in &test_cases {
-            let output = element_identifier(CompleteStr(input)).unwrap_output();
+            let output = object_element_identifier(CompleteStr(input)).unwrap_output();
             assert_eq!(output, *expected_output);
         }
     }
@@ -203,6 +218,132 @@ EOF
             assert_eq!(&remaining.0, expected_remaining);
             assert_eq!(actual_identifier, *expected_key);
             assert_eq!(actual_expression, *expected_value);
+        }
+    }
+
+    #[test]
+    fn empty_object_body_is_parsed_correctly() {
+        let hcl = "";
+        let parsed = object_body(CompleteStr(hcl)).unwrap_output();
+
+        assert_eq!(0, parsed.len());
+    }
+
+    #[test]
+    fn non_terminating_new_lines_object_bodies_are_parsed_correctly() {
+        let hcl = "test = true";
+        let parsed = object_body(CompleteStr(hcl)).unwrap_output();
+
+        assert_eq!(1, parsed.len());
+        assert_eq!(parsed["test"], Expression::from(true));
+    }
+
+    #[test]
+    fn single_object_body_are_parsed_correctly() {
+        let hcl = "foo = \"bar\"\n";
+        let parsed = object_body(CompleteStr(hcl)).unwrap_output();
+
+        assert_eq!(1, parsed.len());
+        assert_eq!(parsed["foo"], Expression::from("bar"));
+    }
+
+    #[test]
+    fn scalar_object_body_are_parsed_correctly() {
+        let hcl = r#"test_unsigned_int = 123
+test_signed_int /*inline comment */ = -123 # Another comment
+test_float = -1.23
+
+bool_true = true
+bool_false = false
+
+string = "Hello World!"
+comma_separated = "I'm special!",
+
+long_string = <<EOF
+hihi
+another line!
+EOF
+string_escaped = "\" Hello World!"
+"#;
+        let parsed = object_body(CompleteStr(hcl)).unwrap_output();
+
+        let expected: HashMap<_, _> = vec![
+            ("test_unsigned_int", Expression::from(123)),
+            ("test_signed_int", Expression::from(-123)),
+            ("test_float", Expression::from(-1.23)),
+            ("bool_true", Expression::from(true)),
+            ("bool_false", Expression::from(false)),
+            ("string", Expression::from("Hello World!")),
+            ("comma_separated", Expression::from("I'm special!")),
+            ("long_string", Expression::from("hihi\nanother line!")),
+            ("string_escaped", Expression::from("\" Hello World!")),
+        ]
+        .into_iter()
+        .collect();
+
+        assert_eq!(expected.len(), parsed.len());
+        for (expected_key, expected_value) in expected {
+            println!("Checking {}", expected_key);
+            let actual_value = &parsed[expected_key];
+            assert_eq!(*actual_value, expected_value);
+        }
+    }
+
+    #[test]
+    fn list_object_body_are_parsed_correctly() {
+        let hcl = fixtures::LIST;
+        let parsed = object_body(CompleteStr(hcl)).unwrap_output();
+
+        let expected: HashMap<_, _> = vec![
+            (
+                "list",
+                Expression::new_tuple(vec![
+                    Expression::from(true),
+                    Expression::from(false),
+                    Expression::from(123),
+                    Expression::from(-123.456),
+                    Expression::from("foobar"),
+                ]),
+            ),
+            (
+                "list_multi",
+                Expression::new_tuple(vec![
+                    Expression::from(true),
+                    Expression::from(false),
+                    Expression::from(123),
+                    Expression::from(-123.456),
+                    Expression::from("foobar"),
+                ]),
+            ),
+            (
+                "list_in_list",
+                Expression::new_tuple(vec![
+                    Expression::new_tuple(vec![
+                        Expression::from("test"),
+                        Expression::from("foobar"),
+                    ]),
+                    Expression::from(1),
+                    Expression::from(2),
+                    Expression::from(-3),
+                ]),
+            ),
+            (
+                "map_in_list",
+                Expression::new_tuple(vec![
+                    Expression::new_object(vec![("test", Expression::from(123))]),
+                    Expression::new_object(vec![("foo", Expression::from("bar"))]),
+                    Expression::new_object(vec![("baz", Expression::from(false))]),
+                ]),
+            ),
+        ]
+        .into_iter()
+        .collect();
+
+        assert_eq!(expected.len(), parsed.len());
+        for (expected_key, expected_value) in expected {
+            println!("Checking {}", expected_key);
+            let actual_value = &parsed[expected_key];
+            assert_eq!(*actual_value, expected_value);
         }
     }
 }

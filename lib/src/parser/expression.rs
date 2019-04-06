@@ -2,18 +2,16 @@
 //!
 //! [Reference](https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md#expressions)
 
-use std::borrow::Cow;
-use std::hash::{Hash, Hasher};
 use std::iter::FromIterator;
 use std::str::FromStr;
 
 use nom::types::CompleteStr;
-use nom::{alt_complete, call, do_parse, named, tag, IResult};
+use nom::{alt_complete, call, do_parse, named, tag};
 
 use super::literals;
 use super::number::{number, Number};
+use super::object::{object, Object, ObjectElementIdentifier};
 use super::tuple::{tuple, Tuple};
-use super::{list, map_expression};
 use crate::constants::*;
 use crate::value::Value;
 use crate::Error;
@@ -59,6 +57,7 @@ pub enum Expression<'a> {
     Boolean(bool),
     String(String),
     Tuple(Tuple<'a>),
+    Object(Object<'a>),
 }
 
 impl<'a> Expression<'a> {
@@ -67,6 +66,14 @@ impl<'a> Expression<'a> {
         T: IntoIterator<Item = Expression<'a>>,
     {
         Expression::Tuple(iterator.into_iter().collect())
+    }
+
+    pub fn new_object<T, I>(iterator: T) -> Self
+    where
+        T: IntoIterator<Item = (I, Expression<'a>)>,
+        I: Into<ObjectElementIdentifier<'a>> + 'a,
+    {
+        Expression::Object(iterator.into_iter().map(|(k, v)| (k.into(), v)).collect())
     }
 
     /// # [Reference](https://github.com/hashicorp/hcl2/blob/master/hcl/spec.md#schema-driven-processing)
@@ -88,11 +95,11 @@ impl<'a> Expression<'a> {
                     .map(Self::merge)
                     .collect::<Result<_, Error>>()?,
             )),
-            // Value::Object(maps) => Ok(Value::Object(
-            //     maps.into_iter()
-            //         .map(MapValues::merge)
-            //         .collect::<Result<_, _>>()?,
-            // )),
+            Expression::Object(obj) => Ok(Expression::Object(
+                obj.into_iter()
+                    .map(|(ident, expr)| Ok((ident, expr.merge()?)))
+                    .collect::<Result<_, Error>>()?,
+            )),
             // Value::Block(block) => {
             //     let unmerged: Block = block
             //         .into_iter()
@@ -111,7 +118,7 @@ impl<'a> Expression<'a> {
             Expression::Boolean(_) => BOOLEAN,
             Expression::String(_) => STRING,
             Expression::Tuple(_) => TUPLE,
-            // Expression::Object(_) => OBJECT,
+            Expression::Object(_) => OBJECT,
             // Expression::Block(_) => BLOCK,
         }
     }
@@ -193,7 +200,7 @@ named!(
         // CollectionValue -> tuple
         | tuple => { |v| From::from(v) }
         // CollectionValue -> object
-        // | map_expression => { |m| Value::Object(vec![m]) }
+        | object => { |obj| Expression::Object(obj) }
         // VariableExpr
         // FunctionCall
         // ForExpr
@@ -208,8 +215,6 @@ named!(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    use crate::parser::literals::Key;
 
     #[test]
     fn bracket_expression_parses_correctly() {
@@ -275,16 +280,13 @@ EOF
                 ]),
                 "",
             ),
-            //             (
-            //                 r#"{
-            //         test = 123
-            // }"#,
-            //                 Expression::new_map(vec![vec![(
-            //                     Key::new_identifier("test"),
-            //                     Expression::from(123),
-            //                 )]]),
-            //                 "",
-            //             ),
+            (
+                r#"{
+                    test = 123
+            }"#,
+                Expression::new_object(vec![("test", Expression::from(123))]),
+                "",
+            ),
         ];
 
         for (input, expected_value, expected_remaining) in test_cases.iter() {
