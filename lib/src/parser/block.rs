@@ -9,12 +9,10 @@
 use std::borrow::{Borrow, Cow};
 
 use nom::types::CompleteStr;
-use nom::{
-    alt, call, char, do_parse, many0, named, opt, peek, recognize, tag, terminated, IResult,
-};
+use nom::{alt, call, many0, named, opt, tag};
 
 use crate::parser::attribute::{attribute, Attribute};
-use crate::parser::body::Body;
+use crate::parser::body::{body, Body};
 use crate::parser::identifier::{identifier, Identifier};
 use crate::parser::string::{string_literal, StringLiteral};
 use crate::parser::whitespace::newline;
@@ -34,6 +32,14 @@ pub enum BlockLabel<'a> {
 }
 
 impl<'a> Block<'a> {
+    pub fn new(r#type: Identifier<'a>, labels: Vec<BlockLabel<'a>>, body: Body<'a>) -> Self {
+        Self {
+            r#type,
+            labels,
+            body,
+        }
+    }
+
     pub fn new_one_line(
         r#type: Identifier<'a>,
         labels: Vec<BlockLabel<'a>>,
@@ -120,10 +126,26 @@ named!(
     )
 );
 
+named!(
+    pub block(CompleteStr) -> Block,
+    inline_whitespace!(
+        do_parse!(
+            block_type: call!(identifier)
+            >> labels: call!(block_labels)
+            >> tag!("{")
+            >> newline
+            >> body: call!(body)
+            >> tag!("}")
+            >> (Block::new(block_type, labels, body))
+        )
+    )
+);
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    use crate::parser::expression::Expression;
     use crate::utils::ResultUtilsString;
 
     #[test]
@@ -225,5 +247,30 @@ mod tests {
             let output = one_line_block(CompleteStr(input)).unwrap_output();
             assert_eq!(output, *expected_output);
         }
+    }
+
+    #[test]
+    fn block_is_parsed_correctly() {
+        let hcl = r#"simple_map "foo" bar {
+  foo   = "bar"
+  bar   = "baz"
+  index = 0
+}"#;
+        let block = block(CompleteStr(hcl)).unwrap_output();
+
+        let expected = Block::new(
+            From::from("simple_map"),
+            vec![
+                BlockLabel::StringLiteral(From::from("foo")),
+                BlockLabel::from("bar"),
+            ],
+            Body::new_unmerged(vec![
+                (From::from("foo"), From::from(Expression::from("bar"))),
+                (From::from("bar"), From::from(Expression::from("baz"))),
+                (From::from("index"), From::from(Expression::from(0))),
+            ]),
+        );
+
+        assert_eq!(block, expected);
     }
 }

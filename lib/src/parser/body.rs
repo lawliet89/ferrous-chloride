@@ -8,7 +8,7 @@ use nom::types::CompleteStr;
 use nom::{alt, call, do_parse, eof, named_attr, terminated};
 
 use crate::parser::attribute::attribute;
-use crate::parser::block::Block;
+use crate::parser::block::{block, one_line_block, Block};
 use crate::parser::expression::Expression;
 use crate::parser::identifier::Identifier;
 use crate::parser::whitespace::newline;
@@ -167,7 +167,8 @@ Attribute | Block | OneLineBlock
 "#],
     pub body_element(CompleteStr) -> (Cow<str>, BodyElement),
     alt!(
-        attribute => { |(ident, expr)| (ident, BodyElement::Expression(expr))}
+        attribute => { |(ident, expr)| (ident, BodyElement::Expression(expr)) }
+        // | one_line_block => { |blk: Block| (blk.r#type, BodyElement::Block(vec![blk])) }
     )
 );
 
