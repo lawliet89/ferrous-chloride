@@ -529,20 +529,20 @@ impl Default for MergeBehaviour {
 #[cfg(test)]
 pub(crate) mod fixtures {
     pub static ALL: &[&str] = &[
+        BLOCK,
         LIST,
-        MAP,
         NO_NEWLINE_EOF,
         SCALAR,
-        SIMPLE_MAP,
+        SIMPLE_BLOCK,
         SINGLE,
         STRINGS,
     ];
 
+    pub static BLOCK: &str = include_str!("../fixtures/block.hcl");
     pub static LIST: &str = include_str!("../fixtures/list.hcl");
-    pub static MAP: &str = include_str!("../fixtures/map.hcl");
     pub static NO_NEWLINE_EOF: &str = include_str!("../fixtures/no_newline_terminating.hcl");
     pub static SCALAR: &str = include_str!("../fixtures/scalar.hcl");
-    pub static SIMPLE_MAP: &str = include_str!("../fixtures/simple_map.hcl");
+    pub static SIMPLE_BLOCK: &str = include_str!("../fixtures/simple_block.hcl");
     pub static SINGLE: &str = include_str!("../fixtures/single.hcl");
     pub static STRINGS: &str = include_str!("../fixtures/strings.hcl");
 }

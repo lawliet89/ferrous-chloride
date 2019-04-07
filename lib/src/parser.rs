@@ -572,7 +572,7 @@ foo = "bar"
 
     #[test]
     fn multiple_maps_are_parsed_correctly() {
-        let hcl = fixtures::MAP;
+        let hcl = fixtures::BLOCK;
         let parsed = map_values(CompleteStr(hcl)).unwrap_output();
         println!("{:#?}", parsed);
         assert!(parsed.is_unmerged());
@@ -688,7 +688,7 @@ foo = "bar"
 
     #[test]
     fn maps_are_merged_correctly() {
-        let hcl = fixtures::MAP;
+        let hcl = fixtures::BLOCK;
         let parsed = map_values(CompleteStr(hcl)).unwrap_output();
         assert!(parsed.is_unmerged());
 
@@ -859,7 +859,7 @@ EOF
 
     #[test]
     fn peek_works_on_body() {
-        let example = fixtures::MAP;
+        let example = fixtures::BLOCK;
         let (remaining, actual_value) = peek(CompleteStr(example)).unwrap();
         assert_eq!(&remaining.0, &example);
         assert!(actual_value.is_body());
