@@ -7,13 +7,13 @@ use std::iter::FromIterator;
 use nom::types::CompleteStr;
 use nom::{alt, call, do_parse, eof, named_attr, terminated};
 
-use crate::{Error, KeyValuePairs};
-use crate::HashMap;
 use crate::parser::attribute::attribute;
+use crate::parser::block::Block;
 use crate::parser::expression::Expression;
 use crate::parser::identifier::Identifier;
-use crate::parser::block::Block;
 use crate::parser::whitespace::newline;
+use crate::HashMap;
+use crate::{Error, KeyValuePairs};
 
 /// A HCL document body
 ///
@@ -47,19 +47,20 @@ impl<'a> Body<'a> {
                         BodyElement::Expression(expr) => Err(Error::IllegalMultipleEntries {
                             key,
                             variant: expr.variant_name(),
-                        })?, // Value::Block(ref mut block) => {
-                             //     let value = value;
-                             //     // Check that the incoming value is also a Block
-                             //     if let Value::Block(incoming) = value {
-                             //         block.extend(incoming);
-                             //     } else {
-                             //         Err(Error::ErrorMergingKeys {
-                             //             key,
-                             //             existing_variant: BLOCK,
-                             //             incoming_variant: value.variant_name(),
-                             //         })?;
-                             //     }
-                             // }
+                        })?,
+                        BodyElement::Block(ref mut block) => {
+                            let value = value;
+                            // Check that the incoming value is also a Block
+                            if let BodyElement::Block(incoming) = value {
+                                block.extend(incoming);
+                            } else {
+                                Err(Error::ErrorMergingKeys {
+                                    key,
+                                    existing_variant: crate::constants::BLOCK,
+                                    incoming_variant: value.variant_name(),
+                                })?;
+                            }
+                        }
                     };
                 }
             };
@@ -125,13 +126,27 @@ impl<'a> FromIterator<(Identifier<'a>, BodyElement<'a>)> for Body<'a> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BodyElement<'a> {
     Expression(Expression<'a>),
-    // Block
+    /// Blocks of the same Type
+    // XXX: vec?
+    Block(Vec<Block<'a>>),
 }
 
 impl<'a> BodyElement<'a> {
     pub fn merge(self) -> Result<Self, Error> {
         match self {
             BodyElement::Expression(expr) => Ok(BodyElement::Expression(expr.merge()?)),
+            BodyElement::Block(blk) => {
+                let blk: Result<_, Error> =
+                    blk.into_iter().map(|block| Ok(block.merge()?)).collect();
+                Ok(BodyElement::Block(blk?))
+            }
+        }
+    }
+
+    pub fn variant_name(&self) -> &'static str {
+        match self {
+            BodyElement::Expression(expr) => expr.variant_name(),
+            BodyElement::Block(_) => crate::constants::BLOCK,
         }
     }
 }

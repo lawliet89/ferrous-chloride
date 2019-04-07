@@ -30,6 +30,13 @@ pub enum BlockLabel<'a> {
     Identifier(Identifier<'a>),
 }
 
+impl<'a> Block<'a> {
+    pub fn merge(mut self) -> Result<Self, crate::Error> {
+        self.body = self.body.merge()?;
+        Ok(self)
+    }
+}
+
 impl<'a, S> PartialEq<S> for BlockLabel<'a>
 where
     S: AsRef<str>,
