@@ -1,6 +1,9 @@
 #[macro_use]
 pub mod literals;
 
+#[macro_use]
+pub mod whitespace;
+
 pub mod attribute;
 pub mod body;
 pub mod boolean;
@@ -19,7 +22,8 @@ pub use expression::{expression, Expression};
 
 use std::borrow::Cow;
 
-use crate::parser::literals::{newline, Key};
+use self::whitespace::newline;
+use crate::parser::literals::{Key};
 use crate::value::{self, MapValues, Value};
 use crate::{AsOwned, Error, MergeBehaviour};
 

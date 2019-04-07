@@ -99,7 +99,7 @@ macro_rules! inline_whitespace (
       use nom::{Convert, Err};
       use nom::sep;
 
-      use crate::parser::literals::inline_whitespace;
+      use crate::parser::whitespace::inline_whitespace;
 
       match sep!($i, inline_whitespace, $($args)*) {
         Err(e) => Err(e),
@@ -121,7 +121,7 @@ macro_rules! whitespace (
       use nom::{Convert, Err};
       use nom::sep;
 
-      use crate::parser::literals::whitespace;
+      use crate::parser::whitespace::whitespace;
 
       match sep!($i, whitespace, $($args)*) {
         Err(e) => Err(e),

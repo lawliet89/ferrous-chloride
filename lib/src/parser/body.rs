@@ -7,9 +7,9 @@ use std::iter::FromIterator;
 use nom::types::CompleteStr;
 use nom::{alt, call, do_parse, eof, named_attr, terminated};
 
-use super::attribute::attribute;
-use super::expression::Expression;
-use super::literals::newline;
+use crate::parser::attribute::attribute;
+use crate::parser::expression::Expression;
+use crate::parser::whitespace::newline;
 use crate::HashMap;
 use crate::{Error, KeyValuePairs};
 
