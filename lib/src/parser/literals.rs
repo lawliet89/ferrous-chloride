@@ -4,13 +4,10 @@ pub mod whitespace;
 
 pub mod key;
 pub mod number;
-pub mod string;
 
 #[doc(inline)]
 pub use key::{key, Key};
 #[doc(inline)]
 pub use number::{number, Number};
-#[doc(inline)]
-pub use string::{quoted_single_line_string, string};
 #[doc(inline)]
 pub use whitespace::{inline_whitespace, newline, whitespace};

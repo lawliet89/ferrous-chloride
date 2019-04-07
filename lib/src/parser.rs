@@ -1,14 +1,15 @@
 #[macro_use]
 pub mod literals;
 
-pub mod null;
-pub mod boolean;
-pub mod identifier;
 pub mod attribute;
 pub mod body;
+pub mod boolean;
 pub mod expression;
+pub mod identifier;
+pub mod null;
 pub mod number;
 pub mod object;
+pub mod string;
 pub mod tuple;
 
 #[doc(inline)]
@@ -76,7 +77,7 @@ named!(
         call!(null::null) => { |_| Value::Null }
         | call!(literals::number) => { |v| From::from(v) }
         | call!(boolean::boolean) => { |v| Value::Boolean(v) }
-        | literals::string => { |v| Value::String(v) }
+        | string::string => { |v| Value::String(v) }
         | list => { |v| Value::List(v) }
         | map_expression => { |m| Value::Object(vec![m]) }
     )
@@ -112,7 +113,7 @@ named!(
             )
             | do_parse!(
                 identifier: call!(identifier::identifier)
-                >> keys: many0!(literals::quoted_single_line_string)
+                >> keys: many0!(string::quoted_single_line_string)
                 >> values: call!(map_expression)
                 >> (Key::Identifier(Cow::Borrowed(identifier)), Value::Block(vec![(keys, values)].into_iter().collect()))
             )

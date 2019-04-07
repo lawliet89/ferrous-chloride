@@ -12,9 +12,10 @@ use serde::forward_to_deserialize_any;
 use serde::Deserialize;
 
 use crate::parser;
-use crate::parser::null::null;
 use crate::parser::boolean::boolean;
 use crate::parser::literals;
+use crate::parser::null::null;
+use crate::parser::string::string;
 use crate::value;
 
 pub use self::error::*;
@@ -197,7 +198,7 @@ impl<'de> Deserializer<'de> {
     }
 
     fn parse_string(&mut self) -> Result<String, Error> {
-        let (remaining, output) = literals::string(self.input)?;
+        let (remaining, output) = string(self.input)?;
         self.input = remaining;
         Ok(output)
     }
