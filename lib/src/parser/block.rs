@@ -140,6 +140,7 @@ named!(
 mod tests {
     use super::*;
 
+    use crate::parser::body::BodyElement;
     use crate::parser::expression::Expression;
     use crate::utils::ResultUtilsString;
 
@@ -263,6 +264,77 @@ mod tests {
                 From::from((From::from("foo"), Expression::from("bar"))),
                 From::from((From::from("bar"), Expression::from("baz"))),
                 From::from((From::from("index"), Expression::from(0))),
+            ],
+        );
+
+        assert_eq!(block, expected);
+    }
+
+    #[test]
+    fn nested_block_is_parsed_correctly() {
+        let hcl = r#"resource "security/group" foobar {
+  name = "foobar" # Comment
+
+  allow {
+    name = "localhost" // Seems pointless
+    cidrs = ["127.0.0.1/32"]
+  }
+
+  allow {
+    name = "lan" /* Is this all our LAN CIDR? */
+    cidrs = ["192.168.0.0/16"]
+  }
+
+  deny {
+    # Now this is pointless
+    name = "internet"
+    cidrs = ["0.0.0.0/0"]
+  }
+}"#;
+
+        let block = block(CompleteStr(hcl)).unwrap_output();
+
+        let expected = Block::new(
+            From::from("resource"),
+            vec![
+                BlockLabel::StringLiteral(From::from("security/group")),
+                BlockLabel::from("foobar"),
+            ],
+            vec![
+                From::from((From::from("name"), Expression::from("foobar"))),
+                BodyElement::Block(Block::new(
+                    From::from("allow"),
+                    vec![],
+                    vec![
+                        From::from((From::from("name"), Expression::from("localhost"))),
+                        From::from((
+                            From::from("cidrs"),
+                            Expression::from(vec![From::from("127.0.0.1/32")]),
+                        )),
+                    ],
+                )),
+                BodyElement::Block(Block::new(
+                    From::from("allow"),
+                    vec![],
+                    vec![
+                        From::from((From::from("name"), Expression::from("lan"))),
+                        From::from((
+                            From::from("cidrs"),
+                            Expression::from(vec![From::from("192.168.0.0/16")]),
+                        )),
+                    ],
+                )),
+                BodyElement::Block(Block::new(
+                    From::from("deny"),
+                    vec![],
+                    vec![
+                        From::from((From::from("name"), Expression::from("internet"))),
+                        From::from((
+                            From::from("cidrs"),
+                            Expression::from(vec![From::from("0.0.0.0/0")]),
+                        )),
+                    ],
+                )),
             ],
         );
 
