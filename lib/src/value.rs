@@ -683,7 +683,7 @@ impl<'a> Block<'a> {
     ///
     /// # Usage
     ///
-    /// ```rust
+    /// ```ignore
     /// use ferrous_chloride::parser::literals::Key;
     /// use ferrous_chloride::value::*;
     ///

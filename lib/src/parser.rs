@@ -1,9 +1,7 @@
-#[macro_use]
-pub mod literals;
+pub(crate) mod literals;
 
 #[macro_use]
 pub mod whitespace;
-
 pub mod attribute;
 pub mod block;
 pub mod body;
@@ -16,20 +14,15 @@ pub mod object;
 pub mod string;
 pub mod tuple;
 
-#[doc(inline)]
-pub use attribute::Attribute;
-#[doc(inline)]
-pub use expression::{expression, Expression};
-
-use self::whitespace::newline;
-use crate::parser::literals::Key;
 use crate::value::{self, MapValues, Value};
 use crate::{AsOwned, Error};
+use literals::Key;
+use whitespace::newline;
 
 use nom::types::CompleteStr;
 use nom::{
-    alt, alt_complete, call, char, complete, do_parse, eof, exact, named, opt, peek, preceded, tag,
-    terminated,
+    alt, alt_complete, call, char, complete, do_parse, eof, exact, named, named_attr, opt, peek,
+    preceded, tag, terminated,
 };
 
 /// A HCL document body
@@ -41,7 +34,7 @@ use nom::{
 /// Block        = Identifier (StringLit|Identifier)* "{" Newline Body "}" Newline;
 /// OneLineBlock = Identifier (StringLit|Identifier)* "{" (Identifier "=" Expression)? "}" Newline;
 /// ```
-pub type Body<'a> = value::MapValues<'a>;
+pub(crate) type Body<'a> = value::MapValues<'a>;
 
 named!(
     list_begin(CompleteStr) -> char,
@@ -56,7 +49,7 @@ named!(
 // From https://github.com/Geal/nom/issues/14#issuecomment-158788226
 // whitespace! Must not be captured after `]`!
 named!(
-    pub list(CompleteStr) -> Vec<Value>,
+    pub(crate) list(CompleteStr) -> Vec<Value>,
     preceded!(
         list_begin,
         terminated!(
@@ -75,7 +68,7 @@ named!(
 );
 
 named!(
-    pub single_value(CompleteStr) -> Value,
+    pub(crate) single_value(CompleteStr) -> Value,
     alt_complete!(
         call!(null::null) => { |_| Value::Null }
         | call!(literals::number) => { |v| From::from(v) }
@@ -87,7 +80,7 @@ named!(
 );
 
 named!(
-    pub map_expression(CompleteStr) -> MapValues,
+    pub(crate) map_expression(CompleteStr) -> MapValues,
     do_parse!(
         whitespace!(char!('{'))
         >> values: whitespace!(call!(map_values))
@@ -99,7 +92,7 @@ named!(
 // Parse single key value pair in the form of
 // `"key" = ... | ["..."] | {...}`
 named!(
-    pub attribute(CompleteStr) -> (Key, Value),
+    pub(crate) attribute(CompleteStr) -> (Key, Value),
     inline_whitespace!(
         alt!(
             do_parse!(
@@ -125,7 +118,7 @@ named!(
 );
 
 named!(
-    pub map_values(CompleteStr) -> MapValues,
+    pub(crate) map_values(CompleteStr) -> MapValues,
     do_parse!(
         values: whitespace!(
             many0!(
@@ -144,13 +137,13 @@ named!(
 );
 
 named!(
-    pub body(CompleteStr) -> Body,
+    pub(crate) body(CompleteStr) -> Body,
     exact!(call!(map_values))
 );
 
 // TODO: Make this more efficient.
 named!(
-    pub peek(CompleteStr) -> Value,
+    pub(crate) peek(CompleteStr) -> Value,
     peek!(
         alt!(
             call!(single_value)
@@ -159,16 +152,36 @@ named!(
     )
 );
 
-named!(
-    pub config_file(CompleteStr) -> self::body::Body,
+/// A HCL Configuration File
+///
+/// ```ebnf
+/// ConfigFile = Body;
+/// ```
+///
+/// See the [HCL specification](https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md)
+/// for more information on the file format.
+pub type ConfigFile<'a> = self::body::Body<'a>;
+
+named_attr!(
+    #[doc = r#"Parse a HCL Configuration file.
+
+This is a low level parsing function that will return a [`nom::IResult`]. You should use the
+functions in the [`parser`](crate::parser) module instead.
+
+When parsing the file, all input must be consumed or a parse error will be raised.
+
+See the [HCL specification](https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md)
+for more information on the file format.
+"#],
+    pub config_file(CompleteStr) -> ConfigFile,
     exact!(call!(self::body::body))
 );
 
-/// Parse a HCL string into a [`body::Body`] which is close to an abstract syntax tree of the
+/// Parse a HCL string into a [`ConfigFile`] which is close to an abstract syntax tree of the
 /// HCL string.
-pub fn parse_str(input: &str) -> Result<self::body::Body, Error> {
+pub fn parse_str(input: &str) -> Result<ConfigFile, Error> {
     let (remaining_input, body) =
-        self::body::body(CompleteStr(input)).map_err(|e| Error::from_err_str(&e))?;
+        config_file(CompleteStr(input)).map_err(|e| Error::from_err_str(&e))?;
 
     if !remaining_input.is_empty() {
         Err(Error::Bug(format!(
@@ -190,7 +203,7 @@ Remaining: {}
 /// When reading from a source against which short reads are not efficient, such as a
 /// [`File`](std::fs::File), you will want to apply your own buffering because the library
 /// will not buffer the input. See [`std::io::BufReader`].
-pub fn parse_reader<R: std::io::Read>(mut reader: R) -> Result<self::body::Body<'static>, Error> {
+pub fn parse_reader<R: std::io::Read>(mut reader: R) -> Result<ConfigFile<'static>, Error> {
     let mut buffer = String::new();
     reader.read_to_string(&mut buffer)?;
 
@@ -199,7 +212,7 @@ pub fn parse_reader<R: std::io::Read>(mut reader: R) -> Result<self::body::Body<
 }
 
 /// Parse a HCL string from a slice of bytes
-pub fn parse_slice(bytes: &[u8]) -> Result<self::body::Body, Error> {
+pub fn parse_slice(bytes: &[u8]) -> Result<ConfigFile, Error> {
     let input = std::str::from_utf8(bytes)?;
     parse_str(input)
 }

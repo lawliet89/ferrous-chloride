@@ -23,6 +23,8 @@ pub use parser::{parse_reader, parse_slice, parse_str};
 #[doc(inline)]
 pub use value::Value;
 
+pub use nom;
+
 use std::borrow::Cow;
 use std::collections::HashMap as StdHashMap;
 use std::hash::{BuildHasher, Hash};
