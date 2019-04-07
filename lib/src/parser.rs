@@ -3,6 +3,7 @@ pub mod literals;
 
 pub mod null;
 pub mod boolean;
+pub mod identifier;
 pub mod attribute;
 pub mod body;
 pub mod expression;
@@ -104,13 +105,13 @@ named!(
                 >> (key, value)
             )
             | do_parse!(
-                identifier: call!(literals::identifier)
+                identifier: call!(identifier::identifier)
                 >> complete!(opt!(char!('=')))
                 >> values: call!(map_expression)
                 >> (Key::Identifier(Cow::Borrowed(identifier)), Value::from(values))
             )
             | do_parse!(
-                identifier: call!(literals::identifier)
+                identifier: call!(identifier::identifier)
                 >> keys: many0!(literals::quoted_single_line_string)
                 >> values: call!(map_expression)
                 >> (Key::Identifier(Cow::Borrowed(identifier)), Value::Block(vec![(keys, values)].into_iter().collect()))

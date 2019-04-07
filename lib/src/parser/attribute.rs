@@ -3,8 +3,9 @@ use std::borrow::Cow;
 use nom::types::CompleteStr;
 use nom::{call, char, named};
 
-use super::expression::{expression, Expression};
-use super::literals;
+use crate::parser::expression::{expression, Expression};
+use crate::parser::identifier::identifier;
+
 /// A HCL Attribute
 ///
 /// ```ebnf
@@ -16,7 +17,7 @@ named!(
     pub attribute(CompleteStr) -> Attribute,
     inline_whitespace!(
         do_parse!(
-            identifier: call!(literals::identifier)
+            identifier: call!(identifier)
             >> char!('=')
             >> expression: call!(expression)
             >> (Cow::Borrowed(identifier), expression)

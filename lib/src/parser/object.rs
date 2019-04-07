@@ -15,8 +15,9 @@ use std::borrow::{Borrow, Cow};
 use nom::types::CompleteStr;
 use nom::{alt, call, char, do_parse, named, peek, recognize, tag, terminated, IResult};
 
-use super::expression::{expression, Expression};
-use crate::parser::literals::{identifier, newline};
+use crate::parser::identifier::identifier;
+use crate::parser::expression::{expression, Expression};
+use crate::parser::literals::{newline};
 use crate::HashMap;
 
 // TODO: Dealing with expressions and ambiguity. See reference

@@ -98,7 +98,7 @@ impl<'a> Hash for Key<'a> {
 named!(
     pub key(CompleteStr) -> Key,
     alt_complete!(
-        call!(super::identifier) => { |s| Key::Identifier(Cow::Borrowed(s)) }
+        call!(crate::parser::identifier::identifier) => { |s| Key::Identifier(Cow::Borrowed(s)) }
         | super::string::quoted_single_line_string => { |s| Key::String(Cow::Owned(s)) }
     )
 );

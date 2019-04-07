@@ -2,13 +2,10 @@
 #[macro_use]
 pub mod whitespace;
 
-pub mod identifier;
 pub mod key;
 pub mod number;
 pub mod string;
 
-#[doc(inline)]
-pub use identifier::identifier;
 #[doc(inline)]
 pub use key::{key, Key};
 #[doc(inline)]
