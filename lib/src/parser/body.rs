@@ -192,4 +192,115 @@ mod tests {
 
         assert_eq!(expected, parsed);
     }
+
+    #[test]
+    fn fixture_block_is_parsed_correctly() {
+        use crate::parser::block::BlockLabel;
+
+        let hcl = fixtures::BLOCK;
+        let parsed = body(CompleteStr(hcl)).unwrap_output();
+
+        let expected = vec![
+            From::from(Block::new(
+                From::from("simple_map"),
+                vec![],
+                vec![
+                    From::from((From::from("foo"), Expression::from("bar"))),
+                    From::from((From::from("bar"), Expression::from("baz"))),
+                    From::from((From::from("index"), Expression::from(1))),
+                ],
+            )),
+            From::from(Block::new(
+                From::from("simple_map"),
+                vec![],
+                vec![
+                    From::from((From::from("foo"), Expression::from("bar"))),
+                    From::from((From::from("bar"), Expression::from("baz"))),
+                    From::from((From::from("index"), Expression::from(0))),
+                ],
+            )),
+            From::from(Block::new(
+                From::from("resource"),
+                vec![
+                    BlockLabel::StringLiteral(From::from("security/group")),
+                    BlockLabel::StringLiteral(From::from("foobar")),
+                ],
+                vec![
+                    From::from((From::from("name"), Expression::from("foobar"))),
+                    BodyElement::Block(Block::new(
+                        From::from("allow"),
+                        vec![],
+                        vec![
+                            From::from((From::from("name"), Expression::from("localhost"))),
+                            From::from((
+                                From::from("cidrs"),
+                                Expression::from(vec![From::from("127.0.0.1/32")]),
+                            )),
+                        ],
+                    )),
+                    BodyElement::Block(Block::new(
+                        From::from("allow"),
+                        vec![],
+                        vec![
+                            From::from((From::from("name"), Expression::from("lan"))),
+                            From::from((
+                                From::from("cidrs"),
+                                Expression::from(vec![From::from("192.168.0.0/16")]),
+                            )),
+                        ],
+                    )),
+                    BodyElement::Block(Block::new(
+                        From::from("deny"),
+                        vec![],
+                        vec![
+                            From::from((From::from("name"), Expression::from("internet"))),
+                            From::from((
+                                From::from("cidrs"),
+                                Expression::from(vec![From::from("0.0.0.0/0")]),
+                            )),
+                        ],
+                    )),
+                ],
+            )),
+            From::from(Block::new(
+                From::from("resource"),
+                vec![
+                    BlockLabel::StringLiteral(From::from("security/group")),
+                    BlockLabel::StringLiteral(From::from("second")),
+                ],
+                vec![
+                    From::from((From::from("name"), Expression::from("second"))),
+                    BodyElement::Block(Block::new(
+                        From::from("allow"),
+                        vec![],
+                        vec![
+                            From::from((From::from("name"), Expression::from("all"))),
+                            From::from((
+                                From::from("cidrs"),
+                                Expression::from(vec![From::from("0.0.0.0/0")]),
+                            )),
+                        ],
+                    )),
+                ],
+            )),
+            From::from(Block::new(
+                From::from("resource"),
+                vec![
+                    BlockLabel::StringLiteral(From::from("instance")),
+                    BlockLabel::StringLiteral(From::from("an_instance")),
+                ],
+                vec![
+                    From::from((From::from("name"), Expression::from("an_instance"))),
+                    From::from((From::from("image"), Expression::from("ubuntu:18.04"))),
+                    BodyElement::Block(Block::new(
+                        From::from("user"),
+                        vec![BlockLabel::StringLiteral(From::from("test"))],
+                        vec![From::from((From::from("root"), Expression::from(true)))],
+                    )),
+                ],
+            )),
+        ];
+
+        assert_eq!(parsed, expected);
+    }
 }
