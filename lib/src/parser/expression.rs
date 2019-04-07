@@ -8,10 +8,11 @@ use std::str::FromStr;
 use nom::types::CompleteStr;
 use nom::{alt_complete, call, do_parse, named, tag};
 
-use super::literals;
-use super::number::{number, Number};
-use super::object::{object, Object, ObjectElementIdentifier};
-use super::tuple::{tuple, Tuple};
+use crate::parser::null::null;
+use crate::parser::literals;
+use crate::parser::number::{number, Number};
+use crate::parser::object::{object, Object, ObjectElementIdentifier};
+use crate::parser::tuple::{tuple, Tuple};
 use crate::constants::*;
 use crate::Error;
 
@@ -186,7 +187,7 @@ named!(
     pub expression(CompleteStr) -> Expression,
     alt_complete!(
         // LiteralValue -> "null"
-        call!(literals::null) => { |_| Expression::Null }
+        call!(null) => { |_| Expression::Null }
         // LiteralValue -> NumericLit
         | call!(number) => { |v| From::from(v) }
         // LiteralValue -> "true" | "false"

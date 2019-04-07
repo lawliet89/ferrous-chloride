@@ -1,6 +1,7 @@
 #[macro_use]
 pub mod literals;
 
+pub mod null;
 pub mod attribute;
 pub mod body;
 pub mod expression;
@@ -70,7 +71,7 @@ named!(
 named!(
     pub single_value(CompleteStr) -> Value,
     alt_complete!(
-        call!(literals::null) => { |_| Value::Null }
+        call!(null::null) => { |_| Value::Null }
         | call!(literals::number) => { |v| From::from(v) }
         | call!(literals::boolean) => { |v| Value::Boolean(v) }
         | literals::string => { |v| Value::String(v) }
