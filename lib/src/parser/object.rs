@@ -67,7 +67,7 @@ impl<'a> From<&'a str> for ObjectElementIdentifier<'a> {
 
 pub type ObjectElement<'a> = (ObjectElementIdentifier<'a>, Expression<'a>);
 
-pub type Object<'a> = HashMap<ObjectElementIdentifier<'a>, Expression<'a>>;
+pub type Object<'a> = Vec<ObjectElement<'a>>;
 
 // Cannot use `named!` because the compiler cannot determine the lifetime
 pub fn object_element_identifier<'a>(
@@ -114,7 +114,7 @@ named!(
 );
 
 named!(
-    pub object_body(CompleteStr) -> HashMap<ObjectElementIdentifier, Expression>,
+    pub object_body(CompleteStr) -> Object,
     do_parse!(
         values: whitespace!(
             many0!(
@@ -259,7 +259,7 @@ EOF
         let parsed = object_body(CompleteStr(hcl)).unwrap_output();
 
         assert_eq!(1, parsed.len());
-        assert_eq!(parsed["test"], Expression::from(true));
+        assert_eq!(parsed, vec![(From::from("test"), Expression::from(true))]);
     }
 
     #[test]
@@ -268,7 +268,7 @@ EOF
         let parsed = object(CompleteStr(hcl)).unwrap_output();
 
         assert_eq!(1, parsed.len());
-        assert_eq!(parsed["test"], Expression::from(true));
+        assert_eq!(parsed, vec![(From::from("test"), Expression::from(true))]);
     }
 
     #[test]
@@ -277,7 +277,7 @@ EOF
         let parsed = object_body(CompleteStr(hcl)).unwrap_output();
 
         assert_eq!(1, parsed.len());
-        assert_eq!(parsed["foo"], Expression::from("bar"));
+        assert_eq!(parsed, vec![(From::from("foo"), Expression::from("bar"))]);
     }
 
     #[test]
@@ -286,7 +286,7 @@ EOF
         let parsed = object(CompleteStr(hcl)).unwrap_output();
 
         assert_eq!(1, parsed.len());
-        assert_eq!(parsed["foo"], Expression::from("bar"));
+        assert_eq!(parsed, vec![(From::from("foo"), Expression::from("bar"))]);
     }
 
     #[test]
@@ -297,10 +297,14 @@ true = false
 "#;
         let parsed = object_body(CompleteStr(hcl)).unwrap_output();
 
-        assert_eq!(3, parsed.len());
-        assert_eq!(parsed["foo"], Expression::from("bar"));
-        assert_eq!(parsed["bar"], Expression::from("baz"));
-        assert_eq!(parsed["true"], Expression::from(false));
+        assert_eq!(
+            parsed,
+            vec![
+                (From::from("foo"), Expression::from("bar")),
+                (From::from("bar"), Expression::from("baz")),
+                (From::from("true"), Expression::from(false))
+            ]
+        );
     }
 
     #[test]
@@ -311,10 +315,14 @@ bar = "baz"
 true = false}"#;
         let parsed = object(CompleteStr(hcl)).unwrap_output();
 
-        assert_eq!(3, parsed.len());
-        assert_eq!(parsed["foo"], Expression::from("bar"));
-        assert_eq!(parsed["bar"], Expression::from("baz"));
-        assert_eq!(parsed["true"], Expression::from(false));
+        assert_eq!(
+            parsed,
+            vec![
+                (From::from("foo"), Expression::from("bar")),
+                (From::from("bar"), Expression::from("baz")),
+                (From::from("true"), Expression::from(false))
+            ]
+        );
     }
 
     #[test]
@@ -324,10 +332,14 @@ bar = "baz"
 true = false,"#;
         let parsed = object_body(CompleteStr(hcl)).unwrap_output();
 
-        assert_eq!(3, parsed.len());
-        assert_eq!(parsed["foo"], Expression::from("bar"));
-        assert_eq!(parsed["bar"], Expression::from("baz"));
-        assert_eq!(parsed["true"], Expression::from(false));
+        assert_eq!(
+            parsed,
+            vec![
+                (From::from("foo"), Expression::from("bar")),
+                (From::from("bar"), Expression::from("baz")),
+                (From::from("true"), Expression::from(false))
+            ]
+        );
     }
 
     #[test]
@@ -338,10 +350,14 @@ bar = "baz"
 true = false,}"#;
         let parsed = object(CompleteStr(hcl)).unwrap_output();
 
-        assert_eq!(3, parsed.len());
-        assert_eq!(parsed["foo"], Expression::from("bar"));
-        assert_eq!(parsed["bar"], Expression::from("baz"));
-        assert_eq!(parsed["true"], Expression::from(false));
+        assert_eq!(
+            parsed,
+            vec![
+                (From::from("foo"), Expression::from("bar")),
+                (From::from("bar"), Expression::from("baz")),
+                (From::from("true"), Expression::from(false))
+            ]
+        );
     }
 
     #[test]
@@ -353,10 +369,14 @@ true = false
 "#;
         let parsed = object_body(CompleteStr(hcl)).unwrap_output();
 
-        assert_eq!(3, parsed.len());
-        assert_eq!(parsed["foo"], Expression::from("bar"));
-        assert_eq!(parsed["bar"], Expression::from("baz"));
-        assert_eq!(parsed["true"], Expression::from(false));
+        assert_eq!(
+            parsed,
+            vec![
+                (From::from("foo"), Expression::from("bar")),
+                (From::from("bar"), Expression::from("baz")),
+                (From::from("true"), Expression::from(false))
+            ]
+        );
     }
 
     #[test]
@@ -369,10 +389,14 @@ true = false
 }"#;
         let parsed = object(CompleteStr(hcl)).unwrap_output();
 
-        assert_eq!(3, parsed.len());
-        assert_eq!(parsed["foo"], Expression::from("bar"));
-        assert_eq!(parsed["bar"], Expression::from("baz"));
-        assert_eq!(parsed["true"], Expression::from(false));
+        assert_eq!(
+            parsed,
+            vec![
+                (From::from("foo"), Expression::from("bar")),
+                (From::from("bar"), Expression::from("baz")),
+                (From::from("true"), Expression::from(false))
+            ]
+        );
     }
 
     #[test]
@@ -395,26 +419,28 @@ string_escaped = "\" Hello World!"
 "#;
         let parsed = object_body(CompleteStr(hcl)).unwrap_output();
 
-        let expected: HashMap<_, _> = vec![
-            ("test_unsigned_int", Expression::from(123)),
-            ("test_signed_int", Expression::from(-123)),
-            ("test_float", Expression::from(-1.23)),
-            ("bool_true", Expression::from(true)),
-            ("bool_false", Expression::from(false)),
-            ("string", Expression::from("Hello World!")),
-            ("comma_separated", Expression::from("I'm special!")),
-            ("long_string", Expression::from("hihi\nanother line!")),
-            ("string_escaped", Expression::from("\" Hello World!")),
-        ]
-        .into_iter()
-        .collect();
+        let expected = vec![
+            (From::from("test_unsigned_int"), Expression::from(123)),
+            (From::from("test_signed_int"), Expression::from(-123)),
+            (From::from("test_float"), Expression::from(-1.23)),
+            (From::from("bool_true"), Expression::from(true)),
+            (From::from("bool_false"), Expression::from(false)),
+            (From::from("string"), Expression::from("Hello World!")),
+            (
+                From::from("comma_separated"),
+                Expression::from("I'm special!"),
+            ),
+            (
+                From::from("long_string"),
+                Expression::from("hihi\nanother line!"),
+            ),
+            (
+                From::from("string_escaped"),
+                Expression::from("\" Hello World!"),
+            ),
+        ];
 
-        assert_eq!(expected.len(), parsed.len());
-        for (expected_key, expected_value) in expected {
-            println!("Checking {}", expected_key);
-            let actual_value = &parsed[expected_key];
-            assert_eq!(*actual_value, expected_value);
-        }
+        assert_eq!(expected, parsed);
     }
 
     #[test]
@@ -440,26 +466,28 @@ EOF
         let (remaining, parsed) = object(CompleteStr(hcl)).unwrap();
         assert_eq!("\n", remaining.0);
 
-        let expected: HashMap<_, _> = vec![
-            ("test_unsigned_int", Expression::from(123)),
-            ("test_signed_int", Expression::from(-123)),
-            ("test_float", Expression::from(-1.23)),
-            ("bool_true", Expression::from(true)),
-            ("bool_false", Expression::from(false)),
-            ("string", Expression::from("Hello World!")),
-            ("comma_separated", Expression::from("I'm special!")),
-            ("long_string", Expression::from("hihi\nanother line!")),
-            ("string_escaped", Expression::from("\" Hello World!")),
-        ]
-        .into_iter()
-        .collect();
+        let expected = vec![
+            (From::from("test_unsigned_int"), Expression::from(123)),
+            (From::from("test_signed_int"), Expression::from(-123)),
+            (From::from("test_float"), Expression::from(-1.23)),
+            (From::from("bool_true"), Expression::from(true)),
+            (From::from("bool_false"), Expression::from(false)),
+            (From::from("string"), Expression::from("Hello World!")),
+            (
+                From::from("comma_separated"),
+                Expression::from("I'm special!"),
+            ),
+            (
+                From::from("long_string"),
+                Expression::from("hihi\nanother line!"),
+            ),
+            (
+                From::from("string_escaped"),
+                Expression::from("\" Hello World!"),
+            ),
+        ];
 
-        assert_eq!(expected.len(), parsed.len());
-        for (expected_key, expected_value) in expected {
-            println!("Checking {}", expected_key);
-            let actual_value = &parsed[expected_key];
-            assert_eq!(*actual_value, expected_value);
-        }
+        assert_eq!(expected, parsed);
     }
 
     #[test]
@@ -467,9 +495,9 @@ EOF
         let hcl = fixtures::LIST;
         let parsed = object_body(CompleteStr(hcl)).unwrap_output();
 
-        let expected: HashMap<_, _> = vec![
+        let expected = vec![
             (
-                "list",
+                From::from("list"),
                 Expression::new_tuple(vec![
                     Expression::from(true),
                     Expression::from(false),
@@ -479,7 +507,7 @@ EOF
                 ]),
             ),
             (
-                "list_multi",
+                From::from("list_multi"),
                 Expression::new_tuple(vec![
                     Expression::from(true),
                     Expression::from(false),
@@ -489,7 +517,7 @@ EOF
                 ]),
             ),
             (
-                "list_in_list",
+                From::from("list_in_list"),
                 Expression::new_tuple(vec![
                     Expression::new_tuple(vec![
                         Expression::from("test"),
@@ -501,23 +529,16 @@ EOF
                 ]),
             ),
             (
-                "object_in_list",
+                From::from("object_in_list"),
                 Expression::new_tuple(vec![
                     Expression::new_object(vec![("test", Expression::from(123))]),
                     Expression::new_object(vec![("foo", Expression::from("bar"))]),
                     Expression::new_object(vec![("baz", Expression::from(false))]),
                 ]),
             ),
-        ]
-        .into_iter()
-        .collect();
+        ];
 
-        assert_eq!(expected.len(), parsed.len());
-        for (expected_key, expected_value) in expected {
-            println!("Checking {}", expected_key);
-            let actual_value = &parsed[expected_key];
-            assert_eq!(*actual_value, expected_value);
-        }
+        assert_eq!(expected, parsed);
     }
 
     #[test]
@@ -525,9 +546,9 @@ EOF
         let hcl = ["{", fixtures::LIST, "}"].join("");
         let parsed = object(CompleteStr(&hcl)).unwrap_output();
 
-        let expected: HashMap<_, _> = vec![
+        let expected = vec![
             (
-                "list",
+                From::from("list"),
                 Expression::new_tuple(vec![
                     Expression::from(true),
                     Expression::from(false),
@@ -537,7 +558,7 @@ EOF
                 ]),
             ),
             (
-                "list_multi",
+                From::from("list_multi"),
                 Expression::new_tuple(vec![
                     Expression::from(true),
                     Expression::from(false),
@@ -547,7 +568,7 @@ EOF
                 ]),
             ),
             (
-                "list_in_list",
+                From::from("list_in_list"),
                 Expression::new_tuple(vec![
                     Expression::new_tuple(vec![
                         Expression::from("test"),
@@ -559,23 +580,16 @@ EOF
                 ]),
             ),
             (
-                "object_in_list",
+                From::from("object_in_list"),
                 Expression::new_tuple(vec![
                     Expression::new_object(vec![("test", Expression::from(123))]),
                     Expression::new_object(vec![("foo", Expression::from("bar"))]),
                     Expression::new_object(vec![("baz", Expression::from(false))]),
                 ]),
             ),
-        ]
-        .into_iter()
-        .collect();
+        ];
 
-        assert_eq!(expected.len(), parsed.len());
-        for (expected_key, expected_value) in expected {
-            println!("Checking {}", expected_key);
-            let actual_value = &parsed[expected_key];
-            assert_eq!(*actual_value, expected_value);
-        }
+        assert_eq!(expected, parsed);
     }
 
     #[test]
@@ -593,7 +607,7 @@ EOF
         let (remaining, parsed) = object(CompleteStr(hcl)).unwrap();
         assert_eq!(",\n", remaining.0);
 
-        let expected: HashMap<ObjectElementIdentifier, _> = vec![
+        let expected = vec![
             (From::from("test_unsigned_int"), Expression::from(123)),
             (From::from("true"), Expression::from(false)),
             (
@@ -603,9 +617,7 @@ EOF
                     ("oh_no", Expression::from("reality is broken!")),
                 ]),
             ),
-        ]
-        .into_iter()
-        .collect();
+        ];
 
         assert_eq!(expected, parsed);
     }
