@@ -2,14 +2,11 @@
 #[macro_use]
 pub mod whitespace;
 
-pub mod boolean;
 pub mod identifier;
 pub mod key;
 pub mod number;
 pub mod string;
 
-#[doc(inline)]
-pub use boolean::boolean;
 #[doc(inline)]
 pub use identifier::identifier;
 #[doc(inline)]

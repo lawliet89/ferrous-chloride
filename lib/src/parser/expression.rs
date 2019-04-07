@@ -9,6 +9,7 @@ use nom::types::CompleteStr;
 use nom::{alt_complete, call, do_parse, named, tag};
 
 use crate::parser::null::null;
+use crate::parser::boolean::boolean;
 use crate::parser::literals;
 use crate::parser::number::{number, Number};
 use crate::parser::object::{object, Object, ObjectElementIdentifier};
@@ -191,7 +192,7 @@ named!(
         // LiteralValue -> NumericLit
         | call!(number) => { |v| From::from(v) }
         // LiteralValue -> "true" | "false"
-        | call!(literals::boolean) => { |v| From::from(v) }
+        | call!(boolean) => { |v| From::from(v) }
         // TemplateExpr
         // https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md#template-expressions
         | literals::string => { |v| From::from(v) }

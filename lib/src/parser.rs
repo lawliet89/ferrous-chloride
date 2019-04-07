@@ -2,6 +2,7 @@
 pub mod literals;
 
 pub mod null;
+pub mod boolean;
 pub mod attribute;
 pub mod body;
 pub mod expression;
@@ -73,7 +74,7 @@ named!(
     alt_complete!(
         call!(null::null) => { |_| Value::Null }
         | call!(literals::number) => { |v| From::from(v) }
-        | call!(literals::boolean) => { |v| Value::Boolean(v) }
+        | call!(boolean::boolean) => { |v| Value::Boolean(v) }
         | literals::string => { |v| Value::String(v) }
         | list => { |v| Value::List(v) }
         | map_expression => { |m| Value::Object(vec![m]) }

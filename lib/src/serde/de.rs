@@ -13,6 +13,7 @@ use serde::Deserialize;
 
 use crate::parser;
 use crate::parser::null::null;
+use crate::parser::boolean::boolean;
 use crate::parser::literals;
 use crate::value;
 
@@ -140,7 +141,7 @@ impl<'de> Deserializer<'de> {
     }
 
     fn parse_bool(&mut self) -> Result<bool, Error> {
-        let (remaining, output) = literals::boolean(self.input)?;
+        let (remaining, output) = boolean(self.input)?;
         self.input = remaining;
         Ok(output)
     }
