@@ -64,6 +64,21 @@ impl<'a> From<&'a str> for ObjectElementIdentifier<'a> {
     }
 }
 
+impl<'a> crate::AsOwned for ObjectElementIdentifier<'a> {
+    type Output = ObjectElementIdentifier<'static>;
+
+    fn as_owned(&self) -> Self::Output {
+        match self {
+            ObjectElementIdentifier::Identifier(ident) => {
+                ObjectElementIdentifier::Identifier(Cow::Owned(ident.as_owned()))
+            }
+            ObjectElementIdentifier::Expression(expr) => {
+                ObjectElementIdentifier::Expression(Cow::Owned(expr.as_owned()))
+            }
+        }
+    }
+}
+
 pub type ObjectElement<'a> = (ObjectElementIdentifier<'a>, Expression<'a>);
 
 pub type Object<'a> = Vec<ObjectElement<'a>>;

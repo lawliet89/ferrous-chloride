@@ -43,6 +43,16 @@ impl<'a> From<Block<'a>> for BodyElement<'a> {
     }
 }
 
+impl<'a> crate::AsOwned for BodyElement<'a> {
+    type Output = BodyElement<'static>;
+    fn as_owned(&self) -> Self::Output {
+        match self {
+            BodyElement::Attribute(attr) => BodyElement::Attribute(attr.as_owned()),
+            BodyElement::Block(blk) => BodyElement::Block(blk.as_owned()),
+        }
+    }
+}
+
 named_attr!(
     #[doc = r#"Parses a `Body` element
 

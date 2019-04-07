@@ -15,7 +15,6 @@ use crate::parser::number::{number, Number};
 use crate::parser::object::{object, Object, ObjectElementIdentifier};
 use crate::parser::string::string;
 use crate::parser::tuple::{tuple, Tuple};
-use crate::Error;
 
 /// An Expression
 ///
@@ -75,41 +74,6 @@ impl<'a> Expression<'a> {
         Expression::Object(iterator.into_iter().map(|(k, v)| (k.into(), v)).collect())
     }
 
-    /// # [Reference](https://github.com/hashicorp/hcl2/blob/master/hcl/spec.md#schema-driven-processing)
-    ///
-    /// Within a schema, it is an error to request the same attribute name twice or to request a
-    /// block type whose name is also an attribute name. While this can in principle be supported
-    /// in some syntaxes, in other syntaxes the attribute and block namespaces are combined and so
-    /// an an attribute cannot coexist with a block whose type name is identical to the attribute
-    /// name.
-    pub fn merge(self) -> Result<Self, Error> {
-        match self {
-            no_op @ Expression::Null
-            | no_op @ Expression::Number(_)
-            | no_op @ Expression::Boolean(_)
-            | no_op @ Expression::String(_) => Ok(no_op),
-            Expression::Tuple(tuple) => Ok(Expression::Tuple(
-                tuple
-                    .into_iter()
-                    .map(Self::merge)
-                    .collect::<Result<_, Error>>()?,
-            )),
-            Expression::Object(obj) => Ok(Expression::Object(
-                obj.into_iter()
-                    .map(|(ident, expr)| Ok((ident, expr.merge()?)))
-                    .collect::<Result<_, Error>>()?,
-            )),
-            // Value::Block(block) => {
-            //     let unmerged: Block = block
-            //         .into_iter()
-            //         .map(|(key, value)| Ok((key, value.merge()?)))
-            //         .collect::<Result<_, Error>>()?;
-            //     let merged = Block::new_merged(unmerged)?;
-            //     Ok(Value::Block(merged))
-            // }
-        }
-    }
-
     pub fn variant_name(&self) -> &'static str {
         match self {
             Expression::Null => NULL,
@@ -118,7 +82,21 @@ impl<'a> Expression<'a> {
             Expression::String(_) => STRING,
             Expression::Tuple(_) => TUPLE,
             Expression::Object(_) => OBJECT,
-            // Expression::Block(_) => BLOCK,
+        }
+    }
+}
+
+impl<'a> crate::AsOwned for Expression<'a> {
+    type Output = Expression<'static>;
+
+    fn as_owned(&self) -> Self::Output {
+        match self {
+            Expression::Null => Expression::Null,
+            Expression::Number(number) => Expression::Number(number.as_owned()),
+            Expression::Boolean(boolean) => Expression::Boolean(*boolean),
+            Expression::String(string) => Expression::String(string.clone()),
+            Expression::Tuple(tup) => Expression::Tuple(tup.as_owned()),
+            Expression::Object(obj) => Expression::Object(obj.as_owned()),
         }
     }
 }

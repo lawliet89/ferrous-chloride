@@ -23,6 +23,16 @@ named!(
     )
 );
 
+impl<'a> crate::AsOwned for Attribute<'a> {
+    type Output = Attribute<'static>;
+
+    fn as_owned(&self) -> Self::Output {
+        use std::borrow::Cow;
+
+        (Cow::Owned(self.0.as_owned()), self.1.as_owned())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

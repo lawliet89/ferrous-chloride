@@ -5,8 +5,11 @@ use crate::HashMap;
 use std::iter::FromIterator;
 use std::string::ToString;
 
+use nom::types::CompleteStr;
+
 use crate::constants::*;
 use crate::parser::literals::Key;
+use crate::MergeBehaviour;
 use crate::{AsOwned, Error, KeyValuePairs, ScalarLength};
 
 #[derive(Debug, PartialEq, Clone)]
@@ -24,6 +27,8 @@ pub enum Value<'a> {
 
 // TODO: Make Value Generic over type of
 // Merged/unmerged object
+
+pub type Body<'a> = MapValues<'a>;
 
 /// Contains a list of HCL Blocks sharing the same identifier with one or more labels
 /// differentiating each Block from each other.
@@ -882,4 +887,81 @@ impl<'a> FromIterator<(Key<'a>, Value<'a>)> for MapValues<'a> {
     fn from_iter<T: IntoIterator<Item = (Key<'a>, Value<'a>)>>(iter: T) -> Self {
         Self::new_unmerged(iter)
     }
+}
+
+/// Parse a HCL string into a [`Body`] which is close to an abstract syntax tree of the
+/// HCL string.
+///
+/// You can opt to merge the parsed body after parsing. The behaviour of merging is determined by
+/// the [`MergeBehaviour`] enum.
+pub fn from_str(input: &str, merge: Option<MergeBehaviour>) -> Result<Body, Error> {
+    let (remaining_input, unmerged) =
+        crate::parser::body(CompleteStr(input)).map_err(|e| Error::from_err_str(&e))?;
+
+    if !remaining_input.is_empty() {
+        Err(Error::Bug(format!(
+            r#"Input was not completely parsed:
+Input: {},
+Remaining: {}
+"#,
+            input, remaining_input
+        )))?
+    }
+
+    let pairs = match merge {
+        None => unmerged,
+        Some(MergeBehaviour::Error) => unmerged.merge()?,
+        Some(_) => unimplemented!("Not implemented yet"),
+    };
+
+    Ok(pairs)
+}
+
+/// Parse a HCL string from a IO stream reader
+///
+/// The entire IO stream has to be buffered in memory first before parsing can occur.
+///
+/// When reading from a source against which short reads are not efficient, such as a
+/// [`File`](std::fs::File), you will want to apply your own buffering because the library
+/// will not buffer the input. See [`std::io::BufReader`].
+pub fn from_reader<R: std::io::Read>(
+    mut reader: R,
+    merge: Option<MergeBehaviour>,
+) -> Result<Body<'static>, Error> {
+    let mut buffer = String::new();
+    reader.read_to_string(&mut buffer)?;
+
+    // FIXME: Can we do better? We are allocating twice. Once for reading into a buffer
+    // and second time calling `as_owned`.
+    Ok(from_str(&buffer, merge)?.as_owned())
+}
+
+/// Parse a HCL string from a slice of bytes
+pub fn from_slice(bytes: &[u8], merge: Option<MergeBehaviour>) -> Result<Body, Error> {
+    let input = std::str::from_utf8(bytes)?;
+    from_str(input, merge)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::fixtures;
+    use crate::Mergeable;
+
+    #[test]
+    fn strings_are_parsed_correctly_unmerged() {
+        for string in fixtures::ALL {
+            let parsed = from_str(string, None).unwrap();
+            assert!(parsed.is_unmerged());
+        }
+    }
+
+    #[test]
+    fn strings_are_parsed_correctly_merged() {
+        for string in fixtures::ALL {
+            let parsed = from_str(string, Some(MergeBehaviour::Error)).unwrap();
+            assert!(parsed.is_merged());
+        }
+    }
+
 }

@@ -43,6 +43,14 @@ impl<'a> Deref for Number<'a> {
     }
 }
 
+impl<'a> crate::AsOwned for Number<'a> {
+    type Output = Number<'static>;
+
+    fn as_owned(&self) -> Self::Output {
+        Number(Cow::Owned(self.0.as_owned()))
+    }
+}
+
 macro_rules! impl_to_number {
     ($($name:ident => $to:ty, )*) => {$(
         impl_to_number!($name => $to => stringify!(Attempt conversion to $to));

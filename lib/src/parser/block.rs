@@ -85,6 +85,29 @@ impl<'a> From<&'a str> for BlockLabel<'a> {
     }
 }
 
+impl<'a> crate::AsOwned for BlockLabel<'a> {
+    type Output = BlockLabel<'static>;
+
+    fn as_owned(&self) -> Self::Output {
+        match self {
+            BlockLabel::StringLiteral(string) => BlockLabel::StringLiteral(string.clone()),
+            BlockLabel::Identifier(ident) => BlockLabel::Identifier(Cow::Owned(ident.as_owned())),
+        }
+    }
+}
+
+impl<'a> crate::AsOwned for Block<'a> {
+    type Output = Block<'static>;
+
+    fn as_owned(&self) -> Self::Output {
+        Self::Output {
+            r#type: Cow::Owned(self.r#type.as_owned()),
+            labels: self.labels.as_owned(),
+            body: self.body.as_owned(),
+        }
+    }
+}
+
 named!(
     pub block_label(CompleteStr) -> BlockLabel,
     alt!(

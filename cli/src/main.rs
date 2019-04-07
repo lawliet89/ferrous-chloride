@@ -1,6 +1,7 @@
 mod error;
 
-use ferrous_chloride::{parse_reader, MergeBehaviour};
+use ferrous_chloride::value::from_reader;
+use ferrous_chloride::MergeBehaviour;
 use std::fs::File;
 use std::io::{self, Read, Write};
 
@@ -46,7 +47,7 @@ fn run_parse(args: &ArgMatches) -> Result<(), Error> {
         } else {
             Some(MergeBehaviour::Error)
         };
-        parse_reader(input, merge_behaviour)?
+        from_reader(input, merge_behaviour)?
     };
 
     // Write
