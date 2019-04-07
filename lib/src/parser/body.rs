@@ -1,19 +1,12 @@
 //! HCL Body
 //!
 //! [Reference](https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md#structural-elements)
-use std::borrow::Cow;
-use std::iter::FromIterator;
-
 use nom::types::CompleteStr;
 use nom::{alt, call, do_parse, eof, named_attr, terminated};
 
-use crate::parser::attribute::attribute;
+use crate::parser::attribute::{attribute, Attribute};
 use crate::parser::block::{block, one_line_block, Block};
-use crate::parser::expression::Expression;
-use crate::parser::identifier::Identifier;
 use crate::parser::whitespace::newline;
-use crate::HashMap;
-use crate::{Error, KeyValuePairs};
 
 /// A HCL document body
 ///
@@ -25,99 +18,7 @@ use crate::{Error, KeyValuePairs};
 /// OneLineBlock = Identifier (StringLit|Identifier)* "{" (Identifier "=" Expression)? "}" Newline;
 /// ```
 // TODO: Change this into a vec of Body Element. Remove merging semantics
-pub type Body<'a> = KeyValuePairs<Identifier<'a>, BodyElement<'a>>;
-
-impl<'a> Body<'a> {
-    // TODO: Customise merging behaviour wrt duplicate keys
-    pub fn new_merged<T>(iter: T) -> Result<Self, Error>
-    where
-        T: IntoIterator<Item = (Identifier<'a>, BodyElement<'a>)>,
-    {
-        use std::collections::hash_map::Entry;
-
-        let mut map = HashMap::default();
-        for (key, value) in iter {
-            let value = value.merge()?;
-            match map.entry(key) {
-                Entry::Vacant(vacant) => {
-                    vacant.insert(value);
-                }
-                Entry::Occupied(mut occupied) => {
-                    let key = occupied.key().to_string();
-                    match occupied.get_mut() {
-                        BodyElement::Expression(expr) => Err(Error::IllegalMultipleEntries {
-                            key,
-                            variant: expr.variant_name(),
-                        })?,
-                        BodyElement::Block(ref mut block) => {
-                            let value = value;
-                            // Check that the incoming value is also a Block
-                            if let BodyElement::Block(incoming) = value {
-                                block.extend(incoming);
-                            } else {
-                                Err(Error::ErrorMergingKeys {
-                                    key,
-                                    existing_variant: crate::constants::BLOCK,
-                                    incoming_variant: value.variant_name(),
-                                })?;
-                            }
-                        }
-                    };
-                }
-            };
-        }
-        Ok(KeyValuePairs::Merged(map))
-    }
-
-    pub fn new_unmerged<T>(iter: T) -> Self
-    where
-        T: IntoIterator<Item = (Identifier<'a>, BodyElement<'a>)>,
-    {
-        KeyValuePairs::Unmerged(iter.into_iter().collect())
-    }
-
-    pub fn merge(self) -> Result<Self, Error> {
-        if let KeyValuePairs::Unmerged(vec) = self {
-            Self::new_merged(vec.into_iter())
-        } else {
-            Ok(self)
-        }
-    }
-
-    pub fn as_merged(&self) -> Result<Self, Error> {
-        if let KeyValuePairs::Unmerged(vec) = self {
-            Self::new_merged(vec.iter().cloned())
-        } else {
-            Ok(self.clone())
-        }
-    }
-
-    pub fn unmerge(self) -> Self {
-        if let KeyValuePairs::Merged(hashmap) = self {
-            Self::new_unmerged(hashmap.into_iter())
-        } else {
-            self
-        }
-    }
-
-    pub fn as_unmerged(&self) -> Self {
-        if let KeyValuePairs::Merged(hashmap) = self {
-            Self::new_unmerged(
-                hashmap
-                    .iter()
-                    .map(|(key, value)| (key.clone(), value.clone())),
-            )
-        } else {
-            self.clone()
-        }
-    }
-}
-
-impl<'a> FromIterator<(Identifier<'a>, BodyElement<'a>)> for Body<'a> {
-    fn from_iter<T: IntoIterator<Item = (Identifier<'a>, BodyElement<'a>)>>(iter: T) -> Self {
-        Self::new_unmerged(iter)
-    }
-}
+pub type Body<'a> = Vec<BodyElement<'a>>;
 
 /// An element of `Body`
 ///
@@ -126,35 +27,19 @@ impl<'a> FromIterator<(Identifier<'a>, BodyElement<'a>)> for Body<'a> {
 /// ```
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BodyElement<'a> {
-    Expression(Expression<'a>),
-    /// Blocks of the same Type
-    // XXX: vec?
-    Block(Vec<Block<'a>>),
+    Attribute(Attribute<'a>),
+    Block(Block<'a>),
 }
 
-impl<'a> BodyElement<'a> {
-    pub fn merge(self) -> Result<Self, Error> {
-        match self {
-            BodyElement::Expression(expr) => Ok(BodyElement::Expression(expr.merge()?)),
-            BodyElement::Block(blk) => {
-                let blk: Result<_, Error> =
-                    blk.into_iter().map(|block| Ok(block.merge()?)).collect();
-                Ok(BodyElement::Block(blk?))
-            }
-        }
-    }
-
-    pub fn variant_name(&self) -> &'static str {
-        match self {
-            BodyElement::Expression(expr) => expr.variant_name(),
-            BodyElement::Block(_) => crate::constants::BLOCK,
-        }
+impl<'a> From<Attribute<'a>> for BodyElement<'a> {
+    fn from(attr: Attribute<'a>) -> Self {
+        BodyElement::Attribute(attr)
     }
 }
 
-impl<'a> From<Expression<'a>> for BodyElement<'a> {
-    fn from(expr: Expression<'a>) -> Self {
-        BodyElement::Expression(expr)
+impl<'a> From<Block<'a>> for BodyElement<'a> {
+    fn from(blk: Block<'a>) -> Self {
+        BodyElement::Block(blk)
     }
 }
 
@@ -165,10 +50,11 @@ named_attr!(
 Attribute | Block | OneLineBlock
 ```
 "#],
-    pub body_element(CompleteStr) -> (Cow<str>, BodyElement),
+    pub body_element(CompleteStr) -> BodyElement,
     alt!(
-        attribute => { |(ident, expr)| (ident, BodyElement::Expression(expr)) }
-        // | one_line_block => { |blk: Block| (blk.r#type, BodyElement::Block(vec![blk])) }
+        attribute => { |attr| BodyElement::Attribute(attr) }
+        | one_line_block => { |blk| BodyElement::Block(blk) }
+        | block => { |blk| BodyElement::Block(blk) }
     )
 );
 
@@ -200,9 +86,8 @@ Body = (Attribute | Block | OneLineBlock)*;
 mod tests {
     use super::*;
 
-    use crate::HashMap;
-
     use crate::fixtures;
+    use crate::parser::expression::Expression;
     use crate::utils::ResultUtilsString;
 
     #[test]
@@ -218,8 +103,10 @@ mod tests {
         let hcl = fixtures::NO_NEWLINE_EOF;
         let parsed = body(CompleteStr(hcl)).unwrap_output();
 
-        assert_eq!(1, parsed.len());
-        assert_eq!(parsed["test"], From::from(Expression::from(true)));
+        assert_eq!(
+            parsed,
+            vec![From::from((From::from("test"), From::from(true)))]
+        );
     }
 
     #[test]
@@ -227,8 +114,10 @@ mod tests {
         let hcl = fixtures::SINGLE;
         let parsed = body(CompleteStr(hcl)).unwrap_output();
 
-        assert_eq!(1, parsed.len());
-        assert_eq!(parsed["foo"], From::from(Expression::from("bar")));
+        assert_eq!(
+            parsed,
+            vec![From::from((From::from("foo"), From::from("bar")))]
+        );
     }
 
     #[test]
@@ -236,25 +125,24 @@ mod tests {
         let hcl = fixtures::SCALAR;
         let parsed = body(CompleteStr(hcl)).unwrap_output();
 
-        let expected: HashMap<_, _> = vec![
-            ("test_unsigned_int", Expression::from(123)),
-            ("test_signed_int", Expression::from(-123)),
-            ("test_float", Expression::from(-1.23)),
-            ("bool_true", Expression::from(true)),
-            ("bool_false", Expression::from(false)),
-            ("string", Expression::from("Hello World!")),
-            ("long_string", Expression::from("hihi\nanother line!")),
-            ("string_escaped", Expression::from("\" Hello World!")),
-        ]
-        .into_iter()
-        .collect();
+        let expected = vec![
+            BodyElement::from((From::from("test_unsigned_int"), Expression::from(123))),
+            BodyElement::from((From::from("test_signed_int"), Expression::from(-123))),
+            BodyElement::from((From::from("test_float"), Expression::from(-1.23))),
+            BodyElement::from((From::from("bool_true"), Expression::from(true))),
+            BodyElement::from((From::from("bool_false"), Expression::from(false))),
+            BodyElement::from((From::from("string"), Expression::from("Hello World!"))),
+            BodyElement::from((
+                From::from("long_string"),
+                Expression::from("hihi\nanother line!"),
+            )),
+            BodyElement::from((
+                From::from("string_escaped"),
+                Expression::from("\" Hello World!"),
+            )),
+        ];
 
-        assert_eq!(expected.len(), parsed.len());
-        for (expected_key, expected_value) in expected {
-            println!("Checking {}", expected_key);
-            let actual_value = &parsed[expected_key];
-            assert_eq!(*actual_value, From::from(expected_value));
-        }
+        assert_eq!(expected, parsed);
     }
 
     #[test]
@@ -262,9 +150,9 @@ mod tests {
         let hcl = fixtures::LIST;
         let parsed = body(CompleteStr(hcl)).unwrap_output();
 
-        let expected: HashMap<_, _> = vec![
-            (
-                "list",
+        let expected = vec![
+            BodyElement::from((
+                From::from("list"),
                 Expression::new_tuple(vec![
                     From::from(true),
                     From::from(false),
@@ -272,9 +160,9 @@ mod tests {
                     From::from(-123.456),
                     From::from("foobar"),
                 ]),
-            ),
-            (
-                "list_multi",
+            )),
+            BodyElement::from((
+                From::from("list_multi"),
                 Expression::new_tuple(vec![
                     From::from(true),
                     From::from(false),
@@ -282,35 +170,26 @@ mod tests {
                     From::from(-123.456),
                     From::from("foobar"),
                 ]),
-            ),
-            (
-                "list_in_list",
+            )),
+            BodyElement::from((
+                From::from("list_in_list"),
                 Expression::new_tuple(vec![
                     Expression::new_tuple(vec![From::from("test"), From::from("foobar")]),
                     From::from(1),
                     From::from(2),
                     From::from(-3),
                 ]),
-            ),
-            (
-                "object_in_list",
+            )),
+            BodyElement::from((
+                From::from("object_in_list"),
                 Expression::new_tuple(vec![
                     Expression::new_object(vec![("test", Expression::from(123))]),
                     Expression::new_object(vec![("foo", Expression::from("bar"))]),
                     Expression::new_object(vec![("baz", Expression::from(false))]),
                 ]),
-            ),
-        ]
-        .into_iter()
-        .collect();
+            )),
+        ];
 
-        assert_eq!(expected.len(), parsed.len());
-        for (expected_key, expected_value) in expected {
-            println!("Checking {}", expected_key);
-            let actual_value = &parsed[expected_key];
-            assert_eq!(*actual_value, From::from(expected_value));
-        }
+        assert_eq!(expected, parsed);
     }
-
-    // TODO: Test merging
 }

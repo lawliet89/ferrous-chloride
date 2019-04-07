@@ -46,8 +46,8 @@ impl<'a> Block<'a> {
         attribute: Option<Attribute<'a>>,
     ) -> Self {
         let body = match attribute {
-            None => Body::new_unmerged(vec![]),
-            Some((ident, expr)) => Body::new_unmerged(vec![(ident, From::from(expr))]),
+            None => vec![],
+            Some(attr) => vec![From::from(attr)],
         };
 
         Self {
@@ -55,11 +55,6 @@ impl<'a> Block<'a> {
             labels,
             body,
         }
-    }
-
-    pub fn merge(mut self) -> Result<Self, crate::Error> {
-        self.body = self.body.merge()?;
-        Ok(self)
     }
 }
 
@@ -264,11 +259,11 @@ mod tests {
                 BlockLabel::StringLiteral(From::from("foo")),
                 BlockLabel::from("bar"),
             ],
-            Body::new_unmerged(vec![
-                (From::from("foo"), From::from(Expression::from("bar"))),
-                (From::from("bar"), From::from(Expression::from("baz"))),
-                (From::from("index"), From::from(Expression::from(0))),
-            ]),
+            vec![
+                From::from((From::from("foo"), Expression::from("bar"))),
+                From::from((From::from("bar"), Expression::from("baz"))),
+                From::from((From::from("index"), Expression::from(0))),
+            ],
         );
 
         assert_eq!(block, expected);

@@ -18,7 +18,6 @@ use nom::{alt, call, char, do_parse, named, peek, recognize, tag, terminated, IR
 use crate::parser::expression::{expression, Expression};
 use crate::parser::identifier::{identifier, Identifier};
 use crate::parser::whitespace::newline;
-use crate::HashMap;
 
 // TODO: Dealing with expressions and ambiguity. See reference
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
