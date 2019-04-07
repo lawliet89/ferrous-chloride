@@ -1,5 +1,8 @@
-// https://www.reddit.com/r/rust/comments/8rpzjd/parsing_string_literals_in_nom/
-// https://github.com/Geal/nom/issues/787
+//! String and Template
+//!
+//! - [Template Expression](https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md#template-expressions)
+//! - [Template](https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md#templates)
+//!
 
 use std::borrow::Cow;
 use std::str;
@@ -13,6 +16,11 @@ use nom::{
     named_args, opt, peek, preceded, return_error, tag, take_while1, take_while_m_n,
 };
 
+
+/// The StringLit production permits the escape sequences discussed for quoted template expressions
+/// as above, but does not permit template interpolation or directive sequences.
+pub type StringLiteral = String;
+
 fn is_hex_digit(c: char) -> bool {
     c.is_digit(16)
 }
@@ -21,13 +29,13 @@ fn is_oct_digit(c: char) -> bool {
     c.is_digit(8)
 }
 
-fn legal_quoted_string_character(c: char) -> bool {
+fn legal_string_literal_character(c: char) -> bool {
     let test = c != '\\' && c != '"';
     debug!("Checking valid string character {:?}: {:?}", c, test);
     test
 }
 
-fn legal_quoted_single_line_string_character(c: char) -> bool {
+fn legal_string_literal_single_line_character(c: char) -> bool {
     let test = c != '\\' && c != '"' && c != '\r' && c != '\n';
     debug!("Checking valid string character {:?}: {:?}", c, test);
     test
@@ -54,21 +62,21 @@ fn hex_to_string(s: &str) -> Result<String, InternalKind> {
 // Unicode References: https://en.wikipedia.org/wiki/List_of_Unicode_characters
 // TODO: Issues with variable length alt https://docs.rs/nom/4.2.0/nom/macro.alt.html#behaviour-of-alt
 named!(unescape(CompleteStr) -> Cow<str>,
-        alt!(
-            // Control Chracters
-            tag!("a")  => { |_| Cow::Borrowed("\x07") }
-            | tag!("b")  => { |_| Cow::Borrowed("\x08") }
-            | tag!("f")  => { |_| Cow::Borrowed("\x0c") }
-            | tag!("n") => { |_| Cow::Borrowed("\n") }
-            | tag!("r")  => { |_| Cow::Borrowed("\r") }
-            | tag!("t")  => { |_| Cow::Borrowed("\t") }
-            | tag!("v")  => { |_| Cow::Borrowed("\x0b") }
-            | tag!("\\") => { |_| Cow::Borrowed("\\") }
-            | tag!("\"") => { |_| Cow::Borrowed("\"") }
-            | tag!("?") => { |_| Cow::Borrowed("?") }
-            | map!(map_res!(complete!(take_while_m_n!(1, 3, is_oct_digit)), |s: CompleteStr| octal_to_string(s.0)), Cow::Owned)
-            | hex_to_unicode
-        )
+    alt!(
+        // Control Chracters
+        tag!("a")  => { |_| Cow::Borrowed("\x07") }
+        | tag!("b")  => { |_| Cow::Borrowed("\x08") }
+        | tag!("f")  => { |_| Cow::Borrowed("\x0c") }
+        | tag!("n") => { |_| Cow::Borrowed("\n") }
+        | tag!("r")  => { |_| Cow::Borrowed("\r") }
+        | tag!("t")  => { |_| Cow::Borrowed("\t") }
+        | tag!("v")  => { |_| Cow::Borrowed("\x0b") }
+        | tag!("\\") => { |_| Cow::Borrowed("\\") }
+        | tag!("\"") => { |_| Cow::Borrowed("\"") }
+        | tag!("?") => { |_| Cow::Borrowed("?") }
+        | map!(map_res!(complete!(take_while_m_n!(1, 3, is_oct_digit)), |s: CompleteStr| octal_to_string(s.0)), Cow::Owned)
+        | hex_to_unicode
+    )
 );
 
 named!(hex_to_unicode(CompleteStr) -> Cow<str>,
@@ -90,9 +98,9 @@ named!(hex_to_unicode(CompleteStr) -> Cow<str>,
 
 // Contents of a single line string
 named!(
-    quoted_string_content(CompleteStr) -> String,
+    multiline_string_content(CompleteStr) -> String,
     escaped_transform!(
-        take_while1!(legal_quoted_string_character),
+        take_while1!(legal_string_literal_character),
         '\\',
         unescape
     )
@@ -102,25 +110,25 @@ named!(
     quoted_string(CompleteStr) -> String,
     delimited!(
         tag!("\""),
-        call!(quoted_string_content),
+        call!(multiline_string_content),
         tag!("\"")
     )
 );
 
 named!(
-    pub quoted_single_line_string_content(CompleteStr) -> String,
+    pub string_literal_content(CompleteStr) -> StringLiteral,
     escaped_transform!(
-        take_while1!(legal_quoted_single_line_string_character),
+        take_while1!(legal_string_literal_single_line_character),
         '\\',
         unescape
     )
 );
 
 named!(
-    pub quoted_single_line_string(CompleteStr) -> String,
+    pub string_literal(CompleteStr) -> StringLiteral,
     delimited!(
         tag!("\""),
-        call!(quoted_single_line_string_content),
+        call!(string_literal_content),
         tag!("\"")
     )
 );
@@ -247,7 +255,7 @@ mod tests {
 
         for (input, expected) in test_cases.iter() {
             println!("Testing {}", input);
-            let actual = quoted_string_content(CompleteStr(input));
+            let actual = multiline_string_content(CompleteStr(input));
             assert_eq!(
                 ResultUtilsString::unwrap_output(actual.map(|s| s.to_owned())),
                 *expected

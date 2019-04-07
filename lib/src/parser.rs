@@ -117,7 +117,7 @@ named!(
             )
             | do_parse!(
                 identifier: call!(identifier::identifier)
-                >> keys: many0!(string::quoted_single_line_string)
+                >> keys: many0!(string::string_literal)
                 >> values: call!(map_expression)
                 >> (Key::Identifier(Cow::Borrowed(identifier)), Value::Block(vec![(keys, values)].into_iter().collect()))
             )

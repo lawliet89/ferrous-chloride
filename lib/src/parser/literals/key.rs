@@ -99,7 +99,7 @@ named!(
     pub key(CompleteStr) -> Key,
     alt_complete!(
         call!(crate::parser::identifier::identifier) => { |s| Key::Identifier(Cow::Borrowed(s)) }
-        | crate::parser::string::quoted_single_line_string => { |s| Key::String(Cow::Owned(s)) }
+        | crate::parser::string::string_literal => { |s| Key::String(Cow::Owned(s)) }
     )
 );
 
