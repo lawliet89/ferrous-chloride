@@ -1,1 +1,1 @@
-initSidebarItems({"static":[["BLOCK",""],["BOOLEAN",""],["FLOAT",""],["INTEGER",""],["LIST",""],["MAP",""],["MAP_VALUES",""],["MERGED",""],["NULL",""],["STRING",""],["UNMERGED",""],["VALUE",""]]});
+initSidebarItems({"static":[["BLOCK",""],["BOOLEAN",""],["FLOAT",""],["INTEGER",""],["LIST",""],["MAP_VALUES",""],["MERGED",""],["NULL",""],["NUMBER",""],["OBJECT",""],["STRING",""],["TUPLE",""],["UNMERGED",""],["VALUE",""]]});

@@ -55,8 +55,8 @@
             <span class="ident">Boolean</span>(<span class="ident">boolean</span>) <span class="op">=&gt;</span> <span class="ident">visitor</span>.<span class="ident">visit_bool</span>(<span class="ident">boolean</span>),
             <span class="ident">String</span>(<span class="ident">string</span>) <span class="op">=&gt;</span> <span class="ident">visitor</span>.<span class="ident">visit_string</span>(<span class="ident">string</span>),
             <span class="ident">List</span>(<span class="ident">list</span>) <span class="op">=&gt;</span> <span class="ident">visitor</span>.<span class="ident">visit_seq</span>(<span class="ident">de</span>::<span class="ident">list</span>::<span class="ident">ListAccess</span>::<span class="ident">new</span>(<span class="ident">list</span>)),
-            <span class="comment">// Map(map) =&gt; visitor.visit_map(de::map::MapAccess::new(map)?),</span>
-            <span class="ident">Map</span>(<span class="ident">_map</span>) <span class="op">=&gt;</span> <span class="macro">unimplemented</span><span class="macro">!</span>(<span class="string">&quot;Not yet&quot;</span>),
+            <span class="comment">// Object(map) =&gt; visitor.visit_map(de::map::MapAccess::new(map)?),</span>
+            <span class="ident">Object</span>(<span class="ident">_map</span>) <span class="op">=&gt;</span> <span class="macro">unimplemented</span><span class="macro">!</span>(<span class="string">&quot;Not yet&quot;</span>),
             <span class="ident">Block</span>(<span class="ident">_block</span>) <span class="op">=&gt;</span> <span class="macro">unimplemented</span><span class="macro">!</span>(<span class="string">&quot;Not yet&quot;</span>),
         }
     }
