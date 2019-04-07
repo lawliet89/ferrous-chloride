@@ -1,14 +1,11 @@
 use nom::types::CompleteStr;
-use nom::{alt, map, named, tag};
+use nom::{alt, named, tag};
 
 // Parse a boolean literal
 named!(pub boolean(CompleteStr) -> bool,
-    map!(
-        alt!(
-            tag!("true")
-            | tag!("false")
-        ),
-        |s| s.as_ref() == "true"    // Can only ever be "true" or "false"
+    alt!(
+        tag!("true") => {|_| true}
+        | tag!("false") => {|_| false}
     )
 );
 

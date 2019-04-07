@@ -1,10 +1,12 @@
 pub static NULL: &str = "Null";
 pub static INTEGER: &str = "Integer";
 pub static FLOAT: &str = "Float";
+pub static NUMBER: &str = "Number";
 pub static BOOLEAN: &str = "Boolean";
 pub static STRING: &str = "String";
 pub static LIST: &str = "List";
-pub static MAP: &str = "Map";
+pub static TUPLE: &str = "Tuple";
+pub static OBJECT: &str = "Object";
 pub static BLOCK: &str = "Block";
 
 pub static MERGED: &str = "Merged";

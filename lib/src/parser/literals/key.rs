@@ -98,8 +98,8 @@ impl<'a> Hash for Key<'a> {
 named!(
     pub key(CompleteStr) -> Key,
     alt_complete!(
-        call!(super::identifier) => { |s| Key::Identifier(Cow::Borrowed(s)) }
-        | super::string::quoted_single_line_string => { |s| Key::String(Cow::Owned(s)) }
+        call!(crate::parser::identifier::identifier) => { |s| Key::Identifier(s) }
+        | crate::parser::string::string_literal => { |s| Key::String(Cow::Owned(s)) }
     )
 );
 
@@ -143,7 +143,7 @@ mod tests {
         let test_cases = [
             ("abcd123", Key::Identifier(From::from("abcd123"))),
             ("_abc", Key::Identifier(From::from("_abc"))),
-            ("藏_①", Key::Identifier(From::from("藏_①"))),
+            ("゛藏_a", Key::Identifier(From::from("゛藏_a"))),
             (r#""123""#, Key::String(From::from("123"))),
             (r#""a/b/c""#, Key::String(From::from("a/b/c"))),
         ];

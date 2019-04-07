@@ -20,8 +20,8 @@ impl<'de, 'a> Deserializer<'de> for Value<'a> {
             Boolean(boolean) => visitor.visit_bool(boolean),
             String(string) => visitor.visit_string(string),
             List(list) => visitor.visit_seq(de::list::ListAccess::new(list)),
-            // Map(map) => visitor.visit_map(de::map::MapAccess::new(map)?),
-            Map(_map) => unimplemented!("Not yet"),
+            // Object(map) => visitor.visit_map(de::map::MapAccess::new(map)?),
+            Object(_map) => unimplemented!("Not yet"),
             Block(_block) => unimplemented!("Not yet"),
         }
     }

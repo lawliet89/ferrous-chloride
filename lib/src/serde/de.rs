@@ -11,7 +11,11 @@ use serde::de::{self, Visitor};
 use serde::forward_to_deserialize_any;
 use serde::Deserialize;
 
-use crate::literals;
+use crate::parser;
+use crate::parser::boolean::boolean;
+use crate::parser::literals;
+use crate::parser::null::null;
+use crate::parser::string::string;
 use crate::value;
 
 pub use self::error::*;
@@ -138,7 +142,7 @@ impl<'de> Deserializer<'de> {
     }
 
     fn parse_bool(&mut self) -> Result<bool, Error> {
-        let (remaining, output) = literals::boolean(self.input)?;
+        let (remaining, output) = boolean(self.input)?;
         self.input = remaining;
         Ok(output)
     }
@@ -194,13 +198,13 @@ impl<'de> Deserializer<'de> {
     }
 
     fn parse_string(&mut self) -> Result<String, Error> {
-        let (remaining, output) = literals::string(self.input)?;
+        let (remaining, output) = string(self.input)?;
         self.input = remaining;
         Ok(output)
     }
 
     fn parse_bytes(&mut self) -> Result<Vec<u8>, Error> {
-        let (remaining, list) = value::list(self.input)?;
+        let (remaining, list) = parser::list(self.input)?;
         self.input = remaining;
         // Check that we are all numbers and fits within u8
         let numbers = list
@@ -225,25 +229,25 @@ impl<'de> Deserializer<'de> {
     }
 
     fn parse_null(&mut self) -> Result<(), Error> {
-        let (remaining, ()) = literals::null(self.input)?;
+        let (remaining, ()) = null(self.input)?;
         self.input = remaining;
         Ok(())
     }
 
     fn parse_list(&mut self) -> Result<value::List, Error> {
-        let (remaining, list) = value::list(self.input)?;
+        let (remaining, list) = parser::list(self.input)?;
         self.input = remaining;
         Ok(list)
     }
 
     fn parse_map(&mut self) -> Result<value::MapValues, Error> {
-        let (remaining, map) = value::map_values(self.input)?;
+        let (remaining, map) = parser::map_values(self.input)?;
         self.input = remaining;
         Ok(map)
     }
 
     fn peek(&mut self) -> Result<value::Value, Error> {
-        let (remaining, peek) = value::peek(self.input)?;
+        let (remaining, peek) = parser::peek(self.input)?;
         self.input = remaining;
         Ok(peek)
     }
@@ -275,7 +279,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             Float(_) => self.deserialize_f64(visitor),
             String(_) => self.deserialize_string(visitor),
             List(_) => self.deserialize_seq(visitor),
-            Map(_) => self.deserialize_map(visitor),
+            Object(_) => self.deserialize_map(visitor),
             Block(_) => self.deserialize_map(visitor),
         }
     }
@@ -490,7 +494,7 @@ where
 mod tests {
     use super::*;
 
-    use std::collections::HashMap;
+    use crate::HashMap;
 
     use serde::Deserialize;
     use serde_bytes::ByteBuf;

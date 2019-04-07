@@ -1,4 +1,29 @@
 //! Whitespace and comments related
+//!
+//! [Reference](https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md#comments-and-whitespace)
+//!
+//! Comments and Whitespace are recognized as lexical elements but are ignored
+//! except as described below.
+//!
+//! Whitespace is defined as a sequence of zero or more space characters
+//! (U+0020). Newline sequences (either U+000A or U+000D followed by U+000A)
+//! are _not_ considered whitespace but are ignored as such in certain contexts.
+//!
+//! Horizontal tab characters (U+0009) are not considered to be whitespace and
+//! are not valid within HCL native syntax.
+//!
+//! Comments serve as program documentation and come in two forms:
+//!
+//! - _Line comments_ start with either the `//` or `#` sequences and end with
+//!   the next newline sequence. A line comments is considered equivalent to a
+//!   newline sequence.
+//!
+//! - _Inline comments_ start with the `/*` sequence and end with the `*/`
+//!   sequence, and may have any characters within except the ending sequence.
+//!   An inline comments is considered equivalent to a whitespace sequence.
+//!
+//! Comments and whitespace cannot begin within within other comments, or within
+//! template literals except inside an interpolation sequence or template directive.
 use nom::types::CompleteStr;
 use nom::{
     alt_complete, call, delimited, do_parse, eat_separator, eol, many0, many1, named, tag,
@@ -10,18 +35,25 @@ fn not_eol(c: char) -> bool {
 }
 
 named!(
-    inline_comment(CompleteStr) -> CompleteStr,
+    pub inline_comment(CompleteStr) -> CompleteStr,
     delimited!(tag!("/*"), take_until!("*/"), tag!("*/"))
 );
 
 named!(
-    hash_comment(CompleteStr) -> CompleteStr,
+    pub hash_comment(CompleteStr) -> CompleteStr,
     delimited!(tag!("#"), take_while!(not_eol), call!(eol))
 );
 
 named!(
-    slash_comment(CompleteStr) -> CompleteStr,
+    pub slash_comment(CompleteStr) -> CompleteStr,
     delimited!(tag!("//"), take_while!(not_eol), call!(eol))
+);
+
+named!(
+    pub line_comment(CompleteStr) -> CompleteStr,
+    alt_complete!(
+        hash_comment | hash_comment
+    )
 );
 
 named!(pub inline_whitespace(CompleteStr) -> Vec<CompleteStr>,
@@ -67,7 +99,7 @@ macro_rules! inline_whitespace (
       use nom::{Convert, Err};
       use nom::sep;
 
-      use crate::literals::inline_whitespace;
+      use crate::parser::whitespace::inline_whitespace;
 
       match sep!($i, inline_whitespace, $($args)*) {
         Err(e) => Err(e),
@@ -89,7 +121,7 @@ macro_rules! whitespace (
       use nom::{Convert, Err};
       use nom::sep;
 
-      use crate::literals::whitespace;
+      use crate::parser::whitespace::whitespace;
 
       match sep!($i, whitespace, $($args)*) {
         Err(e) => Err(e),

@@ -1,29 +1,35 @@
 #[macro_use]
 mod macros;
-#[macro_use]
-pub mod literals;
 
 mod errors;
 mod utils;
 
 pub mod constants;
 pub mod iter;
+#[macro_use]
+pub mod parser;
 pub mod value;
 
 #[cfg(feature = "serde")]
 pub mod serde;
 
+#[cfg(feature = "serde")]
+#[doc(inline)]
+pub use crate::serde::from_str;
 #[doc(inline)]
 pub use errors::Error;
 #[doc(inline)]
+pub use parser::{parse_reader, parse_slice, parse_str};
+#[doc(inline)]
 pub use value::Value;
 
+pub use nom;
+
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::HashMap as StdHashMap;
 use std::hash::{BuildHasher, Hash};
 
-use nom::types::CompleteStr;
-use nom::{call, exact, named};
+pub(crate) type HashMap<K, V> = StdHashMap<K, V, hashbrown::hash_map::DefaultHashBuilder>;
 
 /// Has scalar length
 pub trait ScalarLength {
@@ -91,9 +97,6 @@ pub enum MergeBehaviour {
     TakeLast,
 }
 
-/// A HCL document body
-pub type Body<'a> = value::MapValues<'a>;
-
 impl<T> OneOrMany<T> {
     pub fn len(&self) -> usize {
         match self {
@@ -145,7 +148,7 @@ impl<T> OneOrMany<T> {
 /// A set of `(Key, Value)` pairs which can exist in a merged or unmerged variant
 ///
 /// A merged variant can only have unique keys, where the unmerged variant may have duplicate keys
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Eq)]
 pub enum KeyValuePairs<K, V>
 where
     K: Hash + Eq,
@@ -297,7 +300,7 @@ where
 //     }
 // }
 
-impl<K, V, S> ScalarLength for HashMap<K, V, S>
+impl<K, V, S> ScalarLength for StdHashMap<K, V, S>
 where
     K: Eq + Hash,
     V: ScalarLength,
@@ -381,7 +384,7 @@ where
     }
 }
 
-impl<K, V, S> Mergeable for HashMap<K, V, S>
+impl<K, V, S> Mergeable for StdHashMap<K, V, S>
 where
     K: Hash + Eq,
     V: Mergeable,
@@ -477,7 +480,7 @@ where
     }
 }
 
-impl<K, V, S, KO, VO> AsOwned for HashMap<K, V, S>
+impl<K, V, S, KO, VO> AsOwned for StdHashMap<K, V, S>
 where
     K: Hash + Eq + AsOwned<Output = KO>,
     V: AsOwned<Output = VO>,
@@ -485,7 +488,7 @@ where
     KO: Hash + Eq + 'static,
     VO: 'static,
 {
-    type Output = HashMap<KO, VO, S>;
+    type Output = StdHashMap<KO, VO, S>;
 
     fn as_owned(&self) -> Self::Output {
         self.iter().map(|pair| pair.as_owned()).collect()
@@ -525,102 +528,23 @@ impl Default for MergeBehaviour {
     }
 }
 
-named!(
-    pub body(CompleteStr) -> Body,
-    exact!(call!(value::map_values))
-);
-
-/// Parse a HCL string into a [`Value`] which is close to an abstract syntax tree of the
-/// HCL string.
-///
-/// You can opt to merge the parsed body after parsing. The behaviour of merging is determined by
-/// the [`MergeBehaviour`] enum.
-pub fn parse_str(input: &str, merge: Option<MergeBehaviour>) -> Result<Body, Error> {
-    let (remaining_input, unmerged) =
-        body(CompleteStr(input)).map_err(|e| Error::from_err_str(&e))?;
-
-    if !remaining_input.is_empty() {
-        Err(Error::Bug(format!(
-            r#"Input was not completely parsed:
-Input: {},
-Remaining: {}
-"#,
-            input, remaining_input
-        )))?
-    }
-
-    let pairs = match merge {
-        None => unmerged,
-        Some(MergeBehaviour::Error) => unmerged.merge()?,
-        Some(_) => unimplemented!("Not implemented yet"),
-    };
-
-    Ok(pairs)
-}
-
-/// Parse a HCL string from a IO stream reader
-///
-/// The entire IO stream has to be buffered in memory first before parsing can occur.
-///
-/// When reading from a source against which short reads are not efficient, such as a
-/// [`File`](std::fs::File), you will want to apply your own buffering because the library
-/// will not buffer the input. See [`std::io::BufReader`].
-pub fn parse_reader<R: std::io::Read>(
-    mut reader: R,
-    merge: Option<MergeBehaviour>,
-) -> Result<Body<'static>, Error> {
-    let mut buffer = String::new();
-    reader.read_to_string(&mut buffer)?;
-
-    // FIXME: Can we do better? We are allocating twice. Once for reading into a buffer
-    // and second time calling `as_owned`.
-    Ok(parse_str(&buffer, merge)?.as_owned())
-}
-
-/// Parse a HCL string from a slice of bytes
-pub fn parse_slice(bytes: &[u8], merge: Option<MergeBehaviour>) -> Result<Body, Error> {
-    let input = std::str::from_utf8(bytes)?;
-    parse_str(input, merge)
-}
-
 #[cfg(test)]
 pub(crate) mod fixtures {
     pub static ALL: &[&str] = &[
+        BLOCK,
         LIST,
-        MAP,
         NO_NEWLINE_EOF,
         SCALAR,
-        SIMPLE_MAP,
+        SIMPLE_BLOCK,
         SINGLE,
         STRINGS,
     ];
 
+    pub static BLOCK: &str = include_str!("../fixtures/block.hcl");
     pub static LIST: &str = include_str!("../fixtures/list.hcl");
-    pub static MAP: &str = include_str!("../fixtures/map.hcl");
     pub static NO_NEWLINE_EOF: &str = include_str!("../fixtures/no_newline_terminating.hcl");
     pub static SCALAR: &str = include_str!("../fixtures/scalar.hcl");
-    pub static SIMPLE_MAP: &str = include_str!("../fixtures/simple_map.hcl");
+    pub static SIMPLE_BLOCK: &str = include_str!("../fixtures/simple_block.hcl");
     pub static SINGLE: &str = include_str!("../fixtures/single.hcl");
     pub static STRINGS: &str = include_str!("../fixtures/strings.hcl");
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn strings_are_parsed_correctly_unmerged() {
-        for string in fixtures::ALL {
-            let parsed = parse_str(string, None).unwrap();
-            assert!(parsed.is_unmerged());
-        }
-    }
-
-    #[test]
-    fn strings_are_parsed_correctly_merged() {
-        for string in fixtures::ALL {
-            let parsed = parse_str(string, Some(MergeBehaviour::Error)).unwrap();
-            assert!(parsed.is_merged());
-        }
-    }
 }

@@ -1,4 +1,4 @@
-list = [true, false, 123, -123.456, "foobar"],
+list = [true, false, 123, -123.456, "foobar"]
 list_multi = [ # hmm
     true, # Comment
     false, // Test
@@ -15,8 +15,7 @@ list_in_list = [ // This should work
     -3,
 ]
 
-
-map_in_list = [ /* This too! */
+object_in_list = [ /* This too! */
     {
         test = 123
     },
