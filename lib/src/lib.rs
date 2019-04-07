@@ -146,7 +146,7 @@ impl<T> OneOrMany<T> {
 /// A set of `(Key, Value)` pairs which can exist in a merged or unmerged variant
 ///
 /// A merged variant can only have unique keys, where the unmerged variant may have duplicate keys
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Eq)]
 pub enum KeyValuePairs<K, V>
 where
     K: Hash + Eq,

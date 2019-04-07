@@ -23,12 +23,18 @@
 //!
 //! [uax31]: http://unicode.org/reports/tr31/ "Unicode Identifier and Pattern Syntax"
 
+use std::borrow::Cow;
+
 use nom::types::CompleteStr;
 use nom::{call, do_parse, named_attr, verify};
 use unic_ucd_ident::{is_id_continue, is_id_start};
 
+pub type Identifier<'a> = Cow<'a, str>;
+
 // Parse an identifier
-named_attr!(#[allow(clippy::block_in_if_condition_stmt)], pub identifier(CompleteStr) -> &str,
+named_attr!(
+    #[allow(clippy::block_in_if_condition_stmt)],
+    pub identifier(CompleteStr) -> Identifier,
     do_parse!(
         identifier: verify!(
             call!(crate::utils::while_predicate1, |c| is_id_continue(c) || c == '-'),
@@ -41,7 +47,7 @@ named_attr!(#[allow(clippy::block_in_if_condition_stmt)], pub identifier(Complet
                 }
             }
         )
-        >> (identifier.0)
+        >> (Cow::Borrowed(identifier.0))
     )
 );
 

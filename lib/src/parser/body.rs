@@ -9,6 +9,7 @@ use nom::{alt, call, do_parse, eof, named_attr, terminated};
 
 use crate::parser::attribute::attribute;
 use crate::parser::expression::Expression;
+use crate::parser::identifier::Identifier;
 use crate::parser::whitespace::newline;
 use crate::HashMap;
 use crate::{Error, KeyValuePairs};
@@ -22,13 +23,13 @@ use crate::{Error, KeyValuePairs};
 /// Block        = Identifier (StringLit|Identifier)* "{" Newline Body "}" Newline;
 /// OneLineBlock = Identifier (StringLit|Identifier)* "{" (Identifier "=" Expression)? "}" Newline;
 /// ```
-pub type Body<'a> = KeyValuePairs<Cow<'a, str>, BodyElement<'a>>;
+pub type Body<'a> = KeyValuePairs<Identifier<'a>, BodyElement<'a>>;
 
 impl<'a> Body<'a> {
     // TODO: Customise merging behaviour wrt duplicate keys
     pub fn new_merged<T>(iter: T) -> Result<Self, Error>
     where
-        T: IntoIterator<Item = (Cow<'a, str>, BodyElement<'a>)>,
+        T: IntoIterator<Item = (Identifier<'a>, BodyElement<'a>)>,
     {
         use std::collections::hash_map::Entry;
 
@@ -67,7 +68,7 @@ impl<'a> Body<'a> {
 
     pub fn new_unmerged<T>(iter: T) -> Self
     where
-        T: IntoIterator<Item = (Cow<'a, str>, BodyElement<'a>)>,
+        T: IntoIterator<Item = (Identifier<'a>, BodyElement<'a>)>,
     {
         KeyValuePairs::Unmerged(iter.into_iter().collect())
     }
@@ -109,8 +110,8 @@ impl<'a> Body<'a> {
     }
 }
 
-impl<'a> FromIterator<(Cow<'a, str>, BodyElement<'a>)> for Body<'a> {
-    fn from_iter<T: IntoIterator<Item = (Cow<'a, str>, BodyElement<'a>)>>(iter: T) -> Self {
+impl<'a> FromIterator<(Identifier<'a>, BodyElement<'a>)> for Body<'a> {
+    fn from_iter<T: IntoIterator<Item = (Identifier<'a>, BodyElement<'a>)>>(iter: T) -> Self {
         Self::new_unmerged(iter)
     }
 }

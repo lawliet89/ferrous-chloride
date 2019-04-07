@@ -5,6 +5,7 @@ pub mod literals;
 pub mod whitespace;
 
 pub mod attribute;
+pub mod block;
 pub mod body;
 pub mod boolean;
 pub mod expression;
@@ -20,10 +21,8 @@ pub use attribute::Attribute;
 #[doc(inline)]
 pub use expression::{expression, Expression};
 
-use std::borrow::Cow;
-
 use self::whitespace::newline;
-use crate::parser::literals::{Key};
+use crate::parser::literals::Key;
 use crate::value::{self, MapValues, Value};
 use crate::{AsOwned, Error, MergeBehaviour};
 
@@ -113,13 +112,13 @@ named!(
                 identifier: call!(identifier::identifier)
                 >> complete!(opt!(char!('=')))
                 >> values: call!(map_expression)
-                >> (Key::Identifier(Cow::Borrowed(identifier)), Value::from(values))
+                >> (Key::Identifier(identifier), Value::from(values))
             )
             | do_parse!(
                 identifier: call!(identifier::identifier)
                 >> keys: many0!(string::string_literal)
                 >> values: call!(map_expression)
-                >> (Key::Identifier(Cow::Borrowed(identifier)), Value::Block(vec![(keys, values)].into_iter().collect()))
+                >> (Key::Identifier(identifier), Value::Block(vec![(keys, values)].into_iter().collect()))
             )
         )
     )

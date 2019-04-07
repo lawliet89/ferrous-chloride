@@ -16,7 +16,7 @@ use nom::types::CompleteStr;
 use nom::{alt, call, char, do_parse, named, peek, recognize, tag, terminated, IResult};
 
 use crate::parser::expression::{expression, Expression};
-use crate::parser::identifier::identifier;
+use crate::parser::identifier::{identifier, Identifier};
 use crate::parser::whitespace::newline;
 use crate::HashMap;
 
@@ -24,7 +24,7 @@ use crate::HashMap;
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum ObjectElementIdentifier<'a> {
     /// A literal attribute name
-    Identifier(Cow<'a, str>),
+    Identifier(Identifier<'a>),
     /// An expression that must evaluate to a string
     ///
     /// The HCL [specification](https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md#collection-values)
@@ -76,7 +76,7 @@ pub fn object_element_identifier<'a>(
     alt!(
         input,
         call!(identifier) =>
-            { |ident| ObjectElementIdentifier::Identifier(Cow::Borrowed(ident)) }
+            { |ident| ObjectElementIdentifier::Identifier(ident) }
         | recognize!(call!(expression)) =>
             { |expr: CompleteStr<'a>| ObjectElementIdentifier::Expression(Cow::Borrowed(expr.0)) }
     )

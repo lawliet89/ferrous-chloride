@@ -16,7 +16,6 @@ use nom::{
     named_args, opt, peek, preceded, return_error, tag, take_while1, take_while_m_n,
 };
 
-
 /// The StringLit production permits the escape sequences discussed for quoted template expressions
 /// as above, but does not permit template interpolation or directive sequences.
 pub type StringLiteral = String;

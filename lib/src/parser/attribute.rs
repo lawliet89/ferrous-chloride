@@ -1,17 +1,15 @@
-use std::borrow::Cow;
-
 use nom::types::CompleteStr;
 use nom::{call, char, named};
 
 use crate::parser::expression::{expression, Expression};
-use crate::parser::identifier::identifier;
+use crate::parser::identifier::{identifier, Identifier};
 
 /// A HCL Attribute
 ///
 /// ```ebnf
 /// Attribute = Identifier "=" Expression Newline;
 /// ```
-pub type Attribute<'a> = (Cow<'a, str>, Expression<'a>);
+pub type Attribute<'a> = (Identifier<'a>, Expression<'a>);
 
 named!(
     pub attribute(CompleteStr) -> Attribute,
@@ -20,7 +18,7 @@ named!(
             identifier: call!(identifier)
             >> char!('=')
             >> expression: call!(expression)
-            >> (Cow::Borrowed(identifier), expression)
+            >> (identifier, expression)
         )
     )
 );
