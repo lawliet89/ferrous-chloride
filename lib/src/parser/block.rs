@@ -9,8 +9,11 @@
 use std::borrow::{Borrow, Cow};
 
 use nom::types::CompleteStr;
-use nom::{alt, call, char, do_parse, many0, named, peek, recognize, tag, terminated, IResult};
+use nom::{
+    alt, call, char, do_parse, many0, named, opt, peek, recognize, tag, terminated, IResult,
+};
 
+use crate::parser::attribute::{attribute, Attribute};
 use crate::parser::body::Body;
 use crate::parser::identifier::{identifier, Identifier};
 use crate::parser::string::{string_literal, StringLiteral};
@@ -31,6 +34,23 @@ pub enum BlockLabel<'a> {
 }
 
 impl<'a> Block<'a> {
+    pub fn new_one_line(
+        r#type: Identifier<'a>,
+        labels: Vec<BlockLabel<'a>>,
+        attribute: Option<Attribute<'a>>,
+    ) -> Self {
+        let body = match attribute {
+            None => Body::new_unmerged(vec![]),
+            Some((ident, expr)) => Body::new_unmerged(vec![(ident, From::from(expr))]),
+        };
+
+        Self {
+            r#type,
+            labels,
+            body,
+        }
+    }
+
     pub fn merge(mut self) -> Result<Self, crate::Error> {
         self.body = self.body.merge()?;
         Ok(self)
@@ -81,21 +101,24 @@ named!(
     )
 );
 
-// named!(
-//     pub one_line_block_body(CompleteStr) -> Option<
-// )
+named!(
+    pub one_line_block_body(CompleteStr) -> Option<Attribute>,
+    opt!(attribute)
+);
 
-// named!(
-//     pub one_line_block(CompleteStr) -> Block,
-//     inline_whitespace!(
-//         do_parse!(
-//             block_type: call!(identifier)
-//             >> labels: call!(block_labels)
-//             >> tag!("{")
-//             >>
-//         )
-//     )
-// );
+named!(
+    pub one_line_block(CompleteStr) -> Block,
+    inline_whitespace!(
+        do_parse!(
+            block_type: call!(identifier)
+            >> labels: call!(block_labels)
+            >> tag!("{")
+            >> attribute: call!(one_line_block_body)
+            >> tag!("}")
+            >> (Block::new_one_line(block_type, labels, attribute))
+        )
+    )
+);
 
 #[cfg(test)]
 mod tests {
@@ -148,6 +171,58 @@ mod tests {
 
         for (input, expected_output) in &test_cases {
             let output = block_labels(CompleteStr(input)).unwrap_output();
+            assert_eq!(output, *expected_output);
+        }
+    }
+
+    #[test]
+    fn single_line_block_body_is_parsed_correctly() {
+        let test_cases = [
+            ("", None),
+            ("foo = true", Some((From::from("foo"), From::from(true)))),
+        ];
+
+        for (input, expected_output) in &test_cases {
+            let output = one_line_block_body(CompleteStr(input)).unwrap_output();
+            assert_eq!(output, *expected_output);
+        }
+    }
+
+    #[test]
+    fn single_line_block_is_parsed_correctly() {
+        let test_cases = [
+            (
+                "test {}",
+                Block::new_one_line(From::from("test"), vec![], None),
+            ),
+            (
+                "test foo bar baz {}",
+                Block::new_one_line(
+                    From::from("test"),
+                    vec![
+                        BlockLabel::from("foo"),
+                        BlockLabel::from("bar"),
+                        BlockLabel::from("baz"),
+                    ],
+                    None,
+                ),
+            ),
+            (
+                "test foo \"bar\" baz { foo = 123 }",
+                Block::new_one_line(
+                    From::from("test"),
+                    vec![
+                        BlockLabel::from("foo"),
+                        BlockLabel::StringLiteral(From::from("bar")),
+                        BlockLabel::from("baz"),
+                    ],
+                    Some((From::from("foo"), From::from(123))),
+                ),
+            ),
+        ];
+
+        for (input, expected_output) in &test_cases {
+            let output = one_line_block(CompleteStr(input)).unwrap_output();
             assert_eq!(output, *expected_output);
         }
     }

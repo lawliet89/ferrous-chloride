@@ -24,6 +24,7 @@ use crate::{Error, KeyValuePairs};
 /// Block        = Identifier (StringLit|Identifier)* "{" Newline Body "}" Newline;
 /// OneLineBlock = Identifier (StringLit|Identifier)* "{" (Identifier "=" Expression)? "}" Newline;
 /// ```
+// TODO: Change this into a vec of Body Element. Remove merging semantics
 pub type Body<'a> = KeyValuePairs<Identifier<'a>, BodyElement<'a>>;
 
 impl<'a> Body<'a> {
