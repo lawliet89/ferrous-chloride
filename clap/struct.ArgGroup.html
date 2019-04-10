@@ -31,7 +31,7 @@ the arguments from the specified group is present at runtime.</p>
          --minor         &#39;auto increase minor&#39;
          --patch         &#39;auto increase patch&#39;&quot;</span>)
     .<span class="ident">group</span>(<span class="ident">ArgGroup</span>::<span class="ident">with_name</span>(<span class="string">&quot;vers&quot;</span>)
-         .<span class="ident">args</span>(<span class="kw-2">&amp;</span>[<span class="string">&quot;set-ver&quot;</span>, <span class="string">&quot;major&quot;</span>, <span class="string">&quot;minor&quot;</span>,<span class="string">&quot;patch&quot;</span>])
+         .<span class="ident">args</span>(<span class="kw-2">&amp;</span>[<span class="string">&quot;set-ver&quot;</span>, <span class="string">&quot;major&quot;</span>, <span class="string">&quot;minor&quot;</span>, <span class="string">&quot;patch&quot;</span>])
          .<span class="ident">required</span>(<span class="bool-val">true</span>))
     .<span class="ident">get_matches_from_safe</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="string">&quot;app&quot;</span>, <span class="string">&quot;--major&quot;</span>, <span class="string">&quot;--patch&quot;</span>]);
 <span class="comment">// Because we used two args in the group it&#39;s an error</span>
