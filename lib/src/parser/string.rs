@@ -59,11 +59,22 @@ fn hex_to_string(s: &str) -> Result<String, InternalKind> {
 
 // TODO: Return Cow<'a, str>
 // Tab spaces are illegal and will cause bad output
-fn unindent_heredoc(charas: Vec<char>, identation: usize) -> String {
-    let string = charas.into_iter().collect();
-    if identation > 0 {
-        // TODO: Use a Nom Parser to strip
-        string
+fn unindent_heredoc(charas: Vec<char>, indentation: usize) -> String {
+    let string: String = charas.into_iter().collect();
+    if indentation > 0 {
+        let pattern = format!("\n{}", " ".repeat(indentation));
+
+        // Trim spaces at the beginning first
+        // Let's find a start index up to `indentation` to slice away
+        let mut beginning = string.char_indices().take(indentation);
+        let all_spaces = beginning.all(|(_, c)| c == ' ');
+        (if all_spaces {
+            &string[indentation..]
+        } else {
+            let (start, _) = beginning.next().expect("to not be None");
+            &string[start-1..]
+        })
+        .replace(&pattern, "\n")
     } else {
         string
     }
@@ -220,7 +231,6 @@ named!(
 
 // TODO:
 // - Interpolation `${test("...")}`
-// - Unindent heredoc: https://github.com/hashicorp/hcl/blob/65a6292f0157eff210d03ed1bf6c59b190b8b906/hcl/token/token.go#L174
 
 #[cfg(test)]
 mod tests {
@@ -422,6 +432,58 @@ and quotes "
 with
 new lines
 and quotes ""#,
+            ),
+            (
+                r#"<<-EOF
+    strip
+    the
+    spaces
+    but    not   these
+    EOF
+"#,
+                r#"strip
+the
+spaces
+but    not   these"#,
+            ),
+            (
+                r#"<<-EOF
+    strip
+    the
+    spaces
+    but    not   these
+  EOF
+"#,
+                r#"  strip
+  the
+  spaces
+  but    not   these"#,
+            ),
+            (
+                r#"<<-EOF
+strip
+    the
+spaces
+    but    not   these
+  EOF
+"#,
+                r#"strip
+  the
+spaces
+  but    not   these"#,
+            ),
+            (
+                r#"<<-EOF
+  strip
+    the
+  spaces
+    but    not   these
+    EOF
+"#,
+                r#"strip
+the
+spaces
+but    not   these"#,
             ),
         ];
 
