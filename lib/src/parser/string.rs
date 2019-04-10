@@ -13,7 +13,7 @@ use nom::types::CompleteStr;
 use nom::ErrorKind;
 use nom::{
     alt, call, complete, delimited, do_parse, escaped_transform, many_till, map, map_res, named,
-    named_args, opt, peek, preceded, return_error, tag, take_while1, take_while_m_n,
+    opt, peek, preceded, return_error, tag, take_while1, take_while_m_n, IResult,
 };
 
 /// The StringLit production permits the escape sequences discussed for quoted template expressions
@@ -54,6 +54,11 @@ fn hex_to_string(s: &str) -> Result<String, InternalKind> {
     Ok(std::char::from_u32(byte)
         .ok_or_else(|| InternalKind::InvalidUnicodeCodePoint)?
         .to_string())
+}
+
+// TODO: Return Cow<'a, str>
+pub fn unindent_heredoc(charas: Vec<char>, identation: usize) -> String {
+    charas.into_iter().collect()
 }
 
 // Unescape characters according to the reference https://en.cppreference.com/w/cpp/language/escape
@@ -155,33 +160,44 @@ named!(
     )
 );
 
-// End of heredoc. Must end with an EOL
-// EOL is not consumed
-named_args!(
-    pub heredoc_end<'a>(identifier: &'_ HereDoc<'_>)<CompleteStr<'a>, ()>,
-    do_parse!(
+/// End of heredoc. Must end with an EOL
+/// EOL is not consumed
+///
+/// Returns the identation level if the Heredoc was marked as indented
+pub fn heredoc_end<'a>(
+    input: CompleteStr<'a>,
+    identifier: &'_ HereDoc<'_>,
+) -> IResult<CompleteStr<'a>, usize, u32> {
+    let (remaining, identation) = do_parse!(
+        input,
         call!(nom::eol)
-        >> call!(nom::multispace0)
-        >> tag!(identifier.identifier.0)
-        >> peek!(call!(nom::eol))
-        >> ()
-    )
-);
+            >> identation: call!(nom::multispace0)
+            >> tag!(identifier.identifier.0)
+            >> peek!(call!(nom::eol))
+            >> (identation)
+    )?;
+
+    if identifier.indented {
+        Ok((remaining, identation.len()))
+    } else {
+        Ok((remaining, 0))
+    }
+}
 
 // Parse a Heredoc string
 named!(
     pub heredoc_string(CompleteStr) -> String,
     do_parse!(
         identifier: call!(heredoc_begin)
-        >> strings: alt!(
-            call!(heredoc_end, &identifier) => {|()| vec![] }
+        >> content: alt!(
+            call!(heredoc_end, &identifier) => {|_| (vec![], 0) }
             | do_parse!(
                 call!(nom::eol)
                 >> content: many_till!(call!(nom::anychar), call!(heredoc_end, &identifier))
-                >> (content.0)
+                >> (content)
             )
         )
-        >> (strings.into_iter().collect())
+        >> (unindent_heredoc(content.0, content.1))
     )
 );
 
@@ -333,6 +349,7 @@ mod tests {
                     identifier: CompleteStr("EOF"),
                     indented: false,
                 },
+                0,
                 "\n",
             ),
             (
@@ -341,6 +358,7 @@ mod tests {
                     identifier: CompleteStr("EOH"),
                     indented: true,
                 },
+                4,
                 "\n",
             ),
             (
@@ -349,13 +367,16 @@ mod tests {
                     identifier: CompleteStr("EOF"),
                     indented: false,
                 },
+                0,
                 "\r\n",
             ),
         ];
 
-        for (input, identifier, expected_remaining) in test_cases.iter() {
+        for (input, identifier, identation, expected_remaining) in test_cases.iter() {
             println!("Testing {}", input);
-            let (remaining, ()) = heredoc_end(CompleteStr(input), &identifier).unwrap();
+            let (remaining, actual_identation) =
+                heredoc_end(CompleteStr(input), &identifier).unwrap();
+            assert_eq!(*identation, actual_identation);
             assert_eq!(
                 &remaining.0, expected_remaining,
                 "Input: {}; Remaining: {}",
