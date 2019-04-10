@@ -13,8 +13,7 @@ use nom::types::CompleteStr;
 use nom::ErrorKind;
 use nom::{
     alt, call, complete, delimited, do_parse, escaped_transform, many_till, map, map_res, named,
-    opt, peek, preceded, return_error, tag, take_while, take_while1, take_while_m_n, terminated,
-    IResult,
+    opt, peek, preceded, return_error, tag, take_while1, take_while_m_n, IResult,
 };
 
 /// The StringLit production permits the escape sequences discussed for quoted template expressions
@@ -61,23 +60,28 @@ fn hex_to_string(s: &str) -> Result<String, InternalKind> {
 // Tab spaces are illegal and will cause bad output
 fn unindent_heredoc(charas: Vec<char>, indentation: usize) -> String {
     let string: String = charas.into_iter().collect();
-    if indentation > 0 {
-        let pattern = format!("\n{}", " ".repeat(indentation));
+    if indentation == 0 {
+        return string;
+    }
 
+    let mut result = String::with_capacity(string.len());
+    for line in string.split('\n') {
         // Trim spaces at the beginning first
         // Let's find a start index up to `indentation` to slice away
-        let mut beginning = string.char_indices().take(indentation);
+        let mut beginning = line.char_indices().take(indentation);
         let all_spaces = beginning.all(|(_, c)| c == ' ');
-        (if all_spaces {
-            &string[indentation..]
+        let rest = if all_spaces {
+            &line[indentation..]
         } else {
             let (start, _) = beginning.next().expect("to not be None");
-            &string[start-1..]
-        })
-        .replace(&pattern, "\n")
-    } else {
-        string
+            &line[start - 1..]
+        };
+        result.push_str(rest);
+        result.push('\n');
     }
+    // Remove the last `\n`
+    result.truncate(result.len() - 1);
+    result
 }
 
 // Unescape characters according to the reference https://en.cppreference.com/w/cpp/language/escape
