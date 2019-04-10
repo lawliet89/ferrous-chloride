@@ -13,7 +13,8 @@ use nom::types::CompleteStr;
 use nom::ErrorKind;
 use nom::{
     alt, call, complete, delimited, do_parse, escaped_transform, many_till, map, map_res, named,
-    opt, peek, preceded, return_error, tag, take_while1, take_while_m_n, IResult,
+    opt, peek, preceded, return_error, tag, take_while, take_while1, take_while_m_n, terminated,
+    IResult,
 };
 
 /// The StringLit production permits the escape sequences discussed for quoted template expressions
@@ -57,8 +58,15 @@ fn hex_to_string(s: &str) -> Result<String, InternalKind> {
 }
 
 // TODO: Return Cow<'a, str>
-pub fn unindent_heredoc(charas: Vec<char>, identation: usize) -> String {
-    charas.into_iter().collect()
+// Tab spaces are illegal and will cause bad output
+fn unindent_heredoc(charas: Vec<char>, identation: usize) -> String {
+    let string = charas.into_iter().collect();
+    if identation > 0 {
+        // TODO: Use a Nom Parser to strip
+        string
+    } else {
+        string
+    }
 }
 
 // Unescape characters according to the reference https://en.cppreference.com/w/cpp/language/escape
@@ -171,7 +179,7 @@ pub fn heredoc_end<'a>(
     let (remaining, identation) = do_parse!(
         input,
         call!(nom::eol)
-            >> identation: call!(nom::multispace0)
+            >> identation: call!(nom::space0)
             >> tag!(identifier.identifier.0)
             >> peek!(call!(nom::eol))
             >> (identation)
@@ -193,6 +201,7 @@ named!(
             call!(heredoc_end, &identifier) => {|_| (vec![], 0) }
             | do_parse!(
                 call!(nom::eol)
+                // TODO: Don't allocate a Vec of chars! Return the slice
                 >> content: many_till!(call!(nom::anychar), call!(heredoc_end, &identifier))
                 >> (content)
             )
