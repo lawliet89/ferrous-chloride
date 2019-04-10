@@ -1,0 +1,9 @@
+[package]
+name = "fuzz"
+version = "0.1.0"
+authors = ["gyng <gyng@users.noreply.github.com >"]
+edition = "2018"
+
+[dependencies]
+honggfuzz = "0.5"
+ferrous-chloride = { path = "../lib" }
