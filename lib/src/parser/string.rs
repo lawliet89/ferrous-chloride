@@ -13,7 +13,7 @@ use nom::types::CompleteStr;
 use nom::ErrorKind;
 use nom::{
     alt, call, complete, delimited, do_parse, escaped_transform, many_till, map, map_res, named,
-    named_args, opt, peek, preceded, return_error, tag, take_while1, take_while_m_n,
+    opt, peek, preceded, return_error, tag, take_while1, take_while_m_n, IResult,
 };
 
 /// The StringLit production permits the escape sequences discussed for quoted template expressions
@@ -54,6 +54,34 @@ fn hex_to_string(s: &str) -> Result<String, InternalKind> {
     Ok(std::char::from_u32(byte)
         .ok_or_else(|| InternalKind::InvalidUnicodeCodePoint)?
         .to_string())
+}
+
+// TODO: Return Cow<'a, str>
+// Tab spaces are illegal and will cause bad output
+fn unindent_heredoc(charas: Vec<char>, indentation: usize) -> String {
+    let string: String = charas.into_iter().collect();
+    if indentation == 0 {
+        return string;
+    }
+
+    let mut result = String::with_capacity(string.len());
+    for line in string.split('\n') {
+        // Trim spaces at the beginning first
+        // Let's find a start index up to `indentation` to slice away
+        let mut beginning = line.char_indices().take(indentation);
+        let all_spaces = beginning.all(|(_, c)| c == ' ');
+        let rest = if all_spaces {
+            &line[indentation..]
+        } else {
+            let (start, _) = beginning.next().expect("to not be None");
+            &line[start - 1..]
+        };
+        result.push_str(rest);
+        result.push('\n');
+    }
+    // Remove the last `\n`
+    result.truncate(result.len() - 1);
+    result
 }
 
 // Unescape characters according to the reference https://en.cppreference.com/w/cpp/language/escape
@@ -155,33 +183,45 @@ named!(
     )
 );
 
-// End of heredoc. Must end with an EOL
-// EOL is not consumed
-named_args!(
-    pub heredoc_end<'a>(identifier: &'_ HereDoc<'_>)<CompleteStr<'a>, ()>,
-    do_parse!(
+/// End of heredoc. Must end with an EOL
+/// EOL is not consumed
+///
+/// Returns the identation level if the Heredoc was marked as indented
+pub fn heredoc_end<'a>(
+    input: CompleteStr<'a>,
+    identifier: &'_ HereDoc<'_>,
+) -> IResult<CompleteStr<'a>, usize, u32> {
+    let (remaining, identation) = do_parse!(
+        input,
         call!(nom::eol)
-        >> call!(nom::multispace0)
-        >> tag!(identifier.identifier.0)
-        >> peek!(call!(nom::eol))
-        >> ()
-    )
-);
+            >> identation: call!(nom::space0)
+            >> tag!(identifier.identifier.0)
+            >> peek!(call!(nom::eol))
+            >> (identation)
+    )?;
+
+    if identifier.indented {
+        Ok((remaining, identation.len()))
+    } else {
+        Ok((remaining, 0))
+    }
+}
 
 // Parse a Heredoc string
 named!(
     pub heredoc_string(CompleteStr) -> String,
     do_parse!(
         identifier: call!(heredoc_begin)
-        >> strings: alt!(
-            call!(heredoc_end, &identifier) => {|()| vec![] }
+        >> content: alt!(
+            call!(heredoc_end, &identifier) => {|_| (vec![], 0) }
             | do_parse!(
                 call!(nom::eol)
+                // TODO: Don't allocate a Vec of chars! Return the slice
                 >> content: many_till!(call!(nom::anychar), call!(heredoc_end, &identifier))
-                >> (content.0)
+                >> (content)
             )
         )
-        >> (strings.into_iter().collect())
+        >> (unindent_heredoc(content.0, content.1))
     )
 );
 
@@ -195,7 +235,6 @@ named!(
 
 // TODO:
 // - Interpolation `${test("...")}`
-// - Unindent heredoc: https://github.com/hashicorp/hcl/blob/65a6292f0157eff210d03ed1bf6c59b190b8b906/hcl/token/token.go#L174
 
 #[cfg(test)]
 mod tests {
@@ -333,6 +372,7 @@ mod tests {
                     identifier: CompleteStr("EOF"),
                     indented: false,
                 },
+                0,
                 "\n",
             ),
             (
@@ -341,6 +381,7 @@ mod tests {
                     identifier: CompleteStr("EOH"),
                     indented: true,
                 },
+                4,
                 "\n",
             ),
             (
@@ -349,13 +390,16 @@ mod tests {
                     identifier: CompleteStr("EOF"),
                     indented: false,
                 },
+                0,
                 "\r\n",
             ),
         ];
 
-        for (input, identifier, expected_remaining) in test_cases.iter() {
+        for (input, identifier, identation, expected_remaining) in test_cases.iter() {
             println!("Testing {}", input);
-            let (remaining, ()) = heredoc_end(CompleteStr(input), &identifier).unwrap();
+            let (remaining, actual_identation) =
+                heredoc_end(CompleteStr(input), &identifier).unwrap();
+            assert_eq!(*identation, actual_identation);
             assert_eq!(
                 &remaining.0, expected_remaining,
                 "Input: {}; Remaining: {}",
@@ -392,6 +436,58 @@ and quotes "
 with
 new lines
 and quotes ""#,
+            ),
+            (
+                r#"<<-EOF
+    strip
+    the
+    spaces
+    but    not   these
+    EOF
+"#,
+                r#"strip
+the
+spaces
+but    not   these"#,
+            ),
+            (
+                r#"<<-EOF
+    strip
+    the
+    spaces
+    but    not   these
+  EOF
+"#,
+                r#"  strip
+  the
+  spaces
+  but    not   these"#,
+            ),
+            (
+                r#"<<-EOF
+strip
+    the
+spaces
+    but    not   these
+  EOF
+"#,
+                r#"strip
+  the
+spaces
+  but    not   these"#,
+            ),
+            (
+                r#"<<-EOF
+  strip
+    the
+  spaces
+    but    not   these
+    EOF
+"#,
+                r#"strip
+the
+spaces
+but    not   these"#,
             ),
         ];
 
