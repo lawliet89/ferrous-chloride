@@ -33,8 +33,9 @@ where
     /// If they are unsafe, then the implementation will return `None`.
     fn safe_slice(&self, range: R) -> Option<Self> {
         if !match range.start_bound() {
-            Bound::Included(start) => self.is_slice_boundary(start - 1),
-            Bound::Excluded(start) => self.is_slice_boundary(*start),
+            Bound::Included(start) => self.is_slice_boundary(*start),
+            // No such Range exist
+            Bound::Excluded(start) => self.is_slice_boundary(start + 1),
             Bound::Unbounded => true,
         } {
             return None;
@@ -199,3 +200,23 @@ mod test_utils {
 
 #[cfg(test)]
 pub(crate) use test_utils::*;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn strings_are_sliced_safely() {
+        let s = "Löwe 老虎 Léopard";
+        assert_eq!(Some(s), s.safe_slice(..));
+        assert_eq!(Some("Löwe "), s.safe_slice(0..6));
+        assert_eq!(Some("Löwe "), s.safe_slice(..6));
+        assert_eq!(Some("老"), s.safe_slice(6..9));
+        assert_eq!(Some("老虎 Léopard"), s.safe_slice(6..));
+
+        // "老" is bytes 6 to 8
+        assert_eq!(None, s.safe_slice(6..8));
+        assert_eq!(None, s.safe_slice(7..));
+        assert_eq!(None, s.safe_slice(..7));
+    }
+}
