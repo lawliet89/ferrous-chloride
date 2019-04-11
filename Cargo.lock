@@ -136,19 +136,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "fuzz"
-version = "0.1.0"
-dependencies = [
- "ferrous-chloride 0.1.0",
- "honggfuzz 0.5.43 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "fuzz-afl"
 version = "0.1.0"
 dependencies = [
  "afl 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "ferrous-chloride 0.1.0",
+]
+
+[[package]]
+name = "fuzz-honggfuzz"
+version = "0.1.0"
+dependencies = [
+ "ferrous-chloride 0.1.0",
+ "honggfuzz 0.5.43 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
