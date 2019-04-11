@@ -1,3 +1,5 @@
+use std::ops::{Bound, RangeBounds};
+
 /// Recognizes at least 1 character while a predicate holds true
 pub fn while_predicate1<T, F>(input: T, predicate: F) -> nom::IResult<T, T>
 where
@@ -13,8 +15,43 @@ where
     )
 }
 
+pub trait SliceBoundary<R>: nom::Slice<R> + Sized
+where
+    R: RangeBounds<usize>,
+{
+    /// Indicate if an `index` is the start and/or end of some boundary
+    ///
+    /// For example, in an implementation for a `&str`, this might be start
+    /// and/or end of a UTF-8 code point sequence (see [`str::is_char_boundary`]).
+    fn is_slice_boundary(&self, index: usize) -> bool;
+
+    /// Safe slicing. The start and the end of the range (if bounded) must be
+    /// at a boundary
+    ///
+    /// If they are unsafe, then the implementation will return `None`.
+    fn safe_slice(&self, range: R) -> Option<Self> {
+        if !match range.start_bound() {
+            Bound::Included(start) => self.is_slice_boundary(start - 1),
+            Bound::Excluded(start) => self.is_slice_boundary(*start),
+            Bound::Unbounded => true,
+        } {
+            return None;
+        }
+
+        if !match range.end_bound() {
+            Bound::Included(end) => self.is_slice_boundary(end + 1),
+            Bound::Excluded(end) => self.is_slice_boundary(*end),
+            Bound::Unbounded => true,
+        } {
+            return None;
+        }
+
+        Some(self.slice(range))
+    }
+}
+
 #[cfg(test)]
-pub(crate) mod test {
+mod test_utils {
     use nom::{IResult, InputLength};
     use std::borrow::Borrow;
     use std::fmt::Debug;
@@ -105,4 +142,4 @@ pub(crate) mod test {
 }
 
 #[cfg(test)]
-pub(crate) use test::*;
+pub(crate) use test_utils::*;
