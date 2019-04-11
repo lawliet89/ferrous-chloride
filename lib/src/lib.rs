@@ -1,10 +1,10 @@
 #[macro_use]
 mod macros;
-
 mod errors;
 
 pub mod constants;
 pub mod iter;
+#[macro_use]
 pub mod utils;
 #[macro_use]
 pub mod parser;

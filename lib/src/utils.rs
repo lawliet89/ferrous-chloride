@@ -107,6 +107,74 @@ where
     }
 }
 
+// From https://github.com/Geal/nom/issues/709#issuecomment-475958529
+// `take_till_match!(alt!(tag!("John") | tag!("Amanda")))`
+// Running that on `"Hello, Amanda"` gives `Ok(("Amanda", "Hello, "))
+#[macro_export]
+macro_rules! take_till_match(
+  (__impl $i:expr, $submac2:ident!( $($args2:tt)* )) => (
+    {
+      use nom::{Needed, need_more_err, ErrorKind};
+      use nom::InputTake;
+
+      use $crate::utils::SliceBoundary;
+
+      let ret;
+      let input = $i;
+      let mut index = 0;
+
+      loop {
+        let slice = input.safe_slice(index..);
+
+        match slice {
+            None => {
+                index += 1;
+                if index >= input.len() {
+                // XXX: this error is dramatically wrong
+                    ret = need_more_err(input, Needed::Size(0), ErrorKind::TakeUntil::<u32>);
+                    break;
+                }
+                else {
+                    continue;
+                }
+            },
+            Some(slice) => {
+                match $submac2!(slice, $($args2)*) {
+                    Ok((_i, _o)) => {
+                        ret = Ok(input.take_split(index));
+                        break;
+                    },
+                    Err(_e1)    => {
+                        if index >= input.len() {
+                            // XXX: this error is dramatically wrong
+                            ret = need_more_err(input, Needed::Size(0), ErrorKind::TakeUntil::<u32>);
+                            break;
+                        } else {
+                            index += 1;
+                        }
+                    },
+                }
+            }
+        }
+      }
+
+      ret
+    }
+  );
+  ($i:expr, $submac2:ident!( $($args2:tt)* )) => (
+    take_till_match!(__impl $i, $submac2!($($args2)*));
+  );
+  ($i:expr, $g:expr) => (
+    take_till_match!(__impl $i, call!($g));
+  );
+  ($i:expr, $submac2:ident!( $($args2:tt)* )) => (
+    take_till_match!(__impl $i, $submac2!($($args2)*));
+  );
+  ($i:expr, $g: expr) => (
+    take_till_match!(__impl $i, call!($g));
+  );
+);
+
 #[cfg(test)]
 mod test_utils {
     use nom::{IResult, InputLength};

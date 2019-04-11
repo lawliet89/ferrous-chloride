@@ -14,6 +14,8 @@ pub mod object;
 pub mod string;
 pub mod tuple;
 
+use std::borrow::Cow;
+
 use crate::value::{self, MapValues, Value};
 use crate::{AsOwned, Error};
 use literals::Key;
@@ -73,7 +75,7 @@ named!(
         call!(null::null) => { |_| Value::Null }
         | call!(literals::number) => { |v| From::from(v) }
         | call!(boolean::boolean) => { |v| Value::Boolean(v) }
-        | string::string => { |v| Value::String(v) }
+        | string::string => { |v: Cow<str>| Value::String(v.to_string()) }
         | list => { |v| Value::List(v) }
         | map_expression => { |m| Value::Object(vec![m]) }
     )
