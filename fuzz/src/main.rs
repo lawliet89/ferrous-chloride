@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate honggfuzz;
 
-use ferrous_chloride::parser::parse_str;
+use ferrous_chloride::parse_str;
 
 fn main() {
     loop {
