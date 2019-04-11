@@ -14,6 +14,7 @@
 <span id="14">14</span>
 <span id="15">15</span>
 <span id="16">16</span>
+<span id="17">17</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">nom</span>::<span class="ident">types</span>::<span class="ident">CompleteStr</span>;
 <span class="kw">use</span> <span class="ident">nom</span>::{<span class="ident">do_parse</span>, <span class="ident">named</span>, <span class="ident">tag</span>};
@@ -26,9 +27,10 @@
     )
 );
 
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
 <span class="attribute">#[<span class="ident">test</span>]</span>
 <span class="kw">fn</span> <span class="ident">parses_for_null</span>() {
-    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">utils</span>::<span class="ident">test</span>::<span class="ident">ResultUtilsString</span>;
+    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">utils</span>::<span class="ident">ResultUtilsString</span>;
     <span class="ident">null</span>(<span class="ident">CompleteStr</span>(<span class="string">&quot;null&quot;</span>)).<span class="ident">unwrap_output</span>();
 }
 </pre></div>

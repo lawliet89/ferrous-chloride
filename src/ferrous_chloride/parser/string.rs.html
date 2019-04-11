@@ -549,9 +549,6 @@
 <span id="549">549</span>
 <span id="550">550</span>
 <span id="551">551</span>
-<span id="552">552</span>
-<span id="553">553</span>
-<span id="554">554</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! String and Template</span>
 <span class="doccomment">//!</span>
@@ -567,8 +564,8 @@
 <span class="kw">use</span> <span class="ident">nom</span>::<span class="ident">types</span>::<span class="ident">CompleteStr</span>;
 <span class="kw">use</span> <span class="ident">nom</span>::<span class="ident">ErrorKind</span>;
 <span class="kw">use</span> <span class="ident">nom</span>::{
-    <span class="ident">alt</span>, <span class="ident">call</span>, <span class="ident">complete</span>, <span class="ident">delimited</span>, <span class="ident">do_parse</span>, <span class="ident">escaped_transform</span>, <span class="ident">many_till</span>, <span class="ident">map</span>, <span class="ident">map_res</span>, <span class="ident">named</span>,
-    <span class="ident">opt</span>, <span class="ident">peek</span>, <span class="ident">preceded</span>, <span class="ident">return_error</span>, <span class="ident">tag</span>, <span class="ident">take_while1</span>, <span class="ident">take_while_m_n</span>, <span class="ident">IResult</span>,
+    <span class="ident">alt</span>, <span class="ident">call</span>, <span class="ident">complete</span>, <span class="ident">delimited</span>, <span class="ident">do_parse</span>, <span class="ident">escaped_transform</span>, <span class="ident">map</span>, <span class="ident">map_res</span>, <span class="ident">named</span>, <span class="ident">opt</span>, <span class="ident">peek</span>,
+    <span class="ident">preceded</span>, <span class="ident">return_error</span>, <span class="ident">tag</span>, <span class="ident">take_while1</span>, <span class="ident">take_while_m_n</span>, <span class="ident">IResult</span>,
 };
 
 <span class="doccomment">/// The StringLit production permits the escape sequences discussed for quoted template expressions</span>
@@ -611,12 +608,10 @@
         .<span class="ident">to_string</span>())
 }
 
-<span class="comment">// TODO: Return Cow&lt;&#39;a, str&gt;</span>
 <span class="comment">// Tab spaces are illegal and will cause bad output</span>
-<span class="kw">fn</span> <span class="ident">unindent_heredoc</span>(<span class="ident">charas</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">char</span><span class="op">&gt;</span>, <span class="ident">indentation</span>: <span class="ident">usize</span>) <span class="op">-&gt;</span> <span class="ident">String</span> {
-    <span class="kw">let</span> <span class="ident">string</span>: <span class="ident">String</span> <span class="op">=</span> <span class="ident">charas</span>.<span class="ident">into_iter</span>().<span class="ident">collect</span>();
+<span class="kw">fn</span> <span class="ident">unindent_heredoc</span>(<span class="ident">string</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">indentation</span>: <span class="ident">usize</span>) <span class="op">-&gt;</span> <span class="ident">Cow</span><span class="op">&lt;</span><span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">if</span> <span class="ident">indentation</span> <span class="op">==</span> <span class="number">0</span> {
-        <span class="kw">return</span> <span class="ident">string</span>;
+        <span class="kw">return</span> <span class="ident">Cow</span>::<span class="ident">Borrowed</span>(<span class="ident">string</span>);
     }
 
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">String</span>::<span class="ident">with_capacity</span>(<span class="ident">string</span>.<span class="ident">len</span>());
@@ -636,7 +631,7 @@
     }
     <span class="comment">// Remove the last `\n`</span>
     <span class="ident">result</span>.<span class="ident">truncate</span>(<span class="ident">result</span>.<span class="ident">len</span>() <span class="op">-</span> <span class="number">1</span>);
-    <span class="ident">result</span>
+    <span class="ident">Cow</span>::<span class="ident">Owned</span>(<span class="ident">result</span>)
 }
 
 <span class="comment">// Unescape characters according to the reference https://en.cppreference.com/w/cpp/language/escape</span>
@@ -764,16 +759,15 @@
 
 <span class="comment">// Parse a Heredoc string</span>
 <span class="macro">named</span><span class="macro">!</span>(
-    <span class="kw">pub</span> <span class="ident">heredoc_string</span>(<span class="ident">CompleteStr</span>) <span class="op">-&gt;</span> <span class="ident">String</span>,
+    <span class="kw">pub</span> <span class="ident">heredoc_string</span>(<span class="ident">CompleteStr</span>) <span class="op">-&gt;</span> <span class="ident">Cow</span><span class="op">&lt;</span><span class="ident">str</span><span class="op">&gt;</span>,
     <span class="macro">do_parse</span><span class="macro">!</span>(
         <span class="ident">identifier</span>: <span class="macro">call</span><span class="macro">!</span>(<span class="ident">heredoc_begin</span>)
         <span class="op">&gt;&gt;</span> <span class="ident">content</span>: <span class="macro">alt</span><span class="macro">!</span>(
-            <span class="macro">call</span><span class="macro">!</span>(<span class="ident">heredoc_end</span>, <span class="kw-2">&amp;</span><span class="ident">identifier</span>) <span class="op">=&gt;</span> {<span class="op">|</span><span class="kw">_</span><span class="op">|</span> (<span class="macro">vec</span><span class="macro">!</span>[], <span class="number">0</span>) }
+            <span class="macro">call</span><span class="macro">!</span>(<span class="ident">heredoc_end</span>, <span class="kw-2">&amp;</span><span class="ident">identifier</span>) <span class="op">=&gt;</span> {<span class="op">|</span><span class="kw">_</span><span class="op">|</span> (<span class="string">&quot;&quot;</span>, <span class="number">0</span>) }
             <span class="op">|</span> <span class="macro">do_parse</span><span class="macro">!</span>(
                 <span class="macro">call</span><span class="macro">!</span>(<span class="ident">nom</span>::<span class="ident">eol</span>)
-                <span class="comment">// TODO: Don&#39;t allocate a Vec of chars! Return the slice</span>
-                <span class="op">&gt;&gt;</span> <span class="ident">content</span>: <span class="macro">many_till</span><span class="macro">!</span>(<span class="macro">call</span><span class="macro">!</span>(<span class="ident">nom</span>::<span class="ident">anychar</span>), <span class="macro">call</span><span class="macro">!</span>(<span class="ident">heredoc_end</span>, <span class="kw-2">&amp;</span><span class="ident">identifier</span>))
-                <span class="op">&gt;&gt;</span> (<span class="ident">content</span>)
+                <span class="op">&gt;&gt;</span> <span class="ident">content</span>: <span class="macro">take_till_match</span><span class="macro">!</span>(<span class="macro">call</span><span class="macro">!</span>(<span class="ident">heredoc_end</span>, <span class="kw-2">&amp;</span><span class="ident">identifier</span>))
+                <span class="op">&gt;&gt;</span> ((<span class="ident">content</span>.<span class="number">0</span>).<span class="number">0</span>, <span class="ident">content</span>.<span class="number">1</span>)
             )
         )
         <span class="op">&gt;&gt;</span> (<span class="ident">unindent_heredoc</span>(<span class="ident">content</span>.<span class="number">0</span>, <span class="ident">content</span>.<span class="number">1</span>))
@@ -781,9 +775,9 @@
 );
 
 <span class="macro">named</span><span class="macro">!</span>(
-    <span class="kw">pub</span> <span class="ident">string</span>(<span class="ident">CompleteStr</span>) <span class="op">-&gt;</span> <span class="ident">String</span>,
+    <span class="kw">pub</span> <span class="ident">string</span>(<span class="ident">CompleteStr</span>) <span class="op">-&gt;</span> <span class="ident">Cow</span><span class="op">&lt;</span><span class="ident">str</span><span class="op">&gt;</span>,
     <span class="macro">alt</span><span class="macro">!</span>(
-        <span class="ident">quoted_string</span>
+        <span class="ident">quoted_string</span> <span class="op">=&gt;</span> { <span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">Cow</span>::<span class="ident">Owned</span>(<span class="ident">s</span>) }
         <span class="op">|</span> <span class="ident">heredoc_string</span>
     )
 );
@@ -974,21 +968,21 @@ EOF
             ),
             (
                 <span class="string">r#&quot;&lt;&lt;EOF
-something
+something 老虎
 EOF
 &quot;#</span>,
-                <span class="string">&quot;something&quot;</span>,
+                <span class="string">&quot;something 老虎&quot;</span>,
             ),
             (
                 <span class="string">r#&quot;&lt;&lt;EOH
 something
-with
+with 老虎
 new lines
 and quotes &quot;
                     EOH
 &quot;#</span>,
                 <span class="string">r#&quot;something
-with
+with 老虎
 new lines
 and quotes &quot;&quot;#</span>,
             ),
@@ -997,52 +991,52 @@ and quotes &quot;&quot;#</span>,
     strip
     the
     spaces
-    but    not   these
+    but    not   these 老虎
     EOF
 &quot;#</span>,
                 <span class="string">r#&quot;strip
 the
 spaces
-but    not   these&quot;#</span>,
+but    not   these 老虎&quot;#</span>,
             ),
             (
                 <span class="string">r#&quot;&lt;&lt;-EOF
     strip
     the
     spaces
-    but    not   these
+    but    not   these 老虎
   EOF
 &quot;#</span>,
                 <span class="string">r#&quot;  strip
   the
   spaces
-  but    not   these&quot;#</span>,
+  but    not   these 老虎&quot;#</span>,
             ),
             (
                 <span class="string">r#&quot;&lt;&lt;-EOF
 strip
     the
 spaces
-    but    not   these
+    but    not   these 老虎
   EOF
 &quot;#</span>,
                 <span class="string">r#&quot;strip
   the
 spaces
-  but    not   these&quot;#</span>,
+  but    not   these 老虎&quot;#</span>,
             ),
             (
                 <span class="string">r#&quot;&lt;&lt;-EOF
   strip
     the
   spaces
-    but    not   these
+    but    not   these 老虎
     EOF
 &quot;#</span>,
                 <span class="string">r#&quot;strip
 the
 spaces
-but    not   these&quot;#</span>,
+but    not   these 老虎&quot;#</span>,
             ),
         ];
 
