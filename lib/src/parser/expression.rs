@@ -2,8 +2,8 @@
 //!
 //! [Reference](https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md#expressions)
 
+use std::borrow::Cow;
 use std::iter::FromIterator;
-use std::str::FromStr;
 
 use nom::types::CompleteStr;
 use nom::{alt_complete, call, do_parse, named, tag};
@@ -53,7 +53,7 @@ pub enum Expression<'a> {
     Null,
     Number(Number<'a>),
     Boolean(bool),
-    String(String),
+    String(Cow<'a, str>),
     Tuple(Tuple<'a>),
     Object(Object<'a>),
 }
@@ -94,7 +94,7 @@ impl<'a> crate::AsOwned for Expression<'a> {
             Expression::Null => Expression::Null,
             Expression::Number(number) => Expression::Number(number.as_owned()),
             Expression::Boolean(boolean) => Expression::Boolean(*boolean),
-            Expression::String(string) => Expression::String(string.clone()),
+            Expression::String(string) => Expression::String(Cow::Owned(string.to_string())),
             Expression::Tuple(tup) => Expression::Tuple(tup.as_owned()),
             Expression::Object(obj) => Expression::Object(obj.as_owned()),
         }
@@ -134,20 +134,12 @@ impl_from_expr_type!(Number, i128);
 impl_from_expr_type!(Number, f32);
 impl_from_expr_type!(Number, f64);
 impl_from_expr_type!(Boolean, bool);
-impl_from_expr_type!(String, String);
+impl_from_expr_type!(String, Cow<'a, str>);
 impl_from_expr_type!(Tuple, Vec<Expression<'a>>);
 
 impl<'a> From<&'a str> for Expression<'a> {
     fn from(s: &'a str) -> Self {
-        Expression::String(s.to_string())
-    }
-}
-
-impl<'a> FromStr for Expression<'a> {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Expression::String(s.to_string()))
+        Expression::String(Cow::Borrowed(s))
     }
 }
 
@@ -203,7 +195,7 @@ mod tests {
             ("(true)", Expression::Boolean(true), ""),
             ("123.456", Expression::from(123.456), ""),
             ("123", Expression::from(123), ""),
-            (r#""foobar""#, Expression::String("foobar".to_string()), ""),
+            (r#""foobar""#, Expression::from("foobar"), ""),
             (
                 r#"
 (
@@ -213,7 +205,7 @@ line
 EOF
 )
 "#,
-                Expression::String("new\nline".to_string()),
+                Expression::from("new\nline"),
                 "\n",
             ),
         ];
@@ -236,14 +228,14 @@ EOF
             ("true", Expression::Boolean(true), ""),
             ("123.456", Expression::from(123.456), ""),
             ("123", Expression::from(123), ""),
-            (r#""foobar""#, Expression::String("foobar".to_string()), ""),
+            (r#""foobar""#, Expression::from("foobar"), ""),
             (
                 r#"<<EOF
 new
 line
 EOF
 "#,
-                Expression::String("new\nline".to_string()),
+                Expression::from("new\nline"),
                 "\n",
             ),
             (

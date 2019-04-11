@@ -67,7 +67,7 @@ new
 line
 EOF
 "#,
-                ("test", Expression::String("new\nline".to_string())),
+                ("test", Expression::from("new\nline")),
                 "\n",
             ),
             (r#"test = [],"#, ("test", Expression::Tuple(vec![])), ","),
