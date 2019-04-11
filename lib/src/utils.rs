@@ -1,3 +1,4 @@
+use nom::types::{CompleteByteSlice, CompleteStr, Input};
 use std::ops::{Bound, RangeBounds};
 
 /// Recognizes at least 1 character while a predicate holds true
@@ -22,7 +23,8 @@ where
     /// Indicate if an `index` is the start and/or end of some boundary
     ///
     /// For example, in an implementation for a `&str`, this might be start
-    /// and/or end of a UTF-8 code point sequence (see [`str::is_char_boundary`]).
+    /// and/or end of a UTF-8 code point sequence
+    /// (see [`str::is_char_boundary`](https://doc.rust-lang.org/std/primitive.str.html#method.is_char_boundary)).
     fn is_slice_boundary(&self, index: usize) -> bool;
 
     /// Safe slicing. The start and the end of the range (if bounded) must be
@@ -47,6 +49,60 @@ where
         }
 
         Some(self.slice(range))
+    }
+}
+
+impl<'a, R> SliceBoundary<R> for &'a str
+where
+    R: RangeBounds<usize>,
+    &'a str: nom::Slice<R>,
+{
+    fn is_slice_boundary(&self, index: usize) -> bool {
+        self.is_char_boundary(index)
+    }
+}
+
+impl<'a, R> SliceBoundary<R> for CompleteStr<'a>
+where
+    R: RangeBounds<usize>,
+    CompleteStr<'a>: nom::Slice<R>,
+{
+    fn is_slice_boundary(&self, index: usize) -> bool {
+        self.is_char_boundary(index)
+    }
+}
+
+impl<'a, R, T> SliceBoundary<R> for &'a [T]
+where
+    R: RangeBounds<usize>,
+    &'a [T]: nom::Slice<R>,
+{
+    fn is_slice_boundary(&self, _index: usize) -> bool {
+        // Always true for arbitrary slices
+        true
+    }
+}
+
+impl<R, T> SliceBoundary<R> for Input<T>
+where
+    R: RangeBounds<usize>,
+    Input<T>: nom::Slice<R>,
+    T: nom::Slice<R>,
+{
+    fn is_slice_boundary(&self, _index: usize) -> bool {
+        // Always true for arbitrary slices
+        true
+    }
+}
+
+impl<'a, R> SliceBoundary<R> for CompleteByteSlice<'a>
+where
+    R: RangeBounds<usize>,
+    CompleteByteSlice<'a>: nom::Slice<R>,
+{
+    fn is_slice_boundary(&self, _index: usize) -> bool {
+        // Always true for arbitrary bytes
+        true
     }
 }
 
