@@ -6,9 +6,8 @@ use ferrous_chloride::parse_str;
 fn main() {
     loop {
         fuzz!(|data: &[u8]| {
-            let string = std::str::from_utf8(data);
-            if let Ok(valid_string) = string {
-                let _ = parse_str(valid_string);
+            if let Ok(s) = std::str::from_utf8(data) {
+                let _ = parse_str(s);
             }
         });
     }

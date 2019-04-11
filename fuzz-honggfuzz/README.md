@@ -1,6 +1,13 @@
 # fuzz
 
-`Makefile` commands have to be run in this directory.
+This will fuzz the application using honggfuzz. `Makefile` commands have to be run in this directory.
+
+```
+make install
+make fuzz
+make debug
+make clean
+```
 
 ## Setup
 
