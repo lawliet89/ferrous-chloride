@@ -214,10 +214,8 @@ named!(
             call!(heredoc_end, &identifier) => {|_| ("", 0) }
             | do_parse!(
                 call!(nom::eol)
-                // TODO: Don't allocate a Vec of chars! Return the slice
                 >> content: take_till_match!(call!(heredoc_end, &identifier))
-                >> indentation: call!(heredoc_end, &identifier)
-                >> (content.0, indentation)
+                >> ((content.0).0, content.1)
             )
         )
         >> (unindent_heredoc(content.0, content.1))

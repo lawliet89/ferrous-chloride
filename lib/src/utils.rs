@@ -108,8 +108,18 @@ where
 }
 
 // From https://github.com/Geal/nom/issues/709#issuecomment-475958529
-// `take_till_match!(alt!(tag!("John") | tag!("Amanda")))`
-// Running that on `"Hello, Amanda"` gives `Ok(("Amanda", "Hello, "))
+/// Take bytes until the child parser succeeds
+///
+/// `take_till_match!(I -> IResult<I, O>) => I -> IResult<I, (I, O)>`
+///
+/// ```rust
+/// # use ferrous_chloride::take_till_match;
+/// use nom::{alt, named, tag};
+///
+/// named!(test<&str, (&str, &str)>, take_till_match!(alt!(tag!("John") | tag!("Amanda"))));
+///
+/// assert_eq!(test("Hello, Amanda and Tim"), Ok((" and Tim", ("Hello, ", "Amanda"))));
+/// ```
 #[macro_export]
 macro_rules! take_till_match(
   (__impl $i:expr, $submac2:ident!( $($args2:tt)* )) => (
@@ -140,8 +150,9 @@ macro_rules! take_till_match(
             },
             Some(slice) => {
                 match $submac2!(slice, $($args2)*) {
-                    Ok((_i, _o)) => {
-                        ret = Ok(input.take_split(index));
+                    Ok((i, o)) => {
+                        let (_, start) = input.take_split(index);
+                        ret = Ok((i, (start, o)));
                         break;
                     },
                     Err(_e1)    => {
