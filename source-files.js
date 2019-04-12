@@ -32,3 +32,4 @@ sourcesIndex["unic_ucd_version"] = {"name":"","dirs":[],"files":["lib.rs","pkg_i
 sourcesIndex["unicode_width"] = {"name":"","dirs":[],"files":["lib.rs","tables.rs"]};
 sourcesIndex["unicode_xid"] = {"name":"","dirs":[],"files":["lib.rs","tables.rs"]};
 sourcesIndex["vec_map"] = {"name":"","dirs":[],"files":["lib.rs"]};
+createSourceSidebar();
