@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["fuzz","Fuzz a closure by passing it a `&[u8]`"]],"macro":[["fuzz","Fuzz a closure-like block of code by passing it an object of arbitrary type."]]});
