@@ -12,8 +12,8 @@ use log::debug;
 use nom::types::CompleteStr;
 use nom::ErrorKind;
 use nom::{
-    alt, call, complete, delimited, do_parse, escaped_transform, many_till, map, map_res, named,
-    opt, peek, preceded, return_error, tag, take_while1, take_while_m_n, IResult,
+    alt, call, complete, delimited, do_parse, escaped_transform, map, map_res, named, opt, peek,
+    preceded, return_error, tag, take_while1, take_while_m_n, IResult,
 };
 
 /// The StringLit production permits the escape sequences discussed for quoted template expressions
@@ -56,12 +56,10 @@ fn hex_to_string(s: &str) -> Result<String, InternalKind> {
         .to_string())
 }
 
-// TODO: Return Cow<'a, str>
 // Tab spaces are illegal and will cause bad output
-fn unindent_heredoc(charas: Vec<char>, indentation: usize) -> String {
-    let string: String = charas.into_iter().collect();
+fn unindent_heredoc(string: &str, indentation: usize) -> Cow<str> {
     if indentation == 0 {
-        return string;
+        return Cow::Borrowed(string);
     }
 
     let mut result = String::with_capacity(string.len());
@@ -81,7 +79,7 @@ fn unindent_heredoc(charas: Vec<char>, indentation: usize) -> String {
     }
     // Remove the last `\n`
     result.truncate(result.len() - 1);
-    result
+    Cow::Owned(result)
 }
 
 // Unescape characters according to the reference https://en.cppreference.com/w/cpp/language/escape
@@ -209,16 +207,15 @@ pub fn heredoc_end<'a>(
 
 // Parse a Heredoc string
 named!(
-    pub heredoc_string(CompleteStr) -> String,
+    pub heredoc_string(CompleteStr) -> Cow<str>,
     do_parse!(
         identifier: call!(heredoc_begin)
         >> content: alt!(
-            call!(heredoc_end, &identifier) => {|_| (vec![], 0) }
+            call!(heredoc_end, &identifier) => {|_| ("", 0) }
             | do_parse!(
                 call!(nom::eol)
-                // TODO: Don't allocate a Vec of chars! Return the slice
-                >> content: many_till!(call!(nom::anychar), call!(heredoc_end, &identifier))
-                >> (content)
+                >> content: take_till_match!(call!(heredoc_end, &identifier))
+                >> ((content.0).0, content.1)
             )
         )
         >> (unindent_heredoc(content.0, content.1))
@@ -226,9 +223,9 @@ named!(
 );
 
 named!(
-    pub string(CompleteStr) -> String,
+    pub string(CompleteStr) -> Cow<str>,
     alt!(
-        quoted_string
+        quoted_string => { |s| Cow::Owned(s) }
         | heredoc_string
     )
 );
@@ -419,21 +416,21 @@ EOF
             ),
             (
                 r#"<<EOF
-something
+something 老虎
 EOF
 "#,
-                "something",
+                "something 老虎",
             ),
             (
                 r#"<<EOH
 something
-with
+with 老虎
 new lines
 and quotes "
                     EOH
 "#,
                 r#"something
-with
+with 老虎
 new lines
 and quotes ""#,
             ),
@@ -442,52 +439,52 @@ and quotes ""#,
     strip
     the
     spaces
-    but    not   these
+    but    not   these 老虎
     EOF
 "#,
                 r#"strip
 the
 spaces
-but    not   these"#,
+but    not   these 老虎"#,
             ),
             (
                 r#"<<-EOF
     strip
     the
     spaces
-    but    not   these
+    but    not   these 老虎
   EOF
 "#,
                 r#"  strip
   the
   spaces
-  but    not   these"#,
+  but    not   these 老虎"#,
             ),
             (
                 r#"<<-EOF
 strip
     the
 spaces
-    but    not   these
+    but    not   these 老虎
   EOF
 "#,
                 r#"strip
   the
 spaces
-  but    not   these"#,
+  but    not   these 老虎"#,
             ),
             (
                 r#"<<-EOF
   strip
     the
   spaces
-    but    not   these
+    but    not   these 老虎
     EOF
 "#,
                 r#"strip
 the
 spaces
-but    not   these"#,
+but    not   these 老虎"#,
             ),
         ];
 

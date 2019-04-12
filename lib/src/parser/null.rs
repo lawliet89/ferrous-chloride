@@ -9,8 +9,9 @@ named!(
     )
 );
 
+#[cfg(test)]
 #[test]
 fn parses_for_null() {
-    use crate::utils::test::ResultUtilsString;
+    use crate::utils::ResultUtilsString;
     null(CompleteStr("null")).unwrap_output();
 }

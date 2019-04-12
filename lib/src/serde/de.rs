@@ -200,7 +200,7 @@ impl<'de> Deserializer<'de> {
     fn parse_string(&mut self) -> Result<String, Error> {
         let (remaining, output) = string(self.input)?;
         self.input = remaining;
-        Ok(output)
+        Ok(output.to_string())
     }
 
     fn parse_bytes(&mut self) -> Result<Vec<u8>, Error> {
