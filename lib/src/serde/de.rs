@@ -6,6 +6,8 @@
 pub(crate) mod list;
 pub(crate) mod map;
 
+use std::borrow::Cow;
+
 use nom::types::CompleteStr;
 use serde::de::{self, Visitor};
 use serde::forward_to_deserialize_any;
@@ -175,10 +177,10 @@ impl<'de> Deserializer<'de> {
     parse_number!(parse_f32, f32);
     parse_number!(parse_f64, f64);
 
-    fn parse_string(&mut self) -> Result<String, Error> {
+    fn parse_string(&mut self) -> Result<Cow<'de, str>, Error> {
         let (remaining, output) = string(self.input)?;
         self.input = remaining;
-        Ok(output.to_string())
+        Ok(output)
     }
 
     fn parse_bytes(&mut self) -> Result<Vec<u8>, Error> {
@@ -287,12 +289,14 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         self.deserialize_str(visitor)
     }
 
-    // TODO: Borrowed string?
     fn deserialize_str<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        visitor.visit_string(self.parse_string()?)
+        match self.parse_string()? {
+            Cow::Borrowed(string) => visitor.visit_borrowed_str(string),
+            Cow::Owned(string) => visitor.visit_string(string)
+        }
     }
 
     fn deserialize_char<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -301,7 +305,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         let parsed = self.parse_string()?;
         let parsed = if parsed.len() != 1 {
-            Err(Error::ExpectedCharacterGotString(parsed))?
+            Err(Error::ExpectedCharacterGotString(parsed.to_string()))?
         } else {
             parsed
         };
