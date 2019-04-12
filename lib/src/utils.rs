@@ -16,6 +16,86 @@ where
     )
 }
 
+pub trait SafeIndexing<R>: nom::Slice<R> + Sized {
+    type Iter: Iterator<Item = usize>;
+
+    /// Returns an iterator that will only ever yield "safe" indices
+    /// that do not cause panics when slicing
+    ///
+    /// For example, in a `str`, this iterator should never yield an index
+    /// in the middle of a single unicode codepoint
+    fn safe_iter(&self) -> Self::Iter;
+}
+
+fn char_index_take_index((index, _char): (usize, char)) -> usize {
+    index
+}
+
+type TakeCharIndexFn = fn((usize, char)) -> usize;
+
+impl<'a, R> SafeIndexing<R> for &'a str
+where
+    &'a str: nom::Slice<R>,
+{
+    type Iter = std::iter::Map<std::str::CharIndices<'a>, TakeCharIndexFn>;
+
+    fn safe_iter(&self) -> Self::Iter {
+        self.char_indices().map(char_index_take_index)
+    }
+}
+
+impl<'a, R> SafeIndexing<R> for CompleteStr<'a>
+where
+    CompleteStr<'a>: nom::Slice<R>,
+{
+    type Iter = std::iter::Map<std::str::CharIndices<'a>, TakeCharIndexFn>;
+
+    fn safe_iter(&self) -> Self::Iter {
+        self.char_indices().map(char_index_take_index)
+    }
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn add_one(i: &usize) -> Option<usize> {
+    Some(i + 1)
+}
+
+type AddOneFn = fn(&usize) -> Option<usize>;
+
+impl<'a, R, T> SafeIndexing<R> for &'a [T]
+where
+    &'a [T]: nom::Slice<R>,
+{
+    type Iter = std::iter::Successors<usize, AddOneFn>;
+
+    fn safe_iter(&self) -> Self::Iter {
+        std::iter::successors(Some(0), add_one)
+    }
+}
+
+impl<'a, R> SafeIndexing<R> for CompleteByteSlice<'a>
+where
+    CompleteByteSlice<'a>: nom::Slice<R>,
+{
+    type Iter = std::iter::Successors<usize, AddOneFn>;
+
+    fn safe_iter(&self) -> Self::Iter {
+        std::iter::successors(Some(0), add_one)
+    }
+}
+
+impl<R, T> SafeIndexing<R> for Input<T>
+where
+    Input<T>: nom::Slice<R>,
+    T: nom::Slice<R>,
+{
+    type Iter = std::iter::Successors<usize, AddOneFn>;
+
+    fn safe_iter(&self) -> Self::Iter {
+        std::iter::successors(Some(0), add_one)
+    }
+}
+
 pub trait SliceBoundary<R>: nom::Slice<R> + Sized
 where
     R: RangeBounds<usize>,
