@@ -1,5 +1,5 @@
 use nom::types::{CompleteByteSlice, CompleteStr, Input};
-use std::ops::{Bound, RangeBounds};
+use std::ops::RangeFull;
 
 /// Recognizes at least 1 character while a predicate holds true
 pub fn while_predicate1<T, F>(input: T, predicate: F) -> nom::IResult<T, T>
@@ -16,94 +16,83 @@ where
     )
 }
 
-pub trait SliceBoundary<R>: nom::Slice<R> + Sized
-where
-    R: RangeBounds<usize>,
-{
-    /// Indicate if an `index` is the start and/or end of some boundary
+pub trait SafeIndexing: nom::Slice<RangeFull> + Sized {
+    type Iter: Iterator<Item = usize>;
+
+    /// Returns an iterator that will only ever yield "safe" indices
+    /// that do not cause panics when slicing
     ///
-    /// For example, in an implementation for a `&str`, this might be start
-    /// and/or end of a UTF-8 code point sequence
-    /// (see [`str::is_char_boundary`](https://doc.rust-lang.org/std/primitive.str.html#method.is_char_boundary)).
-    fn is_slice_boundary(&self, index: usize) -> bool;
+    /// For example, in a `str`, this iterator should never yield an index
+    /// in the middle of a single unicode codepoint
+    fn safe_indices(&self) -> Self::Iter;
+}
 
-    /// Safe slicing. The start and the end of the range (if bounded) must be
-    /// at a boundary
-    ///
-    /// If they are unsafe, then the implementation will return `None`.
-    fn safe_slice(&self, range: R) -> Option<Self> {
-        if !match range.start_bound() {
-            Bound::Included(start) => self.is_slice_boundary(*start),
-            // No such Range exist
-            Bound::Excluded(start) => self.is_slice_boundary(start + 1),
-            Bound::Unbounded => true,
-        } {
-            return None;
-        }
+fn char_index_take_index((index, _char): (usize, char)) -> usize {
+    index
+}
 
-        if !match range.end_bound() {
-            Bound::Included(end) => self.is_slice_boundary(end + 1),
-            Bound::Excluded(end) => self.is_slice_boundary(*end),
-            Bound::Unbounded => true,
-        } {
-            return None;
-        }
+type TakeCharIndexFn = fn((usize, char)) -> usize;
 
-        Some(self.slice(range))
+impl<'a> SafeIndexing for &'a str
+where
+    &'a str: nom::Slice<RangeFull>,
+{
+    type Iter = std::iter::Map<std::str::CharIndices<'a>, TakeCharIndexFn>;
+
+    fn safe_indices(&self) -> Self::Iter {
+        self.char_indices().map(char_index_take_index)
     }
 }
 
-impl<'a, R> SliceBoundary<R> for &'a str
+impl<'a> SafeIndexing for CompleteStr<'a>
 where
-    R: RangeBounds<usize>,
-    &'a str: nom::Slice<R>,
+    CompleteStr<'a>: nom::Slice<RangeFull>,
 {
-    fn is_slice_boundary(&self, index: usize) -> bool {
-        self.is_char_boundary(index)
+    type Iter = std::iter::Map<std::str::CharIndices<'a>, TakeCharIndexFn>;
+
+    fn safe_indices(&self) -> Self::Iter {
+        self.char_indices().map(char_index_take_index)
     }
 }
 
-impl<'a, R> SliceBoundary<R> for CompleteStr<'a>
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn add_one(i: &usize) -> Option<usize> {
+    Some(i + 1)
+}
+
+type AddOneFn = fn(&usize) -> Option<usize>;
+
+impl<'a, T> SafeIndexing for &'a [T]
 where
-    R: RangeBounds<usize>,
-    CompleteStr<'a>: nom::Slice<R>,
+    &'a [T]: nom::Slice<RangeFull>,
 {
-    fn is_slice_boundary(&self, index: usize) -> bool {
-        self.is_char_boundary(index)
+    type Iter = std::iter::Successors<usize, AddOneFn>;
+
+    fn safe_indices(&self) -> Self::Iter {
+        std::iter::successors(Some(0), add_one)
     }
 }
 
-impl<'a, R, T> SliceBoundary<R> for &'a [T]
+impl<'a> SafeIndexing for CompleteByteSlice<'a>
 where
-    R: RangeBounds<usize>,
-    &'a [T]: nom::Slice<R>,
+    CompleteByteSlice<'a>: nom::Slice<RangeFull>,
 {
-    fn is_slice_boundary(&self, _index: usize) -> bool {
-        // Always true for arbitrary slices
-        true
+    type Iter = std::iter::Successors<usize, AddOneFn>;
+
+    fn safe_indices(&self) -> Self::Iter {
+        std::iter::successors(Some(0), add_one)
     }
 }
 
-impl<R, T> SliceBoundary<R> for Input<T>
+impl<T> SafeIndexing for Input<T>
 where
-    R: RangeBounds<usize>,
-    Input<T>: nom::Slice<R>,
-    T: nom::Slice<R>,
+    Input<T>: nom::Slice<RangeFull>,
+    T: nom::Slice<RangeFull>,
 {
-    fn is_slice_boundary(&self, _index: usize) -> bool {
-        // Always true for arbitrary slices
-        true
-    }
-}
+    type Iter = std::iter::Successors<usize, AddOneFn>;
 
-impl<'a, R> SliceBoundary<R> for CompleteByteSlice<'a>
-where
-    R: RangeBounds<usize>,
-    CompleteByteSlice<'a>: nom::Slice<R>,
-{
-    fn is_slice_boundary(&self, _index: usize) -> bool {
-        // Always true for arbitrary bytes
-        true
+    fn safe_indices(&self) -> Self::Iter {
+        std::iter::successors(Some(0), add_one)
     }
 }
 
@@ -125,51 +114,27 @@ macro_rules! take_till_match(
   (__impl $i:expr, $submac2:ident!( $($args2:tt)* )) => (
     {
       use nom::{Needed, need_more_err, ErrorKind};
-      use nom::InputTake;
+      use nom::{InputTake, Slice};
 
-      use $crate::utils::SliceBoundary;
+      use $crate::utils::SafeIndexing;
 
-      let ret;
+      let mut ret = None;
       let input = $i;
-      let mut index = 0;
-
-      loop {
-        let slice = input.safe_slice(index..);
-
-        match slice {
-            None => {
-                index += 1;
-                if index >= input.len() {
-                // XXX: this error is dramatically wrong
-                    ret = need_more_err(input, Needed::Size(0), ErrorKind::TakeUntil::<u32>);
-                    break;
-                }
-                else {
-                    continue;
-                }
+      for index in input.safe_indices() {
+        let slice = input.slice(index..);
+        match $submac2!(slice, $($args2)*) {
+            Ok((i, o)) => {
+                let (_, start) = input.take_split(index);
+                ret = Some(Ok((i, (start, o))));
+                break;
             },
-            Some(slice) => {
-                match $submac2!(slice, $($args2)*) {
-                    Ok((i, o)) => {
-                        let (_, start) = input.take_split(index);
-                        ret = Ok((i, (start, o)));
-                        break;
-                    },
-                    Err(_e1)    => {
-                        if index >= input.len() {
-                            // XXX: this error is dramatically wrong
-                            ret = need_more_err(input, Needed::Size(0), ErrorKind::TakeUntil::<u32>);
-                            break;
-                        } else {
-                            index += 1;
-                        }
-                    },
-                }
-            }
+            Err(_e1) => {},
         }
       }
-
-      ret
+      match ret {
+          Some(ret) => ret,
+          None => need_more_err(input, Needed::Size(0), ErrorKind::TakeUntil::<u32>)
+      }
     }
   );
   ($i:expr, $submac2:ident!( $($args2:tt)* )) => (
@@ -285,17 +250,30 @@ mod tests {
     use super::*;
 
     #[test]
-    fn strings_are_sliced_safely() {
+    fn strings_indices_are_returned_correctly() {
         let s = "Löwe 老虎 Léopard";
-        assert_eq!(Some(s), s.safe_slice(..));
-        assert_eq!(Some("Löwe "), s.safe_slice(0..6));
-        assert_eq!(Some("Löwe "), s.safe_slice(..6));
-        assert_eq!(Some("老"), s.safe_slice(6..9));
-        assert_eq!(Some("老虎 Léopard"), s.safe_slice(6..));
+        let indices: Vec<_> = s.safe_indices().collect();
 
-        // "老" is bytes 6 to 8
-        assert_eq!(None, s.safe_slice(6..8));
-        assert_eq!(None, s.safe_slice(7..));
-        assert_eq!(None, s.safe_slice(..7));
+        let expected_indices = [
+            0,  // L
+            1,  // ö
+            3,  // w
+            4,  // e
+            5,  // ` `
+            6,  // 老
+            9,  // 虎
+            12, // ` `
+            13, // L
+            14, // é
+            16, // o
+            17, // p
+            18, // a
+            19, // r
+            20, // d
+        ];
+        assert!(indices
+            .iter()
+            .zip(&expected_indices)
+            .all(|(actual, expected)| actual == expected),)
     }
 }
