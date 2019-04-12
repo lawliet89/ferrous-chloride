@@ -2,7 +2,7 @@
 
 This will fuzz the application using honggfuzz. `Makefile` commands have to be run in this directory.
 
-```
+```bash
 make install
 make fuzz
 make debug

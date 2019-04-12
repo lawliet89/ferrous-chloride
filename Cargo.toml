@@ -3,6 +3,9 @@
 members = [
     "lib",
     "cli",
+]
+
+exclude = [
     "fuzz-honggfuzz",
     "fuzz-afl"
 ]
