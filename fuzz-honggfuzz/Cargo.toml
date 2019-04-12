@@ -5,7 +5,7 @@ authors = ["gyng <gyng@users.noreply.github.com >"]
 edition = "2018"
 
 [dependencies]
-ferrous-chloride = { path = "../lib" }
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
+ferrous-chloride = { path = "../lib" }
 honggfuzz = "0.5"
