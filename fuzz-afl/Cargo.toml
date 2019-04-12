@@ -5,5 +5,7 @@ authors = ["Guoyou <gyng@users.noreply.github.com>"]
 edition = "2018"
 
 [dependencies]
+
+[target.'cfg(not(target_os = "windows"))'.dependencies]
 afl = "0.4"
 ferrous-chloride = { path = "../lib" }
