@@ -295,7 +295,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         match self.parse_string()? {
             Cow::Borrowed(string) => visitor.visit_borrowed_str(string),
-            Cow::Owned(string) => visitor.visit_string(string)
+            Cow::Owned(string) => visitor.visit_string(string),
         }
     }
 
@@ -569,6 +569,27 @@ and quotes ""#,
             let deserialized = String::deserialize(&mut deserializer).unwrap();
             assert_eq!(&deserialized, expected);
         }
+    }
+
+    #[test]
+    fn deserialize_borrowed_string() {
+        let input = r#"<<EOF
+something
+    EOF
+"#;
+        let expected = "something";
+        let mut deserializer = Deserializer::from_str(input);
+
+        let deserialized: &str = Deserialize::deserialize(&mut deserializer).unwrap();
+        assert_eq!(deserialized, expected);
+    }
+
+    #[test]
+    #[should_panic(expected = "expected a borrowed string")]
+    fn deserialize_borrowed_string_errors_when_invalid() {
+        let input = r#""impossible!\n""#;
+        let mut deserializer = Deserializer::from_str(input);
+        let _: &str = Deserialize::deserialize(&mut deserializer).unwrap();
     }
 
     #[test]
