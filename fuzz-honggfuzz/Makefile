@@ -1,5 +1,5 @@
 fuzz:
-	HFUZZ_RUN_ARGS="--input fixtures-symlink" cargo hfuzz run fuzz
+	HFUZZ_RUN_ARGS="--input fixtures-symlink" cargo hfuzz run fuzz-honggfuzz
 
 clean:
 	cargo hfuzz clean
