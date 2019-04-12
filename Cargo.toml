@@ -3,4 +3,6 @@
 members = [
     "lib",
     "cli",
+    "fuzz-honggfuzz",
+    "fuzz-afl"
 ]
