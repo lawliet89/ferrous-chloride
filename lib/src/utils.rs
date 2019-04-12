@@ -125,7 +125,8 @@ macro_rules! take_till_match(
         match $submac2!(slice, $($args2)*) {
             Ok((i, o)) => {
                 let (_, start) = input.take_split(index);
-                 ret = Some(Ok((i, (start, o))));
+                ret = Some(Ok((i, (start, o))));
+                break;
             },
             Err(_e1) => {},
         }
