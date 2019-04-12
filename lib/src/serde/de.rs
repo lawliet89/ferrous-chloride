@@ -13,7 +13,6 @@ use serde::Deserialize;
 
 use crate::parser;
 use crate::parser::boolean::boolean;
-use crate::parser::literals;
 use crate::parser::null::null;
 use crate::parser::string::string;
 use crate::value;
@@ -31,19 +30,28 @@ mod error {
     pub enum Error {
         #[fail(display = "HCL parse error: {}", _0)]
         ParseError(#[cause] crate::Error),
+
+        #[fail(display = "Error parsing integer: {}", _0)]
+        ParseIntError(#[cause] std::num::ParseIntError),
+
+        #[fail(display = "Error parsing float: {}", _0)]
+        ParseFloatError(#[cause] std::num::ParseFloatError),
+
         #[fail(display = "Input was not completely consumed during deserialization.")]
         TrailingCharacters,
-        #[fail(display = "Expected an integer but found a float.")]
-        UnexpectedFloat,
+
         #[fail(display = "Overflow when trying to convert to {}", _0)]
         Overflow(&'static str),
+
         #[fail(display = "Expected single character string, got {}", _0)]
         ExpectedCharacterGotString(String),
+
         #[fail(
             display = "Invalid tuple length. Expected {}, got {}",
             expected, actual
         )]
         InvalidTupleLength { expected: usize, actual: usize },
+
         #[fail(display = "{}", _0)]
         Custom(String),
     }
@@ -61,6 +69,18 @@ mod error {
         fn from(e: nom::Err<I, u32>) -> Self {
             let parse_error = crate::Error::from_err_str(&e);
             From::from(parse_error)
+        }
+    }
+
+    impl From<std::num::ParseIntError> for Error {
+        fn from(e: std::num::ParseIntError) -> Self {
+            Error::ParseIntError(e)
+        }
+    }
+
+    impl From<std::num::ParseFloatError> for Error {
+        fn from(e: std::num::ParseFloatError) -> Self {
+            Error::ParseFloatError(e)
         }
     }
 
@@ -109,22 +129,11 @@ pub struct Deserializer<'de> {
     input: CompleteStr<'de>,
 }
 
-macro_rules! parse_integer {
+macro_rules! parse_number {
     ($name:ident, $target:ty) => {
         #[allow(clippy::cast_lossless)]
         fn $name(&mut self) -> Result<$target, Error> {
-            match self.parse_number()? {
-                literals::Number::Float(_) => Err(Error::UnexpectedFloat)?,
-                literals::Number::Integer(u) => {
-                    let min = <$target>::min_value() as i64;
-                    let max = <$target>::max_value() as i64;
-                    if u < min || u > max {
-                        Err(Error::Overflow(stringify!($target)))
-                    } else {
-                        Ok(u as $target)
-                    }
-                }
-            }
+            Ok(self.parse_number()?.parse()?)
         }
     }
 }
@@ -147,55 +156,24 @@ impl<'de> Deserializer<'de> {
         Ok(output)
     }
 
-    fn parse_number(&mut self) -> Result<literals::Number, Error> {
-        let (remaining, output) = literals::number(self.input)?;
+    fn parse_number(&mut self) -> Result<parser::number::Number, Error> {
+        let (remaining, output) = parser::number::number(self.input)?;
         self.input = remaining;
         Ok(output)
     }
 
-    parse_integer!(parse_i8, i8);
-    parse_integer!(parse_i16, i16);
-    parse_integer!(parse_i32, i32);
-    parse_integer!(parse_u8, u8);
-    parse_integer!(parse_u16, u16);
-    parse_integer!(parse_u32, u32);
-    parse_integer!(parse_u64, u64);
-
-    fn parse_i64(&mut self) -> Result<i64, Error> {
-        match self.parse_number()? {
-            literals::Number::Float(_) => Err(Error::UnexpectedFloat)?,
-            literals::Number::Integer(u) => Ok(u),
-        }
-    }
-
-    fn parse_i128(&mut self) -> Result<i128, Error> {
-        match self.parse_number()? {
-            literals::Number::Float(_) => Err(Error::UnexpectedFloat)?,
-            literals::Number::Integer(u) => Ok(i128::from(u)),
-        }
-    }
-
-    fn parse_u128(&mut self) -> Result<u128, Error> {
-        match self.parse_number()? {
-            literals::Number::Float(_) => Err(Error::UnexpectedFloat)?,
-            literals::Number::Integer(u) => Ok(u as u128),
-        }
-    }
-
-    /// Possibly Lossy
-    fn parse_f32(&mut self) -> Result<f32, Error> {
-        match self.parse_number()? {
-            literals::Number::Integer(i) => Ok(i as f32),
-            literals::Number::Float(f) => Ok(f as f32),
-        }
-    }
-
-    fn parse_f64(&mut self) -> Result<f64, Error> {
-        match self.parse_number()? {
-            literals::Number::Integer(i) => Ok(i as f64),
-            literals::Number::Float(f) => Ok(f),
-        }
-    }
+    parse_number!(parse_i8, i8);
+    parse_number!(parse_i16, i16);
+    parse_number!(parse_i32, i32);
+    parse_number!(parse_i64, i64);
+    parse_number!(parse_i128, i128);
+    parse_number!(parse_u8, u8);
+    parse_number!(parse_u16, u16);
+    parse_number!(parse_u32, u32);
+    parse_number!(parse_u64, u64);
+    parse_number!(parse_u128, u128);
+    parse_number!(parse_f32, f32);
+    parse_number!(parse_f64, f64);
 
     fn parse_string(&mut self) -> Result<String, Error> {
         let (remaining, output) = string(self.input)?;
