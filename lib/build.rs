@@ -1,7 +1,7 @@
 extern crate version_check;
 extern crate yansi;
 
-use version_check::{is_min_date, is_min_version, supports_features};
+use version_check::{is_min_date, is_min_version};
 use yansi::Color::{Blue, Red, Yellow};
 
 // Specifies the minimum nightly version needed to compile
@@ -9,10 +9,9 @@ const MIN_DATE: &'static str = "2019-04-10";
 const MIN_VERSION: &'static str = "1.34.0-stable";
 
 fn main() {
-    let ok_channel = supports_features();
     let ok_version = is_min_version(MIN_VERSION);
     let ok_date = is_min_date(MIN_DATE);
-    let triple = (ok_channel, ok_version, ok_date);
+    let double = (ok_version, ok_date);
 
     let print_version_err = |version: &str, date: &str| {
         eprintln!(
@@ -24,7 +23,7 @@ fn main() {
         );
     };
 
-    if let (Some(_ok_channel), Some((ok_version, version)), Some((ok_date, date))) = triple {
+    if let (Some((ok_version, version)), Some((ok_date, date))) = double {
         if !ok_version || !ok_date {
             eprintln!(
                 "{} {}",
