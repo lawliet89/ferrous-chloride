@@ -14,9 +14,6 @@ use serde::forward_to_deserialize_any;
 use serde::Deserialize;
 
 use crate::parser;
-use crate::parser::boolean::boolean;
-use crate::parser::null::null;
-use crate::parser::string::string;
 use crate::value;
 
 pub use self::error::*;
@@ -153,7 +150,7 @@ impl<'de> Deserializer<'de> {
     }
 
     fn parse_bool(&mut self) -> Result<bool, Error> {
-        let (remaining, output) = boolean(self.input)?;
+        let (remaining, output) = parser::boolean::boolean(self.input)?;
         self.input = remaining;
         Ok(output)
     }
@@ -178,7 +175,7 @@ impl<'de> Deserializer<'de> {
     parse_number!(parse_f64, f64);
 
     fn parse_string(&mut self) -> Result<Cow<'de, str>, Error> {
-        let (remaining, output) = string(self.input)?;
+        let (remaining, output) = parser::string::string(self.input)?;
         self.input = remaining;
         Ok(output)
     }
@@ -209,7 +206,7 @@ impl<'de> Deserializer<'de> {
     }
 
     fn parse_null(&mut self) -> Result<(), Error> {
-        let (remaining, ()) = null(self.input)?;
+        let (remaining, ()) = parser::null::null(self.input)?;
         self.input = remaining;
         Ok(())
     }
@@ -339,9 +336,9 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        match self.peek()? {
-            value::Value::Null => visitor.visit_none(),
-            _ => visitor.visit_some(self),
+        match self.parse_null() {
+            Ok(()) => visitor.visit_none(),
+            Err(_) => visitor.visit_some(self),
         }
     }
 
