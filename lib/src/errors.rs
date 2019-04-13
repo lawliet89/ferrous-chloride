@@ -12,17 +12,22 @@ use crate::OneOrMany;
 pub enum Error {
     #[fail(display = "Invalid Unicode Code Points \\{}", _0)]
     InvalidUnicodeCodePoint(String),
+
     #[fail(display = "Invalid Number {}", _0)]
     InvalidNumber(String),
+
     #[fail(display = "Bytes contain invalid unicode: {:#?}", _0)]
     InvalidUnicode(Vec<u8>),
+
     #[fail(display = "Generic Parse Error {}", _0)]
     ParseError(String),
+
     #[fail(
         display = "Variant {} does not allow multiple values with the same key {}",
         variant, key
     )]
     IllegalMultipleEntries { key: String, variant: &'static str },
+
     #[fail(
         display = "Error merging key {} into `Value`: existing value of variant {} \
                    cannot be merged with variant {}",
@@ -33,6 +38,7 @@ pub enum Error {
         existing_variant: &'static str,
         incoming_variant: &'static str,
     },
+
     #[fail(
         display = "Expected type {} to be of variant {} but got {} instead",
         enum_type, expected, actual
@@ -42,10 +48,19 @@ pub enum Error {
         expected: &'static str,
         actual: &'static str,
     },
+
     #[fail(display = "IO Error: {}", _0)]
     IOError(#[cause] std::io::Error),
+
     #[fail(display = "Bytes to be parsed is invalid UTF-8: {}", _0)]
     InvalidUnicodeToParse(#[cause] std::str::Utf8Error),
+
+    #[fail(
+        display = "Expected all input to be consumed, but the following remains: {}",
+        _0
+    )]
+    UnexpectedRemainingInput(String),
+
     #[fail(
         display = "Possible bug with the library encountered: {}; Please report to \
                    https://github.com/lawliet89/ferrous-chloride/issues",
