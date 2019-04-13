@@ -5,7 +5,9 @@ use std::ops::Deref;
 use std::str::FromStr;
 
 use nom::types::CompleteStr;
-use nom::{call, map, named, recognize_float};
+use nom::{alt, call, char, digit, map, named, opt, pair, recognize_float, tuple};
+
+use crate::Error;
 
 /// A number, represented as a string for aribitrary precision
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -78,6 +80,104 @@ impl<'a> Number<'a> {
         as_f32 => f32,
         as_f64 => f64,
     );
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct Component<'a> {
+    /// The original input number literal
+    pub input: &'a str,
+    /// Whether the number is positive
+    pub positive: bool,
+    /// The whole number part of the number
+    pub whole: &'a str,
+    /// The fraction (decimal) part of the number
+    pub fraction: Option<&'a str>,
+    /// Whether an exponent is present
+    pub exponent: Option<Exponent<'a>>,
+}
+
+impl<'a> Component<'a> {
+    /// Parse a number string into its components
+    ///
+    /// Referenced from the implementation of [`nom::recognize_float`]
+    pub fn parse(s: &'a str) -> Result<Self, Error> {
+        let input = CompleteStr(s);
+        let (input, positive) =
+            opt!(input, alt!(char!('+') | char!('-'))).map_err(|e| Error::from_err_str(&e))?;
+        let positive = match positive {
+            None => true,
+            Some('+') => true,
+            Some('-') => false,
+            _ => unreachable!("bug in number sign parsing"),
+        };
+
+        let (input, (whole, fraction)) = alt!(
+            input,
+            tuple!(digit, opt!(pair!(char!('.'), opt!(digit)))) => { |(digit, decimals )| {
+                let decimals = match decimals {
+                    None => None,
+                    Some((_, None)) => None,
+                    Some((_, Some(decimals))) => Some(decimals)
+                };
+                (digit, decimals)
+            } }
+            | tuple!(char!('.'), digit) => { |(_, decimals)| (CompleteStr("0"), Some(decimals))  }
+        )
+        .map_err(|e| Error::from_err_str(&e))?;
+
+        let whole = whole.0;
+        let fraction = fraction.map(|frac| frac.0);
+
+        let exponent = Exponent::parse(input.0, true)?;
+
+        Ok(Component {
+            input: s,
+            positive,
+            whole,
+            fraction,
+            exponent,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct Exponent<'a> {
+    /// Whether the exponent is positive
+    pub positive: bool,
+    /// The number part of the exponent
+    pub exponent: &'a str,
+}
+
+impl<'a> Exponent<'a> {
+    pub fn parse(input: &'a str, check_remaining: bool) -> Result<Option<Self>, Error> {
+        let input = CompleteStr(input);
+        let (remaining, exponent) = opt!(
+            input,
+            tuple!(
+                alt!(char!('e') | char!('E')),
+                opt!(alt!(char!('+') | char!('-'))),
+                digit
+            )
+        )
+        .map_err(|e| Error::from_err_str(&e))?;
+
+        let exponent = exponent.map(|(_, sign, exponent)| {
+            let positive = match sign {
+                None => true,
+                Some('+') => true,
+                Some('-') => false,
+                _ => unreachable!("bug in number sign parsing"),
+            };
+            let exponent = exponent.0;
+            Exponent { positive, exponent }
+        });
+
+        if check_remaining && !remaining.is_empty() {
+            Err(Error::UnexpectedRemainingInput(remaining.to_string()))?;
+        }
+
+        Ok(exponent)
+    }
 }
 
 named!(

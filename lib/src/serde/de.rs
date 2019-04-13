@@ -3,6 +3,7 @@
 //! This module contains the types and trait implementation to allow deserialization from a HCL
 //! string to Rust types that you can usually disregard. To find out more
 //! about _using_ them, head to [`serde` documentation](https://serde.rs/).
+pub(crate) mod expression;
 pub(crate) mod list;
 pub(crate) mod map;
 
@@ -10,8 +11,7 @@ use std::borrow::Cow;
 
 use nom::types::CompleteStr;
 use serde::de::{self, Visitor};
-use serde::forward_to_deserialize_any;
-use serde::Deserialize;
+use serde::{forward_to_deserialize_any, Deserialize};
 
 use crate::parser;
 use crate::value;
@@ -134,6 +134,19 @@ macro_rules! parse_number {
         fn $name(&mut self) -> Result<$target, Error> {
             Ok(self.parse_number()?.parse()?)
         }
+    }
+}
+
+pub(crate) fn deserialize_string<'de, V>(
+    string: Cow<'de, str>,
+    visitor: V,
+) -> Result<V::Value, Compat>
+where
+    V: Visitor<'de>,
+{
+    match string {
+        Cow::Borrowed(string) => visitor.visit_borrowed_str(string),
+        Cow::Owned(string) => visitor.visit_string(string),
     }
 }
 
@@ -290,10 +303,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        match self.parse_string()? {
-            Cow::Borrowed(string) => visitor.visit_borrowed_str(string),
-            Cow::Owned(string) => visitor.visit_string(string),
-        }
+        deserialize_string(self.parse_string()?, visitor)
     }
 
     fn deserialize_char<V>(self, visitor: V) -> Result<V::Value, Self::Error>
