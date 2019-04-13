@@ -2,16 +2,7 @@ use serde::de::{self, Visitor};
 use serde::forward_to_deserialize_any;
 
 use crate::parser::expression::Expression;
-use crate::parser::number::Number;
-use crate::serde::de::{deserialize_string, Compat};
-
-/// Copy the implementation of [`nom::recognize_float`] to check which visitor method to use
-fn deserialize_number<'de, V>(number: Number<'de>, visitor: V) -> Result<V::Value, Compat>
-where
-    V: Visitor<'de>,
-{
-    unimplemented!("Not yet")
-}
+use crate::serde::de::{deserialize_number, deserialize_string, Compat};
 
 impl<'de> de::Deserializer<'de> for Expression<'de> {
     type Error = Compat;
