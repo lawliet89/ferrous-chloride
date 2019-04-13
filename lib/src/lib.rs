@@ -522,6 +522,21 @@ where
     }
 }
 
+impl<T> AsOwned for Option<T>
+where
+    T: AsOwned,
+    <T as AsOwned>::Output: 'static,
+{
+    type Output = Option<<T as AsOwned>::Output>;
+
+    fn as_owned(&self) -> Self::Output {
+        match self {
+            None => None,
+            Some(t) => Some(t.as_owned()),
+        }
+    }
+}
+
 impl Default for MergeBehaviour {
     fn default() -> Self {
         MergeBehaviour::Error

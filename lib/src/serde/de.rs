@@ -116,6 +116,12 @@ mod error {
         }
     }
 
+    impl From<crate::Error> for Compat {
+        fn from(e: crate::Error) -> Self {
+            From::from(Error::ParseError(e))
+        }
+    }
+
     impl From<Compat> for Error {
         fn from(e: Compat) -> Self {
             e.0.into_inner()
@@ -147,6 +153,22 @@ where
     match string {
         Cow::Borrowed(string) => visitor.visit_borrowed_str(string),
         Cow::Owned(string) => visitor.visit_string(string),
+    }
+}
+
+fn deserialize_number<'de, V>(
+    number: crate::parser::number::Number<'de>,
+    visitor: V,
+) -> Result<V::Value, Compat>
+where
+    V: Visitor<'de>,
+{
+    if number.is_float() {
+        visitor.visit_f64(number.as_f64().map_err(|e| Error::ParseFloatError(e))?)
+    } else if number.is_signed() {
+        visitor.visit_i64(number.as_i64().map_err(|e| Error::ParseIntError(e))?)
+    } else {
+        visitor.visit_u64(number.as_u64().map_err(|e| Error::ParseIntError(e))?)
     }
 }
 
