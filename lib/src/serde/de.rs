@@ -6,8 +6,6 @@
 pub(crate) mod expression;
 pub(crate) mod object;
 
-pub(crate) mod list;
-
 use std::borrow::Cow;
 
 use nom::types::CompleteStr;
