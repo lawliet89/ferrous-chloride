@@ -164,11 +164,11 @@ where
     V: Visitor<'de>,
 {
     if number.is_float() {
-        visitor.visit_f64(number.as_f64().map_err(|e| Error::ParseFloatError(e))?)
+        visitor.visit_f64(number.as_f64().map_err(Error::ParseFloatError)?)
     } else if number.is_signed() {
-        visitor.visit_i64(number.as_i64().map_err(|e| Error::ParseIntError(e))?)
+        visitor.visit_i64(number.as_i64().map_err(Error::ParseIntError)?)
     } else {
-        visitor.visit_u64(number.as_u64().map_err(|e| Error::ParseIntError(e))?)
+        visitor.visit_u64(number.as_u64().map_err(Error::ParseIntError)?)
     }
 }
 
