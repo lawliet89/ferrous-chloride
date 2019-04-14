@@ -2,7 +2,9 @@ use serde::de::{self, IntoDeserializer, Visitor};
 use serde::forward_to_deserialize_any;
 
 use crate::parser::expression::Expression;
-use crate::serde::de::{deserialize_number, deserialize_string, deserialize_tuple, Compat};
+use crate::serde::de::{
+    deserialize_number, deserialize_object, deserialize_string, deserialize_tuple, Compat,
+};
 
 impl<'de> de::Deserializer<'de> for Expression<'de> {
     type Error = Compat;
@@ -18,7 +20,7 @@ impl<'de> de::Deserializer<'de> for Expression<'de> {
             Boolean(boolean) => visitor.visit_bool(boolean),
             String(string) => deserialize_string(string, visitor),
             Tuple(tuple) => deserialize_tuple(tuple, visitor, None),
-            Object(_object) => unimplemented!("Not yet"),
+            Object(object) => deserialize_object(object, visitor),
         }
     }
 
@@ -318,5 +320,24 @@ mod tests {
         ]);
         let deserialized: TupleTwo = Deserialize::deserialize(deserializer).unwrap();
         assert_eq!(deserialized, TupleTwo(1., true, "null"));
+    }
+
+    #[test]
+    fn deserialize_simple_maps() {
+        use std::collections::HashMap;
+
+        let deserializer = Expression::new_object(vec![
+            ("test", Expression::from("foo")),
+            ("bar", Expression::from("baz")),
+        ]);
+        let deserialized: HashMap<String, String> = Deserialize::deserialize(deserializer).unwrap();
+
+        let expected: HashMap<_, _> = [("test", "foo"), ("bar", "baz")]
+            .iter()
+            .cloned()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+
+        assert_eq!(deserialized, expected);
     }
 }
