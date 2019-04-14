@@ -10,7 +10,7 @@ pub(crate) mod map;
 use std::borrow::Cow;
 
 use nom::types::CompleteStr;
-use serde::de::{self, Visitor};
+use serde::de::{self, IntoDeserializer, Visitor};
 use serde::{forward_to_deserialize_any, Deserialize};
 
 use crate::parser;
@@ -41,9 +41,6 @@ mod error {
 
         #[fail(display = "Overflow when trying to convert to {}", _0)]
         Overflow(&'static str),
-
-        #[fail(display = "Expected single character string, got {}", _0)]
-        ExpectedCharacterGotString(String),
 
         #[fail(
             display = "Invalid tuple length. Expected {}, got {}",
@@ -143,10 +140,7 @@ macro_rules! parse_number {
     }
 }
 
-pub(crate) fn deserialize_string<'de, V>(
-    string: Cow<'de, str>,
-    visitor: V,
-) -> Result<V::Value, Compat>
+fn deserialize_string<'de, V>(string: Cow<'de, str>, visitor: V) -> Result<V::Value, Compat>
 where
     V: Visitor<'de>,
 {
@@ -170,6 +164,16 @@ where
     } else {
         visitor.visit_u64(number.as_u64().map_err(Error::ParseIntError)?)
     }
+}
+
+fn deserialize_tuple<'de, V>(
+    tuple: crate::parser::tuple::Tuple<'de>,
+    visitor: V,
+) -> Result<V::Value, Compat>
+where
+    V: Visitor<'de>,
+{
+    visitor.visit_seq(tuple.into_deserializer())
 }
 
 impl<'de> Deserializer<'de> {
@@ -215,39 +219,14 @@ impl<'de> Deserializer<'de> {
         Ok(output)
     }
 
-    fn parse_bytes(&mut self) -> Result<Vec<u8>, Error> {
-        let (remaining, list) = parser::list(self.input)?;
-        self.input = remaining;
-        // Check that we are all numbers and fits within u8
-        let numbers = list
-            .into_iter()
-            .map(|value| {
-                value.integer().map_err(Error::from).and_then(|integer| {
-                    #[allow(clippy::cast_lossless)]
-                    let min = u8::min_value() as i64;
-                    #[allow(clippy::cast_lossless)]
-                    let max = u8::max_value() as i64;
-
-                    if integer < min || integer > max {
-                        Err(Error::Overflow(stringify!(u8)))
-                    } else {
-                        Ok(integer as u8)
-                    }
-                })
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
-        Ok(numbers)
-    }
-
     fn parse_null(&mut self) -> Result<(), Error> {
         let (remaining, ()) = parser::null::null(self.input)?;
         self.input = remaining;
         Ok(())
     }
 
-    fn parse_list(&mut self) -> Result<value::List, Error> {
-        let (remaining, list) = parser::list(self.input)?;
+    fn parse_list(&mut self) -> Result<parser::tuple::Tuple<'de>, Error> {
+        let (remaining, list) = parser::tuple::tuple(self.input)?;
         self.input = remaining;
         Ok(list)
     }
@@ -332,21 +311,14 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        let parsed = self.parse_string()?;
-        let parsed = if parsed.len() != 1 {
-            Err(Error::ExpectedCharacterGotString(parsed.to_string()))?
-        } else {
-            parsed
-        };
-        let character = parsed.chars().next().expect("to have one character");
-        visitor.visit_char(character)
+        self.deserialize_str(visitor)
     }
 
     fn deserialize_bytes<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        visitor.visit_byte_buf(self.parse_bytes()?)
+        self.deserialize_seq(visitor)
     }
 
     fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -401,7 +373,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         let list = self.parse_list()?;
-        visitor.visit_seq(list::ListAccess::new(list))
+        deserialize_tuple(list, visitor)
     }
 
     fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
@@ -415,7 +387,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 actual: list.len(),
             })?;
         }
-        visitor.visit_seq(list::ListAccess::new(list))
+        deserialize_tuple(list, visitor)
     }
 
     fn deserialize_tuple_struct<V>(
@@ -629,7 +601,7 @@ something
     }
 
     #[test]
-    #[should_panic(expected = "ExpectedCharacterGotString")]
+    #[should_panic(expected = "expected a character")]
     fn deserialize_char_should_error_on_strings() {
         let mut deserializer = Deserializer::from_str("\"foobar\"");
         let _ = char::deserialize(&mut deserializer).unwrap();
@@ -648,14 +620,14 @@ something
     }
 
     #[test]
-    #[should_panic(expected = "UnexpectedVariant")]
+    #[should_panic(expected = "expected u8")]
     fn deserialize_bytes_errors_on_invalid_entries() {
         let mut deserializer = Deserializer::from_str("[1, false]");
         let _ = ByteBuf::deserialize(&mut deserializer).unwrap();
     }
 
     #[test]
-    #[should_panic(expected = "Overflow")]
+    #[should_panic(expected = "expected u8")]
     fn deserialize_bytes_errors_on_overflow() {
         let mut deserializer = Deserializer::from_str("[1, 999]");
         let _ = ByteBuf::deserialize(&mut deserializer).unwrap();
