@@ -4,8 +4,9 @@
 //! string to Rust types that you can usually disregard. To find out more
 //! about _using_ them, head to [`serde` documentation](https://serde.rs/).
 pub(crate) mod expression;
+pub(crate) mod object;
+
 pub(crate) mod list;
-pub(crate) mod map;
 
 use std::borrow::Cow;
 
@@ -14,7 +15,6 @@ use serde::de::{self, IntoDeserializer, Visitor};
 use serde::{forward_to_deserialize_any, Deserialize};
 
 use crate::parser;
-use crate::value;
 
 pub use self::error::*;
 
@@ -47,6 +47,9 @@ mod error {
             expected, actual
         )]
         InvalidTupleLength { expected: usize, actual: usize },
+
+        #[fail(display = "Object has duplicate key {}", _0)]
+        ObjectDuplicateKey(String),
 
         #[fail(display = "{}", _0)]
         Custom(String),
@@ -151,7 +154,7 @@ where
 }
 
 fn deserialize_number<'de, V>(
-    number: crate::parser::number::Number<'de>,
+    number: parser::number::Number<'de>,
     visitor: V,
 ) -> Result<V::Value, Compat>
 where
@@ -167,7 +170,7 @@ where
 }
 
 fn deserialize_tuple<'de, V>(
-    tuple: crate::parser::tuple::Tuple<'de>,
+    tuple: parser::tuple::Tuple<'de>,
     visitor: V,
     check_length: Option<usize>,
 ) -> Result<V::Value, Compat>
@@ -184,6 +187,16 @@ where
     }
 
     visitor.visit_seq(tuple.into_deserializer())
+}
+
+fn deserialize_object<'de, V>(
+    object: parser::object::Object<'de>,
+    visitor: V,
+) -> Result<V::Value, Compat>
+where
+    V: Visitor<'de>,
+{
+    visitor.visit_map(object::ObjectMapAccess::new(object))
 }
 
 impl<'de> Deserializer<'de> {
@@ -241,16 +254,16 @@ impl<'de> Deserializer<'de> {
         Ok(list)
     }
 
-    fn parse_map(&mut self) -> Result<value::MapValues, Error> {
-        let (remaining, map) = parser::map_values(self.input)?;
+    fn parse_object(&mut self) -> Result<parser::object::Object<'de>, Error> {
+        let (remaining, object) = parser::object::object(self.input)?;
         self.input = remaining;
-        Ok(map)
+        Ok(object)
     }
 
-    fn peek(&mut self) -> Result<value::Value, Error> {
-        let (remaining, peek) = parser::peek(self.input)?;
+    fn parse_expression(&mut self) -> Result<parser::expression::Expression<'de>, Error> {
+        let (remaining, expr) = parser::expression::expression(self.input)?;
         self.input = remaining;
-        Ok(peek)
+        Ok(expr)
     }
 }
 
@@ -272,17 +285,13 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        use value::Value::*;
-        match self.peek()? {
-            Null => self.deserialize_unit(visitor),
-            Boolean(_) => self.deserialize_bool(visitor),
-            Integer(_) => self.deserialize_i128(visitor),
-            Float(_) => self.deserialize_f64(visitor),
-            String(_) => self.deserialize_string(visitor),
-            List(_) => self.deserialize_seq(visitor),
-            Object(_) => self.deserialize_map(visitor),
-            Block(_) => self.deserialize_map(visitor),
+        // This is an expensive procedure!
+        let expression = self.parse_expression();
+        if let Ok(expr) = expression {
+            return expr.deserialize_any(visitor);
         }
+
+        unimplemented!("Unknown");
     }
 
     deserialize_scalars!(deserialize_bool, visit_bool, parse_bool);
@@ -420,8 +429,9 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        let map = self.parse_map()?;
-        visitor.visit_map(map::MapAccess::new(map)?)
+        // FIXME: Can be an object or block...
+        let object = self.parse_object()?;
+        deserialize_object(object, visitor)
     }
 
     fn deserialize_struct<V>(
@@ -433,6 +443,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        // FIXME: Can be an object or block...
         self.deserialize_map(visitor)
     }
 
@@ -737,9 +748,10 @@ something
 
     #[test]
     fn deserialize_simple_maps() {
-        let input = r#"
-test = "foo"
-bar  = "baz""#;
+        let input = r#"{
+    test = "foo"
+    bar  = "baz"
+}"#;
         let mut deserializer = Deserializer::from_str(input);
         let deserialized: HashMap<String, String> =
             Deserialize::deserialize(&mut deserializer).unwrap();
@@ -768,7 +780,8 @@ bar  = "baz""#;
 name = "second"
 allow = false
 index = 1
-list = ["foo", "bar", "baz"]"#;
+list = ["foo", "bar", "baz"]}
+"#;
         let mut deserializer = Deserializer::from_str(input);
         let deserialized: DeserializeMe = Deserialize::deserialize(&mut deserializer).unwrap();
 

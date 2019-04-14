@@ -37,6 +37,19 @@ pub enum ObjectElementIdentifier<'a> {
     Expression(Cow<'a, str>),
 }
 
+impl<'a> ObjectElementIdentifier<'a> {
+    /// Turn an object element identifier into a string
+    pub fn as_str(&self) -> Cow<'a, str> {
+        match self {
+            ObjectElementIdentifier::Identifier(ident) => ident.clone(),
+            // FIXME
+            ObjectElementIdentifier::Expression(_) => {
+                unimplemented!("Expression evaluation is not yet supported")
+            }
+        }
+    }
+}
+
 impl<'a, S> PartialEq<S> for ObjectElementIdentifier<'a>
 where
     S: AsRef<str>,

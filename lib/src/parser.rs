@@ -23,7 +23,7 @@ use whitespace::newline;
 
 use nom::types::CompleteStr;
 use nom::{
-    alt, alt_complete, call, char, complete, do_parse, eof, exact, named, named_attr, opt, peek,
+    alt, alt_complete, call, char, complete, do_parse, eof, exact, named, named_attr, opt,
     preceded, tag, terminated,
 };
 
@@ -141,17 +141,6 @@ named!(
 named!(
     pub(crate) body(CompleteStr) -> Body,
     exact!(call!(map_values))
-);
-
-// TODO: Make this more efficient.
-named!(
-    pub(crate) peek(CompleteStr) -> Value,
-    peek!(
-        alt!(
-            call!(single_value)
-            | call!(attribute) => { |pair| Value::new_map(vec![vec![pair]])}
-        )
-    )
 );
 
 /// A HCL Configuration File
@@ -808,58 +797,5 @@ foo = "bar"
         ])
         .unwrap();
         assert_eq!(&expected_resources, resource);
-    }
-
-    #[test]
-    fn peek_works_correctly() {
-        let test_cases = [
-            ("null", Value::Null),
-            (r#"123"#, Value::Integer(123)),
-            ("123", Value::Integer(123)),
-            ("123", Value::Integer(123)),
-            ("true", Value::Boolean(true)),
-            ("123.456", Value::Float(123.456)),
-            ("123", Value::Integer(123)),
-            (r#""foobar""#, Value::String("foobar".to_string())),
-            (
-                r#"<<EOF
-new
-line
-EOF
-"#,
-                Value::String("new\nline".to_string()),
-            ),
-            (
-                r#"[true, false, 123, -123.456, "foobar"]"#,
-                Value::new_list(vec![
-                    Value::from(true),
-                    Value::from(false),
-                    Value::from(123),
-                    Value::from(-123.456),
-                    Value::from("foobar"),
-                ]),
-            ),
-            (
-                r#"{
-        test = 123
-}"#,
-                Value::new_map(vec![vec![(Key::new_identifier("test"), Value::from(123))]]),
-            ),
-        ];
-
-        for (input, expected_value) in test_cases.iter() {
-            println!("Testing {}", input);
-            let (remaining, actual_value) = peek(CompleteStr(input)).unwrap();
-            assert_eq!(&remaining.0, input);
-            assert_eq!(actual_value, *expected_value);
-        }
-    }
-
-    #[test]
-    fn peek_works_on_body() {
-        let example = fixtures::BLOCK;
-        let (remaining, actual_value) = peek(CompleteStr(example)).unwrap();
-        assert_eq!(&remaining.0, &example);
-        assert!(actual_value.is_body());
     }
 }
