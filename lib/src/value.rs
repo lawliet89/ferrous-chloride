@@ -1,6 +1,3 @@
-#[cfg(feature = "serde")]
-pub mod de;
-
 use crate::HashMap;
 use std::iter::FromIterator;
 use std::string::ToString;
