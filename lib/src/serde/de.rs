@@ -169,10 +169,20 @@ where
 fn deserialize_tuple<'de, V>(
     tuple: crate::parser::tuple::Tuple<'de>,
     visitor: V,
+    check_length: Option<usize>,
 ) -> Result<V::Value, Compat>
 where
     V: Visitor<'de>,
 {
+    if let Some(len) = check_length {
+        if tuple.len() != len {
+            Err(Error::InvalidTupleLength {
+                expected: len,
+                actual: tuple.len(),
+            })?;
+        }
+    }
+
     visitor.visit_seq(tuple.into_deserializer())
 }
 
@@ -275,10 +285,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         }
     }
 
-    forward_to_deserialize_any! {
-        enum
-    }
-
     deserialize_scalars!(deserialize_bool, visit_bool, parse_bool);
     deserialize_scalars!(deserialize_i8, visit_i8, parse_i8);
     deserialize_scalars!(deserialize_i16, visit_i16, parse_i16);
@@ -373,7 +379,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         let list = self.parse_list()?;
-        deserialize_tuple(list, visitor)
+        deserialize_tuple(list, visitor, None)
     }
 
     fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
@@ -381,13 +387,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         let list = self.parse_list()?;
-        if list.len() != len {
-            Err(Error::InvalidTupleLength {
-                expected: len,
-                actual: list.len(),
-            })?;
-        }
-        deserialize_tuple(list, visitor)
+        deserialize_tuple(list, visitor, Some(len))
     }
 
     fn deserialize_tuple_struct<V>(
@@ -434,6 +434,10 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         self.deserialize_map(visitor)
+    }
+
+    forward_to_deserialize_any! {
+        enum
     }
 }
 

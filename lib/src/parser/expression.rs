@@ -137,6 +137,12 @@ impl_from_expr_type!(Boolean, bool);
 impl_from_expr_type!(String, Cow<'a, str>);
 impl_from_expr_type!(Tuple, Vec<Expression<'a>>);
 
+impl<'a> From<()> for Expression<'a> {
+    fn from(_: ()) -> Self {
+        Expression::Null
+    }
+}
+
 impl<'a> From<&'a str> for Expression<'a> {
     fn from(s: &'a str) -> Self {
         Expression::String(Cow::Borrowed(s))
