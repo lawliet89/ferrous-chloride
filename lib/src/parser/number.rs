@@ -10,7 +10,7 @@ use nom::{alt, char, digit, opt, pair, tuple};
 
 use crate::AsOwned;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, Hash)]
 pub struct Number<'a> {
     /// The original input number literal
     input: Cow<'a, str>,
@@ -25,6 +25,22 @@ pub struct Number<'a> {
 }
 
 impl<'a> Number<'a> {
+    fn new(
+        input: Cow<'a, str>,
+        positive: bool,
+        whole: Option<Cow<'a, str>>,
+        fraction: Option<Cow<'a, str>>,
+        exponent: Option<Exponent<'a>>,
+    ) -> Self {
+        Self {
+            input,
+            positive,
+            whole,
+            fraction,
+            exponent,
+        }
+    }
+
     /// Is signed integer
     pub fn is_signed(&self) -> bool {
         self.fraction.is_none() && self.exponent.is_none()
@@ -47,13 +63,7 @@ macro_rules! from_uint {
             fn from(n: $from) -> Self {
                 let input = Cow::Owned(n.to_string());
                 let whole = Some(Cow::Owned(n.to_string()));
-                Number {
-                    input,
-                    positive: n > 0,
-                    whole,
-                    fraction: None,
-                    exponent: None,
-                }
+                Self::new(input, true, whole, None, None)
             }
         }
     )*};
@@ -64,18 +74,8 @@ macro_rules! from_int {
         impl<'a> From<$from> for Number<'a> {
             fn from(n: $from) -> Self {
                 let input = Cow::Owned(n.to_string());
-                let whole = if n >= 0 {
-                    Some(Cow::Owned(n.to_string()))
-                } else {
-                    Some(Cow::Owned((n * -1).to_string()))
-                };
-                Number {
-                    input,
-                    positive: n >= 0,
-                    whole,
-                    fraction: None,
-                    exponent: None,
-                }
+                let whole = Some(Cow::Owned(n.abs().to_string()));
+                Self::new(input, n >= 0, whole, None, None)
             }
         }
     )*};
@@ -96,13 +96,7 @@ macro_rules! from_float {
                 let mut parts = string.split(".");
                 let whole = parts.next().map(|s| Cow::Owned(s.to_string()));
                 let fraction = parts.next().map(|s| Cow::Owned(s.to_string()));
-                Number {
-                    input: Cow::Owned(n.to_string()),
-                    positive: n >= 0.0,
-                    whole,
-                    fraction,
-                    exponent: None,
-                }
+                Self::new(Cow::Owned(n.to_string()), n >= 0.0, whole, fraction, None)
             }
         }
     )*};
@@ -160,6 +154,54 @@ impl<'a> AsOwned for Number<'a> {
     }
 }
 
+impl<'a> std::cmp::PartialEq for Number<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        if self.is_float() || other.is_float() {
+            // Good enough comparison
+            // From https://users.rust-lang.org/t/assert-eq-for-float-numbers/7034/4
+            let us = self.as_f64();
+            let them = other.as_f64();
+            if us.is_err() || them.is_err() {
+                println!("Error converting to float!");
+                return false;
+            }
+
+            let us = us.unwrap().abs();
+            let them = them.unwrap().abs();
+            let diff = (us - them).abs();
+
+            if us == them {
+                // Handle infinities.
+                true
+            } else if us == 0.0 || them == 0.0 || diff < std::f64::MIN_POSITIVE {
+                // One of a or b is zero (or both are extremely close to it,) use absolute error.
+                diff < (std::f64::EPSILON * std::f64::MIN_POSITIVE)
+            } else {
+                // Use relative error.
+                (diff / f64::min(us + them, std::f64::MAX)) < std::f64::EPSILON
+            }
+        } else if self.is_unsigned() && other.is_unsigned() {
+            // Unsigned
+            let us = self.as_u128();
+            let them = other.as_u128();
+            if us.is_err() || them.is_err() {
+                println!("Error converting to unsigned!");
+                return false;
+            }
+            us.unwrap().eq(&them.unwrap())
+        } else {
+            // Signed
+            let us = self.as_i128();
+            let them = other.as_i128();
+            if us.is_err() || them.is_err() {
+                println!("Error converting to signed!");
+                return false;
+            }
+            us.unwrap().eq(&them.unwrap())
+        }
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 struct Exponent<'a> {
     /// Whether the exponent is positive
@@ -182,7 +224,7 @@ impl<'a> AsOwned for Exponent<'a> {
 pub fn number<'a>(s: CompleteStr<'a>) -> IResult<CompleteStr<'a>, Number<'a>, u32> {
     use nom::InputTake;
 
-    let (input, positive) = opt!(s.clone(), alt!(char!('+') | char!('-')))?;
+    let (input, positive) = opt!(s, alt!(char!('+') | char!('-')))?;
     let positive = match positive {
         None => true,
         Some('+') => true,
@@ -195,7 +237,7 @@ pub fn number<'a>(s: CompleteStr<'a>) -> IResult<CompleteStr<'a>, Number<'a>, u3
         tuple!(digit, opt!(pair!(char!('.'), opt!(digit)))) => { |(digit, decimals )| {
             let decimals = match decimals {
                 None => None,
-                Some((_, None)) => None,
+                Some((_, None)) => Some(CompleteStr("")),
                 Some((_, Some(decimals))) => Some(decimals)
             };
             (Some(digit), decimals)
@@ -206,15 +248,15 @@ pub fn number<'a>(s: CompleteStr<'a>) -> IResult<CompleteStr<'a>, Number<'a>, u3
     let (remaining, exponent) = exponent(input)?;
 
     let input = s.take(s.len() - remaining.len());
-    let component = Number {
-        input: Cow::Borrowed(input.0),
+    let number = Number::new(
+        Cow::Borrowed(input.0),
         positive,
-        whole: whole.map(|w| Cow::Borrowed(w.0)),
-        fraction: fraction.map(|f| Cow::Borrowed(f.0)),
+        whole.map(|w| Cow::Borrowed(w.0)),
+        fraction.map(|f| Cow::Borrowed(f.0)),
         exponent,
-    };
+    );
 
-    Ok((remaining, component))
+    Ok((remaining, number))
 }
 
 fn exponent<'a>(input: CompleteStr<'a>) -> IResult<CompleteStr<'a>, Option<Exponent<'a>>, u32> {
@@ -269,20 +311,34 @@ mod tests {
         ];
 
         for case in cases.iter() {
+            println!("Testing {}", case);
+
             let (remaining, parsed) = number(CompleteStr(*case)).unwrap();
             assert!(remaining.is_empty());
 
             let expected_int: Result<i64, _> = case.parse();
             let actual_int = parsed.as_i64();
             assert_eq!(expected_int, actual_int);
+            if let Ok(int) = expected_int {
+                let test_from = Number::from(int);
+                assert_eq!(parsed, test_from);
+            }
 
             let expected_uint: Result<u64, _> = case.parse();
             let actual_uint = parsed.as_u64();
             assert_eq!(expected_uint, actual_uint);
+            if let Ok(int) = expected_uint {
+                let test_from = Number::from(int);
+                assert_eq!(parsed, test_from);
+            }
 
             let expected_f64: Result<f64, _> = case.parse();
             let actual_f64 = parsed.as_f64();
             assert_eq!(expected_f64, actual_f64);
+            if let Ok(f) = expected_f64 {
+                let test_from = Number::from(f);
+                assert_eq!(parsed, test_from);
+            }
         }
     }
 }
