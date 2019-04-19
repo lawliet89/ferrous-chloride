@@ -10,7 +10,7 @@ use std::borrow::Cow;
 
 use nom::types::CompleteStr;
 use serde::de::{self, IntoDeserializer, Visitor};
-use serde::{forward_to_deserialize_any, Deserialize};
+use serde::{forward_to_deserialize_any, Deserialize, Serialize};
 
 use crate::parser;
 
@@ -127,6 +127,10 @@ mod error {
     }
 
 }
+
+/// Settings for deserializing HCL into Rust types
+#[derive(Debug, PartialEq, Clone, Eq, Hash, Serialize, Deserialize)]
+pub struct Setting {}
 
 pub struct Deserializer<'de> {
     input: CompleteStr<'de>,
@@ -250,6 +254,14 @@ impl<'de> Deserializer<'de> {
         let (remaining, list) = parser::tuple::tuple(self.input)?;
         self.input = remaining;
         Ok(list)
+    }
+
+    fn parse_object_identifier(
+        &mut self,
+    ) -> Result<parser::object::ObjectElementIdentifier<'de>, Error> {
+        let (remaining, ident) = parser::object::object_element_identifier(self.input)?;
+        self.input = remaining;
+        Ok(ident)
     }
 
     fn parse_object(&mut self) -> Result<parser::object::Object<'de>, Error> {
@@ -413,7 +425,12 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        self.deserialize_str(visitor)
+        match self.parse_object_identifier()? {
+            parser::object::ObjectElementIdentifier::Identifier(string) => {
+                deserialize_string(string, visitor)
+            }
+            _ => unimplemented!("Not supported"),
+        }
     }
 
     fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
