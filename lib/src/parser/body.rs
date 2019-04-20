@@ -31,6 +31,24 @@ pub enum BodyElement<'a> {
     Block(Block<'a>),
 }
 
+impl<'a> BodyElement<'a> {
+    pub fn is_attribute(&self) -> bool {
+        if let BodyElement::Attribute(_) = self {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_block(&self) -> bool {
+        if let BodyElement::Block(_) = self {
+            true
+        } else {
+            false
+        }
+    }
+}
+
 impl<'a> From<Attribute<'a>> for BodyElement<'a> {
     fn from(attr: Attribute<'a>) -> Self {
         BodyElement::Attribute(attr)

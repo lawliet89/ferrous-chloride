@@ -26,10 +26,8 @@ pub use value::Value;
 pub use nom;
 
 use std::borrow::Cow;
-use std::collections::HashMap as StdHashMap;
+use std::collections::HashMap;
 use std::hash::{BuildHasher, Hash};
-
-pub(crate) type HashMap<K, V> = StdHashMap<K, V, hashbrown::hash_map::DefaultHashBuilder>;
 
 /// Has scalar length
 pub trait ScalarLength {
@@ -300,7 +298,7 @@ where
 //     }
 // }
 
-impl<K, V, S> ScalarLength for StdHashMap<K, V, S>
+impl<K, V, S> ScalarLength for HashMap<K, V, S>
 where
     K: Eq + Hash,
     V: ScalarLength,
@@ -384,7 +382,7 @@ where
     }
 }
 
-impl<K, V, S> Mergeable for StdHashMap<K, V, S>
+impl<K, V, S> Mergeable for HashMap<K, V, S>
 where
     K: Hash + Eq,
     V: Mergeable,
@@ -480,7 +478,7 @@ where
     }
 }
 
-impl<K, V, S, KO, VO> AsOwned for StdHashMap<K, V, S>
+impl<K, V, S, KO, VO> AsOwned for HashMap<K, V, S>
 where
     K: Hash + Eq + AsOwned<Output = KO>,
     V: AsOwned<Output = VO>,
@@ -488,7 +486,7 @@ where
     KO: Hash + Eq + 'static,
     VO: 'static,
 {
-    type Output = StdHashMap<KO, VO, S>;
+    type Output = HashMap<KO, VO, S>;
 
     fn as_owned(&self) -> Self::Output {
         self.iter().map(|pair| pair.as_owned()).collect()

@@ -57,4 +57,10 @@ impl<'de> MapAccess<'de> for ObjectMapAccess<'de> {
         let expression = self.expression.take().expect("to be some");
         seed.deserialize(expression)
     }
+
+    fn size_hint(&self) -> Option<usize> {
+        // Vector size hint always returns a value
+        let (lower, _) = self.iterator.size_hint();
+        Some(lower)
+    }
 }

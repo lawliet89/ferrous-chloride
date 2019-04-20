@@ -212,7 +212,7 @@ pub fn parse_slice(bytes: &[u8]) -> Result<ConfigFile, Error> {
 mod tests {
     use super::*;
 
-    use crate::HashMap;
+    use std::collections::HashMap;
 
     use crate::fixtures;
     use crate::utils::{assert_list_eq, ResultUtilsString};

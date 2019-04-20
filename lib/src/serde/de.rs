@@ -3,8 +3,9 @@
 //! This module contains the types and trait implementation to allow deserialization from a HCL
 //! string to Rust types that you can usually disregard. To find out more
 //! about _using_ them, head to [`serde` documentation](https://serde.rs/).
-pub(crate) mod expression;
-pub(crate) mod object;
+pub mod body;
+pub mod expression;
+pub mod object;
 
 use std::borrow::Cow;
 
@@ -48,6 +49,9 @@ mod error {
 
         #[fail(display = "Object has duplicate key {}", _0)]
         ObjectDuplicateKey(String),
+
+        #[fail(display = "Body has duplicate key {}", _0)]
+        BodyDuplicateKey(String),
 
         #[fail(display = "{}", _0)]
         Custom(String),
@@ -507,7 +511,7 @@ where
 mod tests {
     use super::*;
 
-    use crate::HashMap;
+    use std::collections::HashMap;
 
     use serde::Deserialize;
     use serde_bytes::ByteBuf;

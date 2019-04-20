@@ -7,6 +7,8 @@
 //! OneLineBlock = Identifier (StringLit|Identifier)* "{" (Identifier "=" Expression)? "}" Newline;
 //! ```
 use std::borrow::{Borrow, Cow};
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
 
 use nom::types::CompleteStr;
 use nom::{alt, call, many0, named, opt, tag};
@@ -158,6 +160,65 @@ named!(
         )
     )
 );
+
+/// Blocks in a body indexed by their type and labels
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Blocks<'a> {
+    blocks: HashMap<Identifier<'a>, BlockBody<'a>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BlockBody<'a> {
+    Body(Vec<Body<'a>>),
+    Labels(HashMap<Option<BlockLabel<'a>>, BlockBody<'a>>),
+}
+
+impl<'a> BlockBody<'a> {
+    pub fn append(&mut self, mut labels: Vec<BlockLabel<'a>>, body: Body<'a>) {
+        // In place replacement of &mut self
+        take_mut::take(self, move |current| match current {
+            BlockBody::Body(mut bodies) => {
+                if labels.is_empty() {
+                    bodies.push(body);
+                    BlockBody::Body(bodies)
+                } else {
+                    let label = labels.drain(0..1).next();
+
+                    let mut hashmap: HashMap<_, _> =
+                        std::iter::once((None, BlockBody::Body(bodies))).collect();
+                    let mut new_body = BlockBody::default();
+                    new_body.append(labels, body);
+                    hashmap.insert(label, new_body);
+                    BlockBody::Labels(hashmap)
+                }
+            }
+            BlockBody::Labels(mut hashmap) => {
+                let label = if labels.is_empty() {
+                    None
+                } else {
+                    labels.drain(0..1).next()
+                };
+
+                match hashmap.entry(label) {
+                    Entry::Vacant(vacant) => {
+                        vacant.insert(BlockBody::Body(vec![body]));
+                    }
+                    Entry::Occupied(mut occupied) => {
+                        occupied.get_mut().append(labels, body);
+                    }
+                }
+
+                BlockBody::Labels(hashmap)
+            }
+        });
+    }
+}
+
+impl<'a> Default for BlockBody<'a> {
+    fn default() -> Self {
+        BlockBody::Body(vec![])
+    }
+}
 
 #[cfg(test)]
 mod tests {
