@@ -1,4 +1,4 @@
-use crate::HashMap;
+use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::string::ToString;
 
