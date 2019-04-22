@@ -175,24 +175,15 @@ pub enum BlockBody<'a> {
 
 impl<'a> BlockBody<'a> {
     pub fn append(&mut self, mut labels: Vec<BlockLabel<'a>>, body: Body<'a>) {
-        // In place replacement of &mut self
-        take_mut::take(self, move |current| match current {
-            BlockBody::Body(mut bodies) => {
+        match self {
+            BlockBody::Body(ref mut bodies) => {
                 if labels.is_empty() {
                     bodies.push(body);
-                    BlockBody::Body(bodies)
                 } else {
-                    let label = labels.drain(0..1).next();
-
-                    let mut hashmap: HashMap<_, _> =
-                        std::iter::once((None, BlockBody::Body(bodies))).collect();
-                    let mut new_body = BlockBody::default();
-                    new_body.append(labels, body);
-                    hashmap.insert(label, new_body);
-                    BlockBody::Labels(hashmap)
+                    self.body_to_labels(labels, body);
                 }
             }
-            BlockBody::Labels(mut hashmap) => {
+            BlockBody::Labels(ref mut hashmap) => {
                 let label = if labels.is_empty() {
                     None
                 } else {
@@ -207,8 +198,27 @@ impl<'a> BlockBody<'a> {
                         occupied.get_mut().append(labels, body);
                     }
                 }
+            }
+        }
+    }
 
+    /// In place transmute of Body to Labels
+    ///
+    /// Must only be called when `labels` are not empty and the enum is of Body type
+    /// Otherwise, this functon will panic
+    fn body_to_labels(&mut self, mut labels: Vec<BlockLabel<'a>>, body: Body<'a>) {
+        take_mut::take(self, move |current| {
+            if let BlockBody::Body(bodies) = current {
+                let label = labels.drain(0..1).next();
+
+                let mut hashmap: HashMap<_, _> =
+                    std::iter::once((None, BlockBody::Body(bodies))).collect();
+                let mut new_body = BlockBody::default();
+                new_body.append(labels, body);
+                hashmap.insert(label, new_body);
                 BlockBody::Labels(hashmap)
+            } else {
+                panic!("Unexpected enum variant")
             }
         });
     }
