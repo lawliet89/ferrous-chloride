@@ -9,7 +9,9 @@
 use std::borrow::{Borrow, Cow};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::iter::{Extend, FromIterator};
 
+use itertools::Itertools;
 use nom::types::CompleteStr;
 use nom::{alt, call, many0, named, opt, tag};
 
@@ -167,6 +169,46 @@ pub struct Blocks<'a> {
     blocks: HashMap<Identifier<'a>, BlockBody<'a>>,
 }
 
+impl<'a> Blocks<'a> {
+    pub fn new<T>(blocks: T) -> Self
+    where
+        T: IntoIterator<Item = Block<'a>>,
+    {
+        let mut hashmap = HashMap::new();
+        for (block_type, blocks) in blocks
+            .into_iter()
+            .group_by(|block| block.r#type.clone())
+            .into_iter()
+        {
+            let blocks = BlockBody::from_iter(blocks.map(|block| (block.labels, block.body)));
+            hashmap.insert(block_type, blocks);
+        }
+        Self { blocks: hashmap }
+    }
+
+    pub fn append(&mut self, block: Block<'a>) {
+        match self.blocks.entry(block.r#type) {
+            Entry::Vacant(vacant) => {
+                let mut body = BlockBody::default();
+                body.append(block.labels, block.body);
+                vacant.insert(body);
+            }
+            Entry::Occupied(mut occupied) => {
+                occupied.get_mut().append(block.labels, block.body);
+            }
+        }
+    }
+}
+
+impl<'a> FromIterator<Block<'a>> for Blocks<'a> {
+    fn from_iter<T>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = Block<'a>>,
+    {
+        Self::new(iter)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BlockBody<'a> {
     Body(Vec<Body<'a>>),
@@ -221,6 +263,28 @@ impl<'a> BlockBody<'a> {
                 panic!("Unexpected enum variant")
             }
         });
+    }
+}
+
+impl<'a> FromIterator<(Vec<BlockLabel<'a>>, Body<'a>)> for BlockBody<'a> {
+    fn from_iter<T>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = (Vec<BlockLabel<'a>>, Body<'a>)>,
+    {
+        let mut results = Self::default();
+        results.extend(iter);
+        results
+    }
+}
+
+impl<'a> Extend<(Vec<BlockLabel<'a>>, Body<'a>)> for BlockBody<'a> {
+    fn extend<T>(&mut self, iter: T)
+    where
+        T: IntoIterator<Item = (Vec<BlockLabel<'a>>, Body<'a>)>,
+    {
+        for (labels, body) in iter {
+            self.append(labels, body);
+        }
     }
 }
 
