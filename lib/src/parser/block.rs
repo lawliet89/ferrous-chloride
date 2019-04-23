@@ -236,6 +236,8 @@ impl<'a> Blocks<'a> {
         self.blocks.iter_mut()
     }
 
+    /// Returns a flattened iterator, yielding a three-tuple of the block type, block labels and the
+    /// body of a block
     pub fn flat_iter<'b>(
         &'b self,
     ) -> impl Iterator<Item = (&'a str, Vec<&'a str>, &'b Body<'a>)> + 'b
@@ -247,6 +249,28 @@ impl<'a> Blocks<'a> {
             .map(|(block_type, blocks)| {
                 let block_type: &str = block_type.borrow();
                 blocks.flat_iter().map(move |(mut labels, bodies)| {
+                    labels.reverse();
+                    (block_type, labels, bodies)
+                })
+            })
+            .flatten()
+    }
+
+    /// Returns a flattened mutable iterator, yielding a three-tuple of the block type, block
+    /// labels and the body of a block.
+    ///
+    /// Only the body is mutable
+    pub fn flat_iter_mut<'b>(
+        &'b mut self,
+    ) -> impl Iterator<Item = (&'a str, Vec<&'a str>, &'b mut Body<'a>)> + 'b
+    where
+        'b: 'a,
+    {
+        self.blocks
+            .iter_mut()
+            .map(|(block_type, blocks)| {
+                let block_type: &str = block_type.borrow();
+                blocks.flat_iter_mut().map(move |(mut labels, bodies)| {
                     labels.reverse();
                     (block_type, labels, bodies)
                 })
@@ -396,6 +420,34 @@ impl<'a> BlockBody<'a> {
                     vec![Box::new(empty.iter().map(|body| (vec![], body)))];
                 for (label, nested) in labels.iter() {
                     let nested_iter = nested.flat_iter().map(move |(mut labels, body)| {
+                        labels.push(label.as_str());
+                        (labels, body)
+                    });
+                    iterators.push(Box::new(nested_iter));
+                }
+                Box::new(iterators.into_iter().flatten())
+            }
+        }
+    }
+
+    pub(crate) fn flat_iter_mut<'b>(
+        &'b mut self,
+    ) -> Box<dyn Iterator<Item = (Vec<&'a str>, &'b mut Body<'a>)> + 'b>
+    where
+        'b: 'a,
+    {
+        match self {
+            BlockBody::Body(ref mut bodies) => {
+                Box::new(bodies.iter_mut().map(|body| (vec![], body)))
+            }
+            BlockBody::Labels {
+                ref mut empty,
+                ref mut labels,
+            } => {
+                let mut iterators: Vec<Box<dyn Iterator<Item = _>>> =
+                    vec![Box::new(empty.iter_mut().map(|body| (vec![], body)))];
+                for (label, nested) in labels.iter_mut() {
+                    let nested_iter = nested.flat_iter_mut().map(move |(mut labels, body)| {
                         labels.push(label.as_str());
                         (labels, body)
                     });
