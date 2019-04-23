@@ -7,7 +7,7 @@
 //! OneLineBlock = Identifier (StringLit|Identifier)* "{" (Identifier "=" Expression)? "}" Newline;
 //! ```
 use std::borrow::{Borrow, Cow};
-use std::collections::hash_map::Entry;
+use std::collections::hash_map::{self, Entry};
 use std::collections::HashMap;
 use std::iter::{Extend, FromIterator};
 
@@ -219,6 +219,42 @@ impl<'a> Blocks<'a> {
             None => None,
             Some(body) => body.get_mut(labels),
         }
+    }
+
+    /// Get an iterator over the types of blocks
+    pub fn iter(&self) -> hash_map::Iter<Identifier<'a>, BlockBody<'a>> {
+        self.blocks.iter()
+    }
+
+    pub fn iter_mut(&mut self) -> hash_map::IterMut<Identifier<'a>, BlockBody<'a>> {
+        self.blocks.iter_mut()
+    }
+}
+
+impl<'a> IntoIterator for Blocks<'a> {
+    type Item = (Identifier<'a>, BlockBody<'a>);
+    type IntoIter = hash_map::IntoIter<Identifier<'a>, BlockBody<'a>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.blocks.into_iter()
+    }
+}
+
+impl<'a, 'b> IntoIterator for &'b Blocks<'a> {
+    type Item = (&'b Identifier<'a>, &'b BlockBody<'a>);
+    type IntoIter = hash_map::Iter<'b, Identifier<'a>, BlockBody<'a>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'a, 'b> IntoIterator for &'b mut Blocks<'a> {
+    type Item = (&'b Identifier<'a>, &'b mut BlockBody<'a>);
+    type IntoIter = hash_map::IterMut<'b, Identifier<'a>, BlockBody<'a>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
     }
 }
 
