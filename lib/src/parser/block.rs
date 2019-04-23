@@ -9,6 +9,7 @@
 use std::borrow::{Borrow, Cow};
 use std::collections::hash_map::{self, Entry};
 use std::collections::{HashMap, VecDeque};
+use std::hash::{Hash, Hasher};
 use std::iter::{Extend, FromIterator};
 
 use itertools::Itertools;
@@ -56,7 +57,7 @@ impl<'a> Block<'a> {
     }
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BlockLabel<'a> {
     StringLiteral(StringLiteral),
     Identifier(Identifier<'a>),
@@ -72,6 +73,12 @@ impl<'a> BlockLabel<'a> {
             BlockLabel::StringLiteral(literal) => Cow::Owned(literal.clone()),
             BlockLabel::Identifier(ident) => ident.clone(),
         }
+    }
+}
+
+impl<'a> Hash for BlockLabel<'a> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.as_str().hash(state)
     }
 }
 
@@ -545,6 +552,22 @@ impl<'a> BlockBody<'a> {
         }
     }
 
+    /// Borrow the bodies with no labels
+    pub fn get_empty(&self) -> &[Body<'a>] {
+        match self {
+            BlockBody::Body(ref bodies) => bodies,
+            BlockBody::Labels { ref empty, .. } => empty,
+        }
+    }
+
+    /// Borrow the bodies with additional labels
+    pub fn get_labels(&self) -> Option<&HashMap<BlockLabel<'a>, BlockBody<'a>>> {
+        match self {
+            BlockBody::Body(_) => None,
+            BlockBody::Labels { ref labels, .. } => Some(labels),
+        }
+    }
+
     /// In place transmute of Body to Labels
     ///
     /// Must only be called when `labels` are not empty and the enum is of Body type
@@ -810,17 +833,20 @@ mod tests {
         assert_eq!(block, expected);
     }
 
-    #[test]
-    fn blocks_with_no_labels_are_constructed_correctly() {
-        const N: usize = 10;
-
-        let hcl: Vec<_> = std::iter::repeat("test { foo = 123 }").take(N).collect();
+    fn repeat_blocks(n: usize) -> Blocks<'static> {
+        let hcl: Vec<_> = std::iter::repeat("test { foo = 123 }").take(n).collect();
         let parsed: Vec<_> = hcl
             .iter()
             .map(|hcl| one_line_block(CompleteStr(hcl)).unwrap_output())
             .collect();
-        let blocks = Blocks::new(parsed);
+        Blocks::new(parsed)
+    }
 
+    #[test]
+    fn blocks_with_no_labels_are_constructed_correctly() {
+        const N: usize = 10;
+
+        let blocks = repeat_blocks(N);
         assert_eq!(blocks.len(), 1);
         assert_eq!(blocks.len_blocks(), N);
 
@@ -853,5 +879,30 @@ mod tests {
         assert!(blocks
             .iter()
             .all(|(_type, bodies)| !bodies.has_further_labels()))
+    }
+
+    #[test]
+    fn appending_block_with_labels_transforms_correctly() {
+        const N: usize = 10;
+
+        let mut blocks = repeat_blocks(N);
+        let additional_block =
+            one_line_block(CompleteStr(r#"test "foo" { foo = true } "#)).unwrap_output();
+        blocks.append(additional_block);
+
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks.len_blocks(), N + 1);
+
+        let test = blocks.get::<_, &str>("test", &[]).unwrap();
+        assert!(test.has_further_labels());
+
+        let empty = test.get_empty();
+        assert_eq!(empty.len(), N);
+
+        let labels = test.get_labels().expect("to be some");
+        assert_eq!(labels.len(), 1);
+
+        let foo = labels.get("foo").expect("to be some");
+        assert!(!foo.has_further_labels());
     }
 }
