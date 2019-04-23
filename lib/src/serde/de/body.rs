@@ -73,7 +73,7 @@ impl<'de> de::MapAccess<'de> for MapAccess<'de> {
         K: DeserializeSeed<'de>,
     {
         let next = self.elements.next();
-        if let None = next {
+        if next.is_none() {
             return Ok(None);
         }
 

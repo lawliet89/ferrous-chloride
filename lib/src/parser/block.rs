@@ -198,6 +198,28 @@ impl<'a> Blocks<'a> {
             }
         }
     }
+
+    pub fn get<S1, S2>(&self, block_type: S1, labels: &[S2]) -> Option<&BlockBody<'a>>
+    where
+        S1: AsRef<str>,
+        S2: AsRef<str>,
+    {
+        match self.blocks.get(block_type.as_ref()) {
+            None => None,
+            Some(body) => body.get(labels),
+        }
+    }
+
+    pub fn get_mut<S1, S2>(&mut self, block_type: S1, labels: &[S2]) -> Option<&mut BlockBody<'a>>
+    where
+        S1: AsRef<str>,
+        S2: AsRef<str>,
+    {
+        match self.blocks.get_mut(block_type.as_ref()) {
+            None => None,
+            Some(body) => body.get_mut(labels),
+        }
+    }
 }
 
 impl<'a> FromIterator<Block<'a>> for Blocks<'a> {
@@ -209,10 +231,24 @@ impl<'a> FromIterator<Block<'a>> for Blocks<'a> {
     }
 }
 
+impl<'a> Extend<Block<'a>> for Blocks<'a> {
+    fn extend<T>(&mut self, iter: T)
+    where
+        T: IntoIterator<Item = Block<'a>>,
+    {
+        for block in iter {
+            self.append(block)
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BlockBody<'a> {
     Body(Vec<Body<'a>>),
-    Labels(HashMap<Option<BlockLabel<'a>>, BlockBody<'a>>),
+    Labels {
+        empty: Vec<Body<'a>>,
+        labels: HashMap<BlockLabel<'a>, BlockBody<'a>>,
+    },
 }
 
 impl<'a> BlockBody<'a> {
@@ -225,22 +261,62 @@ impl<'a> BlockBody<'a> {
                     self.body_to_labels(labels, body);
                 }
             }
-            BlockBody::Labels(ref mut hashmap) => {
-                let label = if labels.is_empty() {
-                    None
+            BlockBody::Labels {
+                ref mut empty,
+                labels: ref mut hashmap,
+            } => {
+                if labels.is_empty() {
+                    empty.push(body);
                 } else {
-                    labels.drain(0..1).next()
+                    let label = labels.drain(0..1).next().expect("to be some");
+                    match hashmap.entry(label) {
+                        Entry::Vacant(vacant) => {
+                            vacant.insert(BlockBody::Body(vec![body]));
+                        }
+                        Entry::Occupied(mut occupied) => {
+                            occupied.get_mut().append(labels, body);
+                        }
+                    }
                 };
-
-                match hashmap.entry(label) {
-                    Entry::Vacant(vacant) => {
-                        vacant.insert(BlockBody::Body(vec![body]));
-                    }
-                    Entry::Occupied(mut occupied) => {
-                        occupied.get_mut().append(labels, body);
-                    }
-                }
             }
+        }
+    }
+
+    pub fn get<S>(&self, labels: &[S]) -> Option<&Self>
+    where
+        S: AsRef<str>,
+    {
+        match labels.split_first() {
+            None => Some(self),
+            Some((first, rest)) => match self {
+                BlockBody::Body(_) => None,
+                BlockBody::Labels {
+                    labels: ref hashmap,
+                    ..
+                } => match hashmap.get(first.as_ref()) {
+                    None => None,
+                    Some(inner) => inner.get(rest),
+                },
+            },
+        }
+    }
+
+    pub fn get_mut<S>(&mut self, labels: &[S]) -> Option<&mut Self>
+    where
+        S: AsRef<str>,
+    {
+        match labels.split_first() {
+            None => Some(self),
+            Some((first, rest)) => match self {
+                BlockBody::Body(_) => None,
+                BlockBody::Labels {
+                    labels: ref mut hashmap,
+                    ..
+                } => match hashmap.get_mut(first.as_ref()) {
+                    None => None,
+                    Some(inner) => inner.get_mut(rest),
+                },
+            },
         }
     }
 
@@ -251,14 +327,16 @@ impl<'a> BlockBody<'a> {
     fn body_to_labels(&mut self, mut labels: Vec<BlockLabel<'a>>, body: Body<'a>) {
         take_mut::take(self, move |current| {
             if let BlockBody::Body(bodies) = current {
-                let label = labels.drain(0..1).next();
+                let label = labels.drain(0..1).next().expect("to be some");
 
-                let mut hashmap: HashMap<_, _> =
-                    std::iter::once((None, BlockBody::Body(bodies))).collect();
+                let mut hashmap = HashMap::new();
                 let mut new_body = BlockBody::default();
                 new_body.append(labels, body);
                 hashmap.insert(label, new_body);
-                BlockBody::Labels(hashmap)
+                BlockBody::Labels {
+                    empty: bodies,
+                    labels: hashmap,
+                }
             } else {
                 panic!("Unexpected enum variant")
             }
