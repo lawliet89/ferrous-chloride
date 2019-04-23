@@ -297,6 +297,23 @@ impl<'a> Blocks<'a> {
             })
             .flatten()
     }
+
+    /// Top level length
+    pub fn len(&self) -> usize {
+        self.blocks.len()
+    }
+
+    /// Whether the top level is empty
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Total number of blocks recursively
+    pub fn len_blocks(&self) -> usize {
+        self.blocks
+            .iter()
+            .fold(0, |acc, (_, bodies)| bodies.len_blocks() + acc)
+    }
 }
 
 impl<'a> IntoIterator for Blocks<'a> {
@@ -504,6 +521,30 @@ impl<'a> BlockBody<'a> {
         }
     }
 
+    pub fn len_blocks(&self) -> usize {
+        match self {
+            BlockBody::Body(ref bodies) => bodies.len(),
+            BlockBody::Labels {
+                ref empty,
+                ref labels,
+            } => {
+                empty.len()
+                    + labels
+                        .iter()
+                        .fold(0, |acc, (_, bodies)| bodies.len_blocks() + acc)
+            }
+        }
+    }
+
+    /// Indicates that there are further labels for the block
+    pub fn has_further_labels(&self) -> bool {
+        if let BlockBody::Labels { .. } = self {
+            true
+        } else {
+            false
+        }
+    }
+
     /// In place transmute of Body to Labels
     ///
     /// Must only be called when `labels` are not empty and the enum is of Body type
@@ -634,6 +675,14 @@ mod tests {
                 Block::new_one_line(From::from("test"), vec![], None),
             ),
             (
+                "test { foo = 123 }",
+                Block::new_one_line(
+                    From::from("test"),
+                    vec![],
+                    Some((From::from("foo"), From::from(123))),
+                ),
+            ),
+            (
                 "test foo bar baz {}",
                 Block::new_one_line(
                     From::from("test"),
@@ -759,5 +808,50 @@ mod tests {
         );
 
         assert_eq!(block, expected);
+    }
+
+    #[test]
+    fn blocks_with_no_labels_are_constructed_correctly() {
+        const N: usize = 10;
+
+        let hcl: Vec<_> = std::iter::repeat("test { foo = 123 }").take(N).collect();
+        let parsed: Vec<_> = hcl
+            .iter()
+            .map(|hcl| one_line_block(CompleteStr(hcl)).unwrap_output())
+            .collect();
+        let blocks = Blocks::new(parsed);
+
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks.len_blocks(), N);
+
+        let test = blocks.get::<_, &str>("test", &[]).unwrap();
+        assert!(!test.has_further_labels())
+    }
+
+    #[test]
+    fn multiple_blocks_with_no_labels_are_constructed_correctly() {
+        const N: usize = 10;
+
+        let mut counter = 0;
+        let hcl: Vec<_> = std::iter::from_fn(move || {
+            let hcl = format!("test_{} {{ foo = 123 }}", counter);
+            counter += 1;
+            Some(hcl)
+        })
+        .take(N)
+        .collect();
+
+        let parsed: Vec<_> = hcl
+            .iter()
+            .map(|hcl| one_line_block(CompleteStr(hcl)).unwrap_output())
+            .collect();
+        let blocks = Blocks::new(parsed);
+
+        assert_eq!(blocks.len(), N);
+        assert_eq!(blocks.len_blocks(), N);
+
+        assert!(blocks
+            .iter()
+            .all(|(_type, bodies)| !bodies.has_further_labels()))
     }
 }
