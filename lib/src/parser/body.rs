@@ -17,7 +17,6 @@ use crate::parser::whitespace::newline;
 /// Block        = Identifier (StringLit|Identifier)* "{" Newline Body "}" Newline;
 /// OneLineBlock = Identifier (StringLit|Identifier)* "{" (Identifier "=" Expression)? "}" Newline;
 /// ```
-// TODO: Change this into a vec of Body Element. Remove merging semantics
 pub type Body<'a> = Vec<BodyElement<'a>>;
 
 /// An element of `Body`
@@ -45,6 +44,22 @@ impl<'a> BodyElement<'a> {
             true
         } else {
             false
+        }
+    }
+
+    pub fn unwrap_attribute(self) -> Attribute<'a> {
+        if let BodyElement::Attribute(attr) = self {
+            attr
+        } else {
+            panic!("BodyElement is a block")
+        }
+    }
+
+    pub fn unwrap_block(self) -> Block<'a> {
+        if let BodyElement::Block(blk) = self {
+            blk
+        } else {
+            panic!("BodyElement is an attribute")
         }
     }
 }
