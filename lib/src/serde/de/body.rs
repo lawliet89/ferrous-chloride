@@ -7,13 +7,16 @@ use serde::forward_to_deserialize_any;
 
 use crate::parser;
 use crate::parser::attribute::Attribute;
+use crate::parser::block;
 use crate::parser::body::{Body, BodyElement};
 use crate::parser::expression::Expression;
+use crate::parser::identifier::Identifier;
 use crate::serde::de::{Compat, Error};
 
 #[derive(Clone, Debug)]
 pub enum BodyValue<'de> {
     Expression(Expression<'de>),
+    Block(block::BlockBody<'de>),
 }
 
 #[derive(Clone, Debug)]
@@ -41,8 +44,7 @@ impl<'de> de::Deserializer<'de> for Deserializer<'de> {
 
 #[derive(Clone, Debug)]
 pub struct MapAccess<'de> {
-    // attributes: vec::IntoIter<Attribute<'de>>,
-    elements: vec::IntoIter<BodyElement<'de>>,
+    elements: vec::IntoIter<(Identifier<'de>, BodyValue<'de>)>,
     /// MapAccess users have to call `next_key_seed` before `next_value_seed`
     /// So we store the value extracted after calling `next_key_seed`
     value: Option<BodyValue<'de>>,
@@ -53,16 +55,28 @@ pub struct MapAccess<'de> {
 impl<'de> MapAccess<'de> {
     pub fn new(body: Body<'de>) -> Self {
         Self {
-            elements: body.into_iter(),
+            elements: build_map_acces_iter(body),
             value: None,
             seen_attributes: Default::default(),
         }
     }
 }
 
-pub fn build_map_access<'de>(body: Body<'de>) {
+pub fn build_map_acces_iter<'de>(
+    body: Body<'de>,
+) -> vec::IntoIter<(Identifier<'de>, BodyValue<'de>)> {
     let (attributes, blocks): (Vec<_>, Vec<_>) =
         body.into_iter().partition(BodyElement::is_attribute);
+    let attributes = attributes
+        .into_iter()
+        .map(BodyElement::unwrap_attribute)
+        .map(|(ident, expr)| (ident, BodyValue::Expression(expr)));
+    let blocks = block::Blocks::new(blocks.into_iter().map(BodyElement::unwrap_block))
+        .into_iter()
+        .map(|(ident, bodies)| (ident, BodyValue::Block(bodies)));
+
+    let elements: Vec<_> = attributes.chain(blocks).collect();
+    elements.into_iter()
 }
 
 impl<'de> de::MapAccess<'de> for MapAccess<'de> {
@@ -78,14 +92,14 @@ impl<'de> de::MapAccess<'de> for MapAccess<'de> {
         }
 
         match next.expect("to be some") {
-            BodyElement::Attribute((ident, expr)) => {
+            (ident, expr @ BodyValue::Expression(_)) => {
                 if !self.seen_attributes.insert(ident.clone()) {
                     Err(Error::BodyDuplicateKey(ident.to_string()))?;
                 }
-                self.value = Some(BodyValue::Expression(expr));
+                self.value = Some(expr);
                 seed.deserialize(ident.into_deserializer()).map(Some)
             }
-            BodyElement::Block(block) => unimplemented!("Not yet!"),
+            (block_type, blk @ BodyValue::Block(_)) => unimplemented!("Not yet!"),
         }
     }
 
@@ -95,6 +109,7 @@ impl<'de> de::MapAccess<'de> for MapAccess<'de> {
     {
         match self.value.take().expect("to be some") {
             BodyValue::Expression(expr) => seed.deserialize(expr),
+            BodyValue::Block(blk) => unimplemented!("not yet"),
         }
     }
 
