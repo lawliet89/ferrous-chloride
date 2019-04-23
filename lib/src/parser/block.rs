@@ -8,7 +8,7 @@
 //! ```
 use std::borrow::{Borrow, Cow};
 use std::collections::hash_map::{self, Entry};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::iter::{Extend, FromIterator};
 
 use itertools::Itertools;
@@ -247,7 +247,7 @@ impl<'a> Blocks<'a> {
     /// body of a block
     pub fn flat_iter<'b>(
         &'b self,
-    ) -> impl Iterator<Item = (&'a str, Vec<&'a str>, &'b Body<'a>)> + 'b
+    ) -> impl Iterator<Item = (&'a str, VecDeque<&'a str>, &'b Body<'a>)> + 'b
     where
         'b: 'a,
     {
@@ -255,10 +255,9 @@ impl<'a> Blocks<'a> {
             .iter()
             .map(|(block_type, blocks)| {
                 let block_type: &str = block_type.borrow();
-                blocks.flat_iter().map(move |(mut labels, bodies)| {
-                    labels.reverse();
-                    (block_type, labels, bodies)
-                })
+                blocks
+                    .flat_iter()
+                    .map(move |(labels, bodies)| (block_type, labels, bodies))
             })
             .flatten()
     }
@@ -269,7 +268,7 @@ impl<'a> Blocks<'a> {
     /// Only the body is mutable
     pub fn flat_iter_mut<'b>(
         &'b mut self,
-    ) -> impl Iterator<Item = (&'a str, Vec<&'a str>, &'b mut Body<'a>)> + 'b
+    ) -> impl Iterator<Item = (&'a str, VecDeque<&'a str>, &'b mut Body<'a>)> + 'b
     where
         'b: 'a,
     {
@@ -277,10 +276,9 @@ impl<'a> Blocks<'a> {
             .iter_mut()
             .map(|(block_type, blocks)| {
                 let block_type: &str = block_type.borrow();
-                blocks.flat_iter_mut().map(move |(mut labels, bodies)| {
-                    labels.reverse();
-                    (block_type, labels, bodies)
-                })
+                blocks
+                    .flat_iter_mut()
+                    .map(move |(labels, bodies)| (block_type, labels, bodies))
             })
             .flatten()
     }
@@ -289,14 +287,13 @@ impl<'a> Blocks<'a> {
     /// block labels and the body of a block
     pub fn flat_into_iter(
         self,
-    ) -> impl Iterator<Item = (Cow<'a, str>, Vec<Cow<'a, str>>, Body<'a>)> + 'a {
+    ) -> impl Iterator<Item = (Cow<'a, str>, VecDeque<Cow<'a, str>>, Body<'a>)> + 'a {
         self.blocks
             .into_iter()
             .map(|(block_type, blocks)| {
-                blocks.flat_into_iter().map(move |(mut labels, bodies)| {
-                    labels.reverse();
-                    (block_type.clone(), labels, bodies)
-                })
+                blocks
+                    .flat_into_iter()
+                    .map(move |(labels, bodies)| (block_type.clone(), labels, bodies))
             })
             .flatten()
     }
@@ -427,23 +424,25 @@ impl<'a> BlockBody<'a> {
         }
     }
 
-    pub(crate) fn flat_iter<'b>(
+    pub fn flat_iter<'b>(
         &'b self,
-    ) -> Box<dyn Iterator<Item = (Vec<&'a str>, &'b Body<'a>)> + 'b>
+    ) -> Box<dyn Iterator<Item = (VecDeque<&'a str>, &'b Body<'a>)> + 'b>
     where
         'b: 'a,
     {
         match self {
-            BlockBody::Body(ref bodies) => Box::new(bodies.iter().map(|body| (vec![], body))),
+            BlockBody::Body(ref bodies) => {
+                Box::new(bodies.iter().map(|body| (VecDeque::new(), body)))
+            }
             BlockBody::Labels {
                 ref empty,
                 ref labels,
             } => {
                 let mut iterators: Vec<Box<dyn Iterator<Item = _>>> =
-                    vec![Box::new(empty.iter().map(|body| (vec![], body)))];
+                    vec![Box::new(empty.iter().map(|body| (VecDeque::new(), body)))];
                 for (label, nested) in labels.iter() {
                     let nested_iter = nested.flat_iter().map(move |(mut labels, body)| {
-                        labels.push(label.as_str());
+                        labels.push_front(label.as_str());
                         (labels, body)
                     });
                     iterators.push(Box::new(nested_iter));
@@ -453,25 +452,26 @@ impl<'a> BlockBody<'a> {
         }
     }
 
-    pub(crate) fn flat_iter_mut<'b>(
+    pub fn flat_iter_mut<'b>(
         &'b mut self,
-    ) -> Box<dyn Iterator<Item = (Vec<&'a str>, &'b mut Body<'a>)> + 'b>
+    ) -> Box<dyn Iterator<Item = (VecDeque<&'a str>, &'b mut Body<'a>)> + 'b>
     where
         'b: 'a,
     {
         match self {
             BlockBody::Body(ref mut bodies) => {
-                Box::new(bodies.iter_mut().map(|body| (vec![], body)))
+                Box::new(bodies.iter_mut().map(|body| (VecDeque::new(), body)))
             }
             BlockBody::Labels {
                 ref mut empty,
                 ref mut labels,
             } => {
-                let mut iterators: Vec<Box<dyn Iterator<Item = _>>> =
-                    vec![Box::new(empty.iter_mut().map(|body| (vec![], body)))];
+                let mut iterators: Vec<Box<dyn Iterator<Item = _>>> = vec![Box::new(
+                    empty.iter_mut().map(|body| (VecDeque::new(), body)),
+                )];
                 for (label, nested) in labels.iter_mut() {
                     let nested_iter = nested.flat_iter_mut().map(move |(mut labels, body)| {
-                        labels.push(label.as_str());
+                        labels.push_front(label.as_str());
                         (labels, body)
                     });
                     iterators.push(Box::new(nested_iter));
@@ -481,17 +481,20 @@ impl<'a> BlockBody<'a> {
         }
     }
 
-    pub(crate) fn flat_into_iter(
+    pub fn flat_into_iter(
         self,
-    ) -> Box<dyn Iterator<Item = (Vec<Cow<'a, str>>, Body<'a>)> + 'a> {
+    ) -> Box<dyn Iterator<Item = (VecDeque<Cow<'a, str>>, Body<'a>)> + 'a> {
         match self {
-            BlockBody::Body(bodies) => Box::new(bodies.into_iter().map(|body| (vec![], body))),
+            BlockBody::Body(bodies) => {
+                Box::new(bodies.into_iter().map(|body| (VecDeque::new(), body)))
+            }
             BlockBody::Labels { empty, labels } => {
-                let mut iterators: Vec<Box<dyn Iterator<Item = _>>> =
-                    vec![Box::new(empty.into_iter().map(|body| (vec![], body)))];
+                let mut iterators: Vec<Box<dyn Iterator<Item = _>>> = vec![Box::new(
+                    empty.into_iter().map(|body| (VecDeque::new(), body)),
+                )];
                 for (label, nested) in labels.into_iter() {
                     let nested_iter = nested.flat_into_iter().map(move |(mut labels, body)| {
-                        labels.push(label.as_cow());
+                        labels.push_front(label.as_cow());
                         (labels, body)
                     });
                     iterators.push(Box::new(nested_iter));
