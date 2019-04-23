@@ -66,6 +66,13 @@ impl<'a> BlockLabel<'a> {
     pub fn as_str(&self) -> &str {
         self.borrow()
     }
+
+    pub fn as_cow(&self) -> Cow<'a, str> {
+        match self {
+            BlockLabel::StringLiteral(literal) => Cow::Owned(literal.clone()),
+            BlockLabel::Identifier(ident) => ident.clone(),
+        }
+    }
 }
 
 impl<'a, S> PartialEq<S> for BlockLabel<'a>
@@ -277,6 +284,22 @@ impl<'a> Blocks<'a> {
             })
             .flatten()
     }
+
+    /// Consumes self and return  a flattened iterator, yielding a three-tuple of the block type,
+    /// block labels and the body of a block
+    pub fn flat_into_iter(
+        self,
+    ) -> impl Iterator<Item = (Cow<'a, str>, Vec<Cow<'a, str>>, Body<'a>)> + 'a {
+        self.blocks
+            .into_iter()
+            .map(|(block_type, blocks)| {
+                blocks.flat_into_iter().map(move |(mut labels, bodies)| {
+                    labels.reverse();
+                    (block_type.clone(), labels, bodies)
+                })
+            })
+            .flatten()
+    }
 }
 
 impl<'a> IntoIterator for Blocks<'a> {
@@ -449,6 +472,26 @@ impl<'a> BlockBody<'a> {
                 for (label, nested) in labels.iter_mut() {
                     let nested_iter = nested.flat_iter_mut().map(move |(mut labels, body)| {
                         labels.push(label.as_str());
+                        (labels, body)
+                    });
+                    iterators.push(Box::new(nested_iter));
+                }
+                Box::new(iterators.into_iter().flatten())
+            }
+        }
+    }
+
+    pub(crate) fn flat_into_iter(
+        self,
+    ) -> Box<dyn Iterator<Item = (Vec<Cow<'a, str>>, Body<'a>)> + 'a> {
+        match self {
+            BlockBody::Body(bodies) => Box::new(bodies.into_iter().map(|body| (vec![], body))),
+            BlockBody::Labels { empty, labels } => {
+                let mut iterators: Vec<Box<dyn Iterator<Item = _>>> =
+                    vec![Box::new(empty.into_iter().map(|body| (vec![], body)))];
+                for (label, nested) in labels.into_iter() {
+                    let nested_iter = nested.flat_into_iter().map(move |(mut labels, body)| {
+                        labels.push(label.as_cow());
                         (labels, body)
                     });
                     iterators.push(Box::new(nested_iter));
