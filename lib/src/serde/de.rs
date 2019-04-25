@@ -3,6 +3,7 @@
 //! This module contains the types and trait implementation to allow deserialization from a HCL
 //! string to Rust types that you can usually disregard. To find out more
 //! about _using_ them, head to [`serde` documentation](https://serde.rs/).
+pub mod block;
 pub mod body;
 pub mod expression;
 pub mod object;
