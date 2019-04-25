@@ -8,7 +8,7 @@
 //! ```
 use std::borrow::{Borrow, Cow};
 use std::collections::hash_map::{self, Entry};
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BTreeSet, HashMap, VecDeque};
 use std::hash::{Hash, Hasher};
 use std::iter::{Extend, FromIterator};
 
@@ -321,6 +321,28 @@ impl<'a> Blocks<'a> {
             .iter()
             .fold(0, |acc, (_, bodies)| bodies.len_blocks() + acc)
     }
+
+    /// Get a set of label lengths for this body
+    pub fn label_lens(&self) -> HashMap<&str, BTreeSet<usize>> {
+        self.blocks
+            .iter()
+            .map(|(ident, bodies)| (ident.borrow(), bodies.label_lens()))
+            .collect()
+    }
+
+    pub fn label_lens_uniform(&self) -> HashMap<&str, Option<usize>> {
+        self.blocks
+            .iter()
+            .map(|(ident, bodies)| (ident.borrow(), bodies.label_lens_uniform()))
+            .collect()
+    }
+
+    pub fn is_label_lens_uniform(&self) -> HashMap<&str, bool> {
+        self.blocks
+            .iter()
+            .map(|(ident, bodies)| (ident.borrow(), bodies.is_label_lens_uniform()))
+            .collect()
+    }
 }
 
 impl<'a> IntoIterator for Blocks<'a> {
@@ -373,6 +395,11 @@ impl<'a> Extend<Block<'a>> for Blocks<'a> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BlockBody<'a> {
     Body(Vec<Body<'a>>),
+    /// Variant where there are block bodies with at least one label
+    ///
+    /// You should not construct this enum by hand. It is a logic error for the `labels` HashMap
+    /// to be empty and you can expect panics or unexpected behaviour from other functions in this
+    /// library.
     Labels {
         empty: Vec<Body<'a>>,
         labels: HashMap<BlockLabel<'a>, BlockBody<'a>>,
@@ -380,6 +407,10 @@ pub enum BlockBody<'a> {
 }
 
 impl<'a> BlockBody<'a> {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     pub fn append(&mut self, mut labels: Vec<BlockLabel<'a>>, body: Body<'a>) {
         match self {
             BlockBody::Body(ref mut bodies) => {
@@ -545,8 +576,9 @@ impl<'a> BlockBody<'a> {
 
     /// Indicates that there are further labels for the block
     pub fn has_further_labels(&self) -> bool {
-        if let BlockBody::Labels { .. } = self {
-            true
+        if let BlockBody::Labels { ref labels, .. } = self {
+            // It is a logic error that labels is empty, but we check it anyway
+            !labels.is_empty()
         } else {
             false
         }
@@ -566,6 +598,59 @@ impl<'a> BlockBody<'a> {
             BlockBody::Body(_) => None,
             BlockBody::Labels { ref labels, .. } => Some(labels),
         }
+    }
+
+    /// Get a set of label lengths for this body
+    pub fn label_lens(&self) -> BTreeSet<usize> {
+        match self {
+            BlockBody::Body(_) => std::iter::once(0).collect(),
+            BlockBody::Labels {
+                ref labels,
+                ref empty,
+            } => {
+                let iterator = labels
+                    .iter()
+                    .map(|(_label, bodies)| bodies.label_lens().into_iter().map(|len| len + 1))
+                    .flatten();
+
+                if empty.is_empty() {
+                    iterator.collect()
+                } else {
+                    iterator.chain(std::iter::once(0)).collect()
+                }
+            }
+        }
+    }
+
+    /// Return a uniform label lens, if any. This is cheaper to computer than `label_lens`
+    pub fn label_lens_uniform(&self) -> Option<usize> {
+        match self {
+            BlockBody::Body(_) => Some(0),
+            BlockBody::Labels {
+                ref labels,
+                ref empty,
+            } => {
+                if !labels.is_empty() && !empty.is_empty() {
+                    None
+                } else if labels.is_empty() {
+                    Some(0)
+                } else {
+                    let mut iter = labels.iter();
+                    let (_label, initial) = iter.next().expect("to be some");
+                    let initial = Some(initial.label_lens_uniform()?);
+                    for (_label, bodies) in iter {
+                        if bodies.label_lens_uniform() != initial {
+                            return None;
+                        }
+                    }
+                    initial
+                }
+            }
+        }
+    }
+
+    pub fn is_label_lens_uniform(&self) -> bool {
+        self.label_lens_uniform().is_some()
     }
 
     /// In place transmute of Body to Labels
@@ -851,7 +936,10 @@ mod tests {
         assert_eq!(blocks.len_blocks(), N);
 
         let test = blocks.get::<_, &str>("test", &[]).unwrap();
-        assert!(!test.has_further_labels())
+        assert!(!test.has_further_labels());
+
+        assert_list_eq!(test.label_lens(), [&0usize]);
+        assert!(test.is_label_lens_uniform());
     }
 
     #[test]
@@ -878,7 +966,15 @@ mod tests {
 
         assert!(blocks
             .iter()
-            .all(|(_type, bodies)| !bodies.has_further_labels()))
+            .all(|(_type, bodies)| !bodies.has_further_labels()));
+
+        assert!(blocks
+            .iter()
+            .all(|(_type, bodies)| bodies.is_label_lens_uniform()));
+
+        for (_type, len) in blocks.label_lens() {
+            assert_list_eq!(len, [&0usize]);
+        }
     }
 
     #[test]
@@ -896,6 +992,9 @@ mod tests {
 
         let test = blocks.get::<_, &str>("test", &[]).unwrap();
         assert!(test.has_further_labels());
+
+        assert_list_eq!(test.label_lens(), [&0usize, &1usize]);
+        assert!(!test.is_label_lens_uniform());
 
         let empty = test.get_empty();
         assert_eq!(empty.len(), N);
@@ -936,12 +1035,23 @@ mod tests {
 
         let test = blocks.get::<_, &str>("test", &[]).unwrap();
         assert!(!test.has_further_labels());
+        assert!(test.is_label_lens_uniform());
+        assert_list_eq!(test.label_lens(), [&0usize]);
+
+        let test_0 = blocks.get::<_, &str>("test_0", &[]).unwrap();
+        assert_list_eq!(test_0.label_lens(), [&1usize]);
+        assert!(test_0.is_label_lens_uniform());
 
         let test_0 = blocks.get("test_0", &["foobar"]).unwrap();
         assert!(!test_0.has_further_labels());
 
+        let test_1 = blocks.get::<_, &str>("test_1", &[]).unwrap();
+        assert_list_eq!(test_1.label_lens(), [&2usize]);
+        assert!(test_1.is_label_lens_uniform());
+
         let test_1 = blocks.get("test_1", &["foobar"]).unwrap();
         assert!(test_1.has_further_labels());
+        assert_list_eq!(test_1.label_lens(), [&1usize]);
 
         let test_1 = blocks.get("test_1", &["foobar", "foobar"]).unwrap();
         assert!(!test_1.has_further_labels());

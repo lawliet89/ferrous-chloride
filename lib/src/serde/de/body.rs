@@ -5,8 +5,6 @@ use std::vec;
 use serde::de::{self, DeserializeSeed, IntoDeserializer, Visitor};
 use serde::forward_to_deserialize_any;
 
-use crate::parser;
-use crate::parser::attribute::Attribute;
 use crate::parser::block;
 use crate::parser::body::{Body, BodyElement};
 use crate::parser::expression::Expression;
@@ -21,7 +19,7 @@ pub enum BodyValue<'de> {
 
 #[derive(Clone, Debug)]
 pub struct Deserializer<'de> {
-    body: Body<'de>,
+    pub(crate) body: Body<'de>,
 }
 
 impl<'de> de::Deserializer<'de> for Deserializer<'de> {
@@ -49,7 +47,7 @@ pub struct MapAccess<'de> {
     /// So we store the value extracted after calling `next_key_seed`
     value: Option<BodyValue<'de>>,
     /// Set of keys we have seen before
-    seen_attributes: HashSet<Cow<'de, str>>,
+    seen: HashSet<Cow<'de, str>>,
 }
 
 impl<'de> MapAccess<'de> {
@@ -57,12 +55,12 @@ impl<'de> MapAccess<'de> {
         Self {
             elements: build_map_acces_iter(body),
             value: None,
-            seen_attributes: Default::default(),
+            seen: Default::default(),
         }
     }
 }
 
-pub fn build_map_acces_iter<'de>(
+pub(crate) fn build_map_acces_iter<'de>(
     body: Body<'de>,
 ) -> vec::IntoIter<(Identifier<'de>, BodyValue<'de>)> {
     let (attributes, blocks): (Vec<_>, Vec<_>) =
@@ -93,13 +91,21 @@ impl<'de> de::MapAccess<'de> for MapAccess<'de> {
 
         match next.expect("to be some") {
             (ident, expr @ BodyValue::Expression(_)) => {
-                if !self.seen_attributes.insert(ident.clone()) {
+                if !self.seen.insert(ident.clone()) {
                     Err(Error::BodyDuplicateKey(ident.to_string()))?;
                 }
                 self.value = Some(expr);
                 seed.deserialize(ident.into_deserializer()).map(Some)
             }
-            (block_type, blk @ BodyValue::Block(_)) => unimplemented!("Not yet!"),
+            (block_type, blk @ BodyValue::Block(_)) => {
+                // If this key has been seen before, we have a bug
+                assert!(
+                    self.seen.insert(block_type.clone()),
+                    "bug in block merging code"
+                );
+                self.value = Some(blk);
+                seed.deserialize(block_type.into_deserializer()).map(Some)
+            }
         }
     }
 
@@ -109,7 +115,7 @@ impl<'de> de::MapAccess<'de> for MapAccess<'de> {
     {
         match self.value.take().expect("to be some") {
             BodyValue::Expression(expr) => seed.deserialize(expr),
-            BodyValue::Block(blk) => unimplemented!("not yet"),
+            BodyValue::Block(blk) => seed.deserialize(blk),
         }
     }
 

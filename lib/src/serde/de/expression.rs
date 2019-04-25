@@ -67,6 +67,8 @@ impl<'de> de::Deserializer<'de> for Expression<'de> {
         self.deserialize_tuple(len, visitor)
     }
 
+    // TODO: Enum Unit Variant from String
+
     forward_to_deserialize_any! {
         bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
         bytes byte_buf unit unit_struct seq
