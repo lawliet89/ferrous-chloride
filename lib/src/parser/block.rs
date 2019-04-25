@@ -886,12 +886,13 @@ mod tests {
         const N: usize = 10;
 
         let mut blocks = repeat_blocks(N);
-        let additional_block =
-            one_line_block(CompleteStr(r#"test "foo" { foo = true } "#)).unwrap_output();
-        blocks.append(additional_block);
+        let additional_block = std::iter::repeat(
+            one_line_block(CompleteStr(r#"test "foo" { foo = true } "#)).unwrap_output(),
+        );
+        blocks.extend(additional_block.take(N));
 
         assert_eq!(blocks.len(), 1);
-        assert_eq!(blocks.len_blocks(), N + 1);
+        assert_eq!(blocks.len_blocks(), N + N);
 
         let test = blocks.get::<_, &str>("test", &[]).unwrap();
         assert!(test.has_further_labels());
@@ -902,7 +903,45 @@ mod tests {
         let labels = test.get_labels().expect("to be some");
         assert_eq!(labels.len(), 1);
 
+        #[allow(clippy::blacklisted_name)]
         let foo = labels.get("foo").expect("to be some");
         assert!(!foo.has_further_labels());
+        assert_eq!(foo.len_blocks(), N);
+    }
+
+    #[test]
+    fn appending_block_with_multiple_labels_transforms_correctly() {
+        const N: usize = 10;
+
+        let mut blocks = repeat_blocks(N);
+
+        let mut counter = 0;
+        let additional_block_hcl: Vec<_> = std::iter::from_fn(move || {
+            let labels = std::iter::repeat("\"foobar\"").take(counter % 2 + 1).join(" ");
+            let hcl = format!("test_{} {} {{ foo = true }}", counter, labels);
+            counter += 1;
+            Some(hcl)
+        })
+        .take(N)
+        .collect();
+        let additional_block = additional_block_hcl
+            .iter()
+            .map(|hcl| one_line_block(CompleteStr(&hcl)).unwrap_output());
+        blocks.extend(additional_block);
+
+        assert_eq!(blocks.len(), 1 + N);
+        assert_eq!(blocks.len_blocks(), N + N);
+
+        let test = blocks.get::<_, &str>("test", &[]).unwrap();
+        assert!(!test.has_further_labels());
+
+        let test_0 = blocks.get("test_0", &["foobar"]).unwrap();
+        assert!(!test_0.has_further_labels());
+
+        let test_1 = blocks.get("test_1", &["foobar"]).unwrap();
+        assert!(test_1.has_further_labels());
+
+        let test_1 = blocks.get("test_1", &["foobar", "foobar"]).unwrap();
+        assert!(!test_1.has_further_labels());
     }
 }
