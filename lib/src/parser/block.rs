@@ -917,7 +917,9 @@ mod tests {
 
         let mut counter = 0;
         let additional_block_hcl: Vec<_> = std::iter::from_fn(move || {
-            let labels = std::iter::repeat("\"foobar\"").take(counter % 2 + 1).join(" ");
+            let labels = std::iter::repeat("\"foobar\"")
+                .take(counter % 2 + 1)
+                .join(" ");
             let hcl = format!("test_{} {} {{ foo = true }}", counter, labels);
             counter += 1;
             Some(hcl)
@@ -943,5 +945,14 @@ mod tests {
 
         let test_1 = blocks.get("test_1", &["foobar", "foobar"]).unwrap();
         assert!(!test_1.has_further_labels());
+
+        // Test the flattened iterator implementation
+        for (block_type, labels, _body) in blocks.flat_iter() {
+            if block_type == "test" {
+                assert_eq!(0, labels.len());
+            } else {
+                assert!(!labels.is_empty());
+            }
+        }
     }
 }
