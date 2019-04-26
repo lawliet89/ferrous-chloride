@@ -166,7 +166,7 @@ impl<'de> de::MapAccess<'de> for MapAccess<'de> {
 /// Deserialize a type `T` from a provided HCL String
 ///
 /// ```rust
-/// # use ferrous_chloride::serde::from_str;
+/// # use ferrous_chloride::serde::de::body::from_str;
 /// use serde::Deserialize;
 ///
 /// #[derive(Deserialize, PartialEq, Debug)]
@@ -227,4 +227,30 @@ list = ["foo", "bar", "baz"]
 
         assert_eq!(expected, deserialized);
     }
+
+    //     #[test]
+    //     fn deserialize_nested_structs() {
+    //         #[derive(Deserialize, PartialEq, Debug)]
+    //         struct SecurityGroup {
+    //             name: String,
+    //             allow: Allow,
+    //         }
+
+    //         #[derive(Deserialize, PartialEq, Debug)]
+    //         struct Allow {
+    //             name: String,
+    //             cidrs: Vec<String>,
+    //         }
+
+    //         let input = r#"
+    //   name = "second"
+
+    //   allow {
+    //     name = "all"
+    //     cidrs = ["0.0.0.0/0"]
+    //   }
+    // "#;
+    //         let mut deserializer = Deserializer::from_str(input);
+    //         let deserialized: SecurityGroup = Deserialize::deserialize(&mut deserializer).unwrap();
+    //     }
 }
