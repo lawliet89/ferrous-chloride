@@ -4,6 +4,7 @@ use std::vec;
 
 use serde::de::{self, DeserializeSeed, IntoDeserializer, Visitor};
 use serde::forward_to_deserialize_any;
+use serde::Deserialize;
 
 use crate::parser::block;
 use crate::parser::body::{Body, BodyElement};
@@ -17,9 +18,34 @@ pub enum BodyValue<'de> {
     Block(block::BlockBody<'de>),
 }
 
+/// Deserializer for a HCL configuration file.
+///
+/// In HCL, a [`ConfigFile`](crate::parser::ConfigFile) is essentially a
+/// [`Body`] which is a sequence of
+/// [`Attribute`s](crate::parser::Attribute) or [`Block`s](block::Block).
+///
+/// The semantics of HCL processing requires that the entire file be parsed at once before we can
+/// process the structural elements such as blocks. This deserializer thus expects to be passed
+/// a full HCL configuration file.
+///
+/// To deserialize HCL expressions into types like `&str`,
+/// use [`Expression::parse`]
+/// to parse the HCL expression, and then use the parsed [`Expression`] to deserialize.
 #[derive(Clone, Debug)]
 pub struct Deserializer<'de> {
-    pub(crate) body: Body<'de>,
+    body: Body<'de>,
+}
+
+impl<'de> Deserializer<'de> {
+    pub fn new(body: Body<'de>) -> Self {
+        Self { body }
+    }
+
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(s: &'de str) -> Result<Self, Error> {
+        let body = crate::parser::parse_str(s)?;
+        Ok(Self::new(body))
+    }
 }
 
 impl<'de> de::Deserializer<'de> for Deserializer<'de> {
@@ -29,8 +55,19 @@ impl<'de> de::Deserializer<'de> for Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        unimplemented!("Not yet!")
+        // Best guess is to treat the visitor as a map
+        visitor.visit_map(MapAccess::new(self.body))
     }
+
+    // Option
+    // unit
+    // unit struct
+    // newtype struct
+    // seq
+    // tuple
+    // tuple struct
+    // struct
+    // enum
 
     // These types are not possible to deserialize from a Body
     forward_to_deserialize_any! {
@@ -123,5 +160,71 @@ impl<'de> de::MapAccess<'de> for MapAccess<'de> {
         // Vector size hint always returns a value
         let (lower, _) = self.elements.size_hint();
         Some(lower)
+    }
+}
+
+/// Deserialize a type `T` from a provided HCL String
+///
+/// ```rust
+/// # use ferrous_chloride::serde::from_str;
+/// use serde::Deserialize;
+///
+/// #[derive(Deserialize, PartialEq, Debug)]
+/// struct DeserializeMe {
+///     name: String,
+///     allow: bool,
+///     index: usize,
+///     list: Vec<String>,
+///     nothing: Option<f64>,
+/// }
+///
+/// let input = r#"
+/// name = "second"
+/// allow = false
+/// index = 1
+/// list = ["foo", "bar", "baz"]"#;
+///
+/// let deserialized: DeserializeMe = from_str(input).unwrap();
+/// ```
+pub fn from_str<'a, T>(s: &'a str) -> Result<T, Error>
+where
+    T: Deserialize<'a>,
+{
+    let deserializer = Deserializer::from_str(s)?;
+    Ok(T::deserialize(deserializer)?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn deserialize_simple_structs() {
+        #[derive(Deserialize, PartialEq, Debug)]
+        struct DeserializeMe {
+            name: String,
+            allow: bool,
+            index: usize,
+            list: Vec<String>,
+            nothing: Option<f64>,
+        }
+
+        let input = r#"
+name = "second"
+allow = false
+index = 1
+list = ["foo", "bar", "baz"]
+"#;
+        let deserialized = from_str(input).unwrap();
+
+        let expected = DeserializeMe {
+            name: "second".to_string(),
+            allow: false,
+            index: 1,
+            list: vec!["foo".to_string(), "bar".to_string(), "baz".to_string()],
+            nothing: None,
+        };
+
+        assert_eq!(expected, deserialized);
     }
 }

@@ -14,6 +14,15 @@ pub mod object;
 pub mod string;
 pub mod tuple;
 
+#[doc(inline)]
+pub use attribute::Attribute;
+#[doc(inline)]
+pub use block::{Block, Blocks};
+#[doc(inline)]
+pub use body::Body;
+#[doc(inline)]
+pub use expression::Expression;
+
 use std::borrow::Cow;
 
 use crate::value::{self, MapValues, Value};
@@ -36,7 +45,7 @@ use nom::{
 /// Block        = Identifier (StringLit|Identifier)* "{" Newline Body "}" Newline;
 /// OneLineBlock = Identifier (StringLit|Identifier)* "{" (Identifier "=" Expression)? "}" Newline;
 /// ```
-pub(crate) type Body<'a> = value::MapValues<'a>;
+pub(crate) type OldBody<'a> = value::MapValues<'a>;
 
 named!(
     list_begin(CompleteStr) -> char,
@@ -139,7 +148,7 @@ named!(
 );
 
 named!(
-    pub(crate) body(CompleteStr) -> Body,
+    pub(crate) body(CompleteStr) -> OldBody,
     exact!(call!(map_values))
 );
 

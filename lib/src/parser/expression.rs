@@ -15,6 +15,7 @@ use crate::parser::number::{number, Number};
 use crate::parser::object::{object, Object, ObjectElementIdentifier};
 use crate::parser::string::string;
 use crate::parser::tuple::{tuple, Tuple};
+use crate::Error;
 
 /// An Expression
 ///
@@ -49,16 +50,36 @@ use crate::parser::tuple::{tuple, Tuple};
 /// - Numeric literals represent values of type number.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Expression<'a> {
-    /// LiteralValue -> "null"
+    /// A `null` HCL expression, expressed literally
     Null,
+    /// An arbitrary precision number
     Number(Number<'a>),
+    /// A boolean value, expressed as the literals `true` or `false`
     Boolean(bool),
+    /// A HCL string
     String(Cow<'a, str>),
+    /// A HCL tuple (list)
     Tuple(Tuple<'a>),
+    /// A HCL object (map)
     Object(Object<'a>),
 }
 
 impl<'a> Expression<'a> {
+    /// Parse a string as a HCL expression
+    ///
+    /// The string is expected to be fully consumed during parsing or an eror will be returned.
+    ///
+    /// In general, this method should not be used. Prefer to use
+    /// [`parse_str`](crate::parser::parse_str) to parse a HCL configuration file instead.
+    pub fn parse(s: &'a str) -> Result<Self, Error> {
+        let (remaining, expr) = expression(CompleteStr(s)).map_err(|e| Error::from_err_str(&e))?;;
+        if !remaining.is_empty() {
+            Err(Error::UnexpectedRemainingInput(remaining.to_string()))?;
+        }
+        Ok(expr)
+    }
+
+    /// Convenience method to create a new Tuple Expression variant from an iterator of Expressions
     pub fn new_tuple<T>(iterator: T) -> Self
     where
         T: IntoIterator<Item = Expression<'a>>,
@@ -66,6 +87,8 @@ impl<'a> Expression<'a> {
         Expression::Tuple(iterator.into_iter().collect())
     }
 
+    /// Convenient method to create a new Object Expression variant from an iterator of
+    /// Key-value pairs.
     pub fn new_object<T, I>(iterator: T) -> Self
     where
         T: IntoIterator<Item = (I, Expression<'a>)>,
@@ -74,6 +97,7 @@ impl<'a> Expression<'a> {
         Expression::Object(iterator.into_iter().map(|(k, v)| (k.into(), v)).collect())
     }
 
+    /// Get the name of the Expression variant as a string.
     pub fn variant_name(&self) -> &'static str {
         match self {
             Expression::Null => NULL,
