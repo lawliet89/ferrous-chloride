@@ -87,7 +87,7 @@ impl<'de> de::SeqAccess<'de> for SeqAccess<'de> {
         match self.iterator.next() {
             None => Ok(None),
             Some(body) => seed
-                .deserialize(crate::serde::de::body::Deserializer { body })
+                .deserialize(crate::serde::de::body::Deserializer::new(body))
                 .map(Some),
         }
     }

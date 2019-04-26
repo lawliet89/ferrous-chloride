@@ -133,10 +133,6 @@ mod error {
 
 }
 
-/// Settings for deserializing HCL into Rust types
-#[derive(Debug, PartialEq, Clone, Eq, Hash, Serialize, Deserialize)]
-pub struct Setting {}
-
 pub struct Deserializer<'de> {
     input: CompleteStr<'de>,
 }
