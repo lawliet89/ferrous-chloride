@@ -1,11 +1,32 @@
-use std::vec::IntoIter;
+use std::collections::{hash_map, HashMap};
+use std::vec;
 
-use serde::de::{self, Visitor};
+use serde::de::{self, IntoDeserializer, Visitor};
 use serde::forward_to_deserialize_any;
 
-use crate::parser::block::BlockBody;
+use crate::parser::block::{BlockBody, BlockLabel};
 use crate::parser::body::Body;
 use crate::serde::de::Compat;
+
+fn deserialize_body_seq<'de, V>(bodies: Vec<Body<'de>>, visitor: V) -> Result<V::Value, Compat>
+where
+    V: Visitor<'de>,
+{
+    visitor.visit_seq(
+        bodies
+            .into_iter()
+            .map(|body| crate::serde::de::body::Deserializer::new(body))
+            .collect::<Vec<_>>()
+            .into_deserializer(),
+    )
+}
+
+fn deserialize_map<'de, V>(body: Body<'de>, visitor: V) -> Result<V::Value, Compat>
+where
+    V: Visitor<'de>,
+{
+    visitor.visit_map(crate::serde::de::body::MapAccess::new(body))
+}
 
 impl<'de> de::Deserializer<'de> for BlockBody<'de> {
     type Error = Compat;
@@ -19,18 +40,20 @@ impl<'de> de::Deserializer<'de> for BlockBody<'de> {
             BlockBody::Body(mut bodies) => {
                 if bodies.len() == 1 {
                     // Deseriaize the single block body as a map/struct
-                    visitor.visit_map(crate::serde::de::body::MapAccess::new(bodies.remove(0)))
+                    deserialize_map(bodies.remove(0), visitor)
                 } else {
-                    visitor.visit_seq(SeqAccess {
-                        iterator: bodies.into_iter(),
-                    })
+                    deserialize_body_seq(bodies, visitor)
                 }
             }
             BlockBody::Labels { mut empty, labels } => {
-                if empty.len() == 1 && labels.is_empty() {
+                if labels.is_empty() {
                     // This should be impossible but we handle it anyway
-                    return visitor
-                        .visit_map(crate::serde::de::body::MapAccess::new(empty.remove(0)));
+                    return if empty.len() == 1 {
+                        // Deseriaize the single block body as a map/struct
+                        deserialize_map(empty.remove(0), visitor)
+                    } else {
+                        deserialize_body_seq(empty, visitor)
+                    };
                 }
                 unimplemented!("not yet")
             }
@@ -53,14 +76,24 @@ impl<'de> de::Deserializer<'de> for BlockBody<'de> {
         V: Visitor<'de>,
     {
         match self {
-            BlockBody::Body(bodies) => visitor.visit_seq(SeqAccess {
-                iterator: bodies.into_iter(),
-            }),
-            BlockBody::Labels { empty, labels } => unimplemented!("not yet"),
+            BlockBody::Body(bodies) => deserialize_body_seq(bodies, visitor),
+            BlockBody::Labels { mut empty, labels } => {
+                if labels.is_empty() {
+                    // This should be impossible but we handle it anyway
+                    return if empty.len() == 1 {
+                        // Deseriaize the single block body as a map/struct
+                        deserialize_map(empty.remove(0), visitor)
+                    } else {
+                        deserialize_body_seq(empty, visitor)
+                    };
+                }
+                unimplemented!("not yet")
+            }
         }
     }
+
     // Tuple
-    // map
+    // map - mapaccess `"labels" = rest`
     // struct
     // enum
 
@@ -72,23 +105,17 @@ impl<'de> de::Deserializer<'de> for BlockBody<'de> {
     }
 }
 
-/// Deserialize a sequence of blocks with no labels
-pub struct SeqAccess<'de> {
-    pub(crate) iterator: IntoIter<Body<'de>>,
+#[derive(Debug)]
+pub struct LabelsSeqAccess<'de> {
+    empty: vec::IntoIter<Body<'de>>,
+    labels: hash_map::IntoIter<BlockLabel<'de>, BlockBody<'de>>,
 }
 
-impl<'de> de::SeqAccess<'de> for SeqAccess<'de> {
-    type Error = Compat;
-
-    fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
-    where
-        T: de::DeserializeSeed<'de>,
-    {
-        match self.iterator.next() {
-            None => Ok(None),
-            Some(body) => seed
-                .deserialize(crate::serde::de::body::Deserializer::new(body))
-                .map(Some),
+impl<'de> LabelsSeqAccess<'de> {
+    pub fn new(empty: Vec<Body<'de>>, labels: HashMap<BlockLabel<'de>, BlockBody<'de>>) -> Self {
+        Self {
+            empty: empty.into_iter(),
+            labels: labels.into_iter(),
         }
     }
 }

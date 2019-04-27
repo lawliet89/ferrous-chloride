@@ -77,6 +77,14 @@ impl<'de> de::Deserializer<'de> for Deserializer<'de> {
     }
 }
 
+impl<'de> IntoDeserializer<'de, Compat> for Deserializer<'de> {
+    type Deserializer = Deserializer<'de>;
+
+    fn into_deserializer(self) -> Self::Deserializer {
+        self
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct MapAccess<'de> {
     elements: vec::IntoIter<(Identifier<'de>, BodyValue<'de>)>,

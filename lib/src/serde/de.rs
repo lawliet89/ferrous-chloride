@@ -13,9 +13,9 @@ pub use self::error::*;
 #[doc(inline)]
 pub use body::{from_str, Deserializer};
 
-use std::borrow::Cow;
-use serde::de::{IntoDeserializer, Visitor};
 use crate::parser;
+use serde::de::{IntoDeserializer, Visitor};
+use std::borrow::Cow;
 
 mod error {
     use std::fmt::Display;
