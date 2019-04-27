@@ -9,3 +9,6 @@
 **/*.rs.bk
 
 target
+
+.idea
+*.iml
