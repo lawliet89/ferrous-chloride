@@ -1,11 +1,12 @@
 use std::collections::{hash_map, HashMap};
 use std::vec;
 
-use serde::de::{self, IntoDeserializer, Visitor};
+use serde::de::{self, Deserializer, IntoDeserializer, Visitor};
 use serde::forward_to_deserialize_any;
 
 use crate::parser::block::{BlockBody, BlockLabel};
 use crate::parser::body::Body;
+use crate::serde::de::body::Deserializer as BodyDeserializer;
 use crate::serde::de::Compat;
 
 fn deserialize_body_seq<'de, V>(bodies: Vec<Body<'de>>, visitor: V) -> Result<V::Value, Compat>
@@ -15,7 +16,7 @@ where
     visitor.visit_seq(
         bodies
             .into_iter()
-            .map(|body| crate::serde::de::body::Deserializer::new(body))
+            .map(|body| BodyDeserializer::new(body))
             .collect::<Vec<_>>()
             .into_deserializer(),
     )
@@ -25,9 +26,16 @@ fn deserialize_map<'de, V>(body: Body<'de>, visitor: V) -> Result<V::Value, Comp
 where
     V: Visitor<'de>,
 {
-    visitor.visit_map(crate::serde::de::body::MapAccess::new(body))
+    BodyDeserializer::new(body).deserialize_map(visitor)
 }
 
+/// Possible states of `BlockBody`:
+/// - Empty: Single Body => Deserialize Map/Struct
+/// - Empty: Multiple Bodies => Seq
+/// - Labels: Zero labels => Logic error! Treat like Empty variannt
+/// - Labels: Zero empty => Single label: enum/struct with labels fields
+///                      => Multiple labels: Seq of above
+/// - Labels: Non-zero empty => Seq of structs with label fields
 impl<'de> de::Deserializer<'de> for BlockBody<'de> {
     type Error = Compat;
 
@@ -96,6 +104,7 @@ impl<'de> de::Deserializer<'de> for BlockBody<'de> {
     // map - mapaccess `"labels" = rest`
     // struct
     // enum
+    // identifier = probably enum
 
     // Many of these types cannot be deserialized from BlockBody
     forward_to_deserialize_any! {

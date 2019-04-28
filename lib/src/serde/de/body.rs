@@ -236,29 +236,84 @@ list = ["foo", "bar", "baz"]
         assert_eq!(expected, deserialized);
     }
 
-    //     #[test]
-    //     fn deserialize_nested_structs() {
-    //         #[derive(Deserialize, PartialEq, Debug)]
-    //         struct SecurityGroup {
-    //             name: String,
-    //             allow: Allow,
-    //         }
+    #[test]
+    fn deserialize_nested_single_block_labeless() {
+        #[derive(Deserialize, PartialEq, Debug)]
+        struct SecurityGroup {
+            name: String,
+            allow: Allow,
+        }
 
-    //         #[derive(Deserialize, PartialEq, Debug)]
-    //         struct Allow {
-    //             name: String,
-    //             cidrs: Vec<String>,
-    //         }
+        #[derive(Deserialize, PartialEq, Debug)]
+        struct Allow {
+            name: String,
+            cidrs: Vec<String>,
+        }
 
-    //         let input = r#"
-    //   name = "second"
+        let input = r#"
+name = "second"
 
-    //   allow {
-    //     name = "all"
-    //     cidrs = ["0.0.0.0/0"]
-    //   }
-    // "#;
-    //         let mut deserializer = Deserializer::from_str(input);
-    //         let deserialized: SecurityGroup = Deserialize::deserialize(&mut deserializer).unwrap();
-    //     }
+allow {
+  name = "all"
+  cidrs = ["0.0.0.0/0"]
+}
+    "#;
+        let deserialized: SecurityGroup = from_str(input).unwrap();
+
+        let expected = SecurityGroup {
+            name: "second".to_string(),
+            allow: Allow {
+                name: "all".to_string(),
+                cidrs: vec!["0.0.0.0/0".to_string()],
+            },
+        };
+
+        assert_eq!(deserialized, expected);
+    }
+
+    #[test]
+    fn deserialize_multiple_single_block_labeless() {
+        #[derive(Deserialize, PartialEq, Debug)]
+        struct SecurityGroup {
+            name: String,
+            allow: Vec<Allow>,
+        }
+
+        #[derive(Deserialize, PartialEq, Debug)]
+        struct Allow {
+            name: String,
+            cidrs: Vec<String>,
+        }
+
+        let input = r#"
+name = "second"
+
+allow {
+  name = "lan"
+  cidrs = ["192.168.0.0/16", "10.0.0.0/8"]
+}
+
+allow {
+  name = "localhost"
+  cidrs = ["127.0.0.1/32"]
+}
+    "#;
+        let deserialized: SecurityGroup = from_str(input).unwrap();
+
+        let expected = SecurityGroup {
+            name: "second".to_string(),
+            allow: vec![
+                Allow {
+                    name: "lan".to_string(),
+                    cidrs: vec!["192.168.0.0/16".to_string(), "10.0.0.0/8".to_string()],
+                },
+                Allow {
+                    name: "localhost".to_string(),
+                    cidrs: vec!["127.0.0.1/32".to_string()],
+                },
+            ],
+        };
+
+        assert_eq!(deserialized, expected);
+    }
 }
