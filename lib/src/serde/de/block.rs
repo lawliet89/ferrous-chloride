@@ -16,7 +16,7 @@ where
     visitor.visit_seq(
         bodies
             .into_iter()
-            .map(|body| BodyDeserializer::new(body))
+            .map(BodyDeserializer::new)
             .collect::<Vec<_>>()
             .into_deserializer(),
     )
