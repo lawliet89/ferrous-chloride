@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["null",""]]});
+initSidebarItems({"fn":[["null","Parses the literal `null` as `()`"]]});

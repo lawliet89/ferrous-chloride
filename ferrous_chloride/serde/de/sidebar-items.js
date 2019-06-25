@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["Error","Error type for deserialization"]],"fn":[["from_str","Deserialize a type `T` from a provided HCL String"]],"struct":[["Compat",""],["Deserializer",""]]});
+initSidebarItems({"enum":[["Error","Error type for deserialization"]],"fn":[["from_str","Deserialize a type `T` from a provided HCL String"]],"mod":[["block",""],["body",""],["expression",""],["object",""]],"struct":[["Compat",""],["Deserializer","Deserializer for a HCL configuration file."]]});

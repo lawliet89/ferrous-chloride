@@ -314,6 +314,39 @@
 <span id="314">314</span>
 <span id="315">315</span>
 <span id="316">316</span>
+<span id="317">317</span>
+<span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
+<span id="349">349</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! HCL Body</span>
 <span class="doccomment">//!</span>
@@ -334,7 +367,6 @@
 <span class="doccomment">/// Block        = Identifier (StringLit|Identifier)* &quot;{&quot; Newline Body &quot;}&quot; Newline;</span>
 <span class="doccomment">/// OneLineBlock = Identifier (StringLit|Identifier)* &quot;{&quot; (Identifier &quot;=&quot; Expression)? &quot;}&quot; Newline;</span>
 <span class="doccomment">/// ```</span>
-<span class="comment">// TODO: Change this into a vec of Body Element. Remove merging semantics</span>
 <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">Body</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">BodyElement</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;&gt;</span>;
 
 <span class="doccomment">/// An element of `Body`</span>
@@ -346,6 +378,40 @@
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">BodyElement</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
     <span class="ident">Attribute</span>(<span class="ident">Attribute</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>),
     <span class="ident">Block</span>(<span class="ident">Block</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>),
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">BodyElement</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_attribute</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">bool</span> {
+        <span class="kw">if</span> <span class="kw">let</span> <span class="ident">BodyElement</span>::<span class="ident">Attribute</span>(<span class="kw">_</span>) <span class="op">=</span> <span class="self">self</span> {
+            <span class="bool-val">true</span>
+        } <span class="kw">else</span> {
+            <span class="bool-val">false</span>
+        }
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_block</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">bool</span> {
+        <span class="kw">if</span> <span class="kw">let</span> <span class="ident">BodyElement</span>::<span class="ident">Block</span>(<span class="kw">_</span>) <span class="op">=</span> <span class="self">self</span> {
+            <span class="bool-val">true</span>
+        } <span class="kw">else</span> {
+            <span class="bool-val">false</span>
+        }
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">unwrap_attribute</span>(<span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">Attribute</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
+        <span class="kw">if</span> <span class="kw">let</span> <span class="ident">BodyElement</span>::<span class="ident">Attribute</span>(<span class="ident">attr</span>) <span class="op">=</span> <span class="self">self</span> {
+            <span class="ident">attr</span>
+        } <span class="kw">else</span> {
+            <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;BodyElement is a block&quot;</span>)
+        }
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">unwrap_block</span>(<span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">Block</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
+        <span class="kw">if</span> <span class="kw">let</span> <span class="ident">BodyElement</span>::<span class="ident">Block</span>(<span class="ident">blk</span>) <span class="op">=</span> <span class="self">self</span> {
+            <span class="ident">blk</span>
+        } <span class="kw">else</span> {
+            <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;BodyElement is an attribute&quot;</span>)
+        }
+    }
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Attribute</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;&gt;</span> <span class="kw">for</span> <span class="ident">BodyElement</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {

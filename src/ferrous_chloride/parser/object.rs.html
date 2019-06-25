@@ -636,6 +636,19 @@
 <span id="636">636</span>
 <span id="637">637</span>
 <span id="638">638</span>
+<span id="639">639</span>
+<span id="640">640</span>
+<span id="641">641</span>
+<span id="642">642</span>
+<span id="643">643</span>
+<span id="644">644</span>
+<span id="645">645</span>
+<span id="646">646</span>
+<span id="647">647</span>
+<span id="648">648</span>
+<span id="649">649</span>
+<span id="650">650</span>
+<span id="651">651</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! Object</span>
 <span class="doccomment">//!</span>
@@ -674,6 +687,19 @@
     <span class="doccomment">/// Users are expected to parse and process the expression in a manner that is appropriate for</span>
     <span class="doccomment">/// the semantics for their application.</span>
     <span class="ident">Expression</span>(<span class="ident">Cow</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">str</span><span class="op">&gt;</span>),
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">ObjectElementIdentifier</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// Turn an object element identifier into a string</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">as_str</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">Cow</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">str</span><span class="op">&gt;</span> {
+        <span class="kw">match</span> <span class="self">self</span> {
+            <span class="ident">ObjectElementIdentifier</span>::<span class="ident">Identifier</span>(<span class="ident">ident</span>) <span class="op">=&gt;</span> <span class="ident">ident</span>.<span class="ident">clone</span>(),
+            <span class="comment">// FIXME</span>
+            <span class="ident">ObjectElementIdentifier</span>::<span class="ident">Expression</span>(<span class="kw">_</span>) <span class="op">=&gt;</span> {
+                <span class="macro">unimplemented</span><span class="macro">!</span>(<span class="string">&quot;Expression evaluation is not yet supported&quot;</span>)
+            }
+        }
+    }
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">S</span><span class="op">&gt;</span> <span class="ident">PartialEq</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ObjectElementIdentifier</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>

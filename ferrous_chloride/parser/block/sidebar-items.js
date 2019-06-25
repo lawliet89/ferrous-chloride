@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["BlockLabel",""]],"fn":[["block",""],["block_label",""],["block_labels",""],["one_line_block",""],["one_line_block_body",""]],"struct":[["Block","HCL Block"]]});
+initSidebarItems({"enum":[["BlockBody",""],["BlockLabel",""]],"fn":[["block",""],["block_label",""],["block_labels",""],["one_line_block",""],["one_line_block_body",""]],"struct":[["Block","HCL Block"],["Blocks","Blocks in a body indexed by their type and labels"]]});

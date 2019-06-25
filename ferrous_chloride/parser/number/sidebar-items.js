@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["number",""]],"struct":[["Number","A number, represented as a string for aribitrary precision"]]});
+initSidebarItems({"fn":[["number",""]],"struct":[["Number",""]]});

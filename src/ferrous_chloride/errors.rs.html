@@ -280,6 +280,21 @@
 <span id="280">280</span>
 <span id="281">281</span>
 <span id="282">282</span>
+<span id="283">283</span>
+<span id="284">284</span>
+<span id="285">285</span>
+<span id="286">286</span>
+<span id="287">287</span>
+<span id="288">288</span>
+<span id="289">289</span>
+<span id="290">290</span>
+<span id="291">291</span>
+<span id="292">292</span>
+<span id="293">293</span>
+<span id="294">294</span>
+<span id="295">295</span>
+<span id="296">296</span>
+<span id="297">297</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">fmt</span>::{<span class="ident">Debug</span>, <span class="ident">Display</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">string</span>::<span class="ident">ToString</span>;
@@ -295,17 +310,22 @@
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Error</span> {
     <span class="attribute">#[<span class="ident">fail</span>(<span class="ident">display</span> <span class="op">=</span> <span class="string">&quot;Invalid Unicode Code Points \\{}&quot;</span>, <span class="ident">_0</span>)]</span>
     <span class="ident">InvalidUnicodeCodePoint</span>(<span class="ident">String</span>),
+
     <span class="attribute">#[<span class="ident">fail</span>(<span class="ident">display</span> <span class="op">=</span> <span class="string">&quot;Invalid Number {}&quot;</span>, <span class="ident">_0</span>)]</span>
     <span class="ident">InvalidNumber</span>(<span class="ident">String</span>),
+
     <span class="attribute">#[<span class="ident">fail</span>(<span class="ident">display</span> <span class="op">=</span> <span class="string">&quot;Bytes contain invalid unicode: {:#?}&quot;</span>, <span class="ident">_0</span>)]</span>
     <span class="ident">InvalidUnicode</span>(<span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>),
+
     <span class="attribute">#[<span class="ident">fail</span>(<span class="ident">display</span> <span class="op">=</span> <span class="string">&quot;Generic Parse Error {}&quot;</span>, <span class="ident">_0</span>)]</span>
     <span class="ident">ParseError</span>(<span class="ident">String</span>),
+
     <span class="attribute">#[<span class="ident">fail</span>(
         <span class="ident">display</span> <span class="op">=</span> <span class="string">&quot;Variant {} does not allow multiple values with the same key {}&quot;</span>,
         <span class="ident">variant</span>, <span class="ident">key</span>
     )]</span>
     <span class="ident">IllegalMultipleEntries</span> { <span class="ident">key</span>: <span class="ident">String</span>, <span class="ident">variant</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> },
+
     <span class="attribute">#[<span class="ident">fail</span>(
         <span class="ident">display</span> <span class="op">=</span> <span class="string">&quot;Error merging key {} into `Value`: existing value of variant {} \
                    cannot be merged with variant {}&quot;</span>,
@@ -316,6 +336,7 @@
         <span class="ident">existing_variant</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>,
         <span class="ident">incoming_variant</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>,
     },
+
     <span class="attribute">#[<span class="ident">fail</span>(
         <span class="ident">display</span> <span class="op">=</span> <span class="string">&quot;Expected type {} to be of variant {} but got {} instead&quot;</span>,
         <span class="ident">enum_type</span>, <span class="ident">expected</span>, <span class="ident">actual</span>
@@ -325,10 +346,19 @@
         <span class="ident">expected</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>,
         <span class="ident">actual</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>,
     },
+
     <span class="attribute">#[<span class="ident">fail</span>(<span class="ident">display</span> <span class="op">=</span> <span class="string">&quot;IO Error: {}&quot;</span>, <span class="ident">_0</span>)]</span>
     <span class="ident">IOError</span>(<span class="attribute">#[<span class="ident">cause</span>]</span> <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Error</span>),
+
     <span class="attribute">#[<span class="ident">fail</span>(<span class="ident">display</span> <span class="op">=</span> <span class="string">&quot;Bytes to be parsed is invalid UTF-8: {}&quot;</span>, <span class="ident">_0</span>)]</span>
     <span class="ident">InvalidUnicodeToParse</span>(<span class="attribute">#[<span class="ident">cause</span>]</span> <span class="ident">std</span>::<span class="ident">str</span>::<span class="ident">Utf8Error</span>),
+
+    <span class="attribute">#[<span class="ident">fail</span>(
+        <span class="ident">display</span> <span class="op">=</span> <span class="string">&quot;Expected all input to be consumed, but the following remains: {}&quot;</span>,
+        <span class="ident">_0</span>
+    )]</span>
+    <span class="ident">UnexpectedRemainingInput</span>(<span class="ident">String</span>),
+
     <span class="attribute">#[<span class="ident">fail</span>(
         <span class="ident">display</span> <span class="op">=</span> <span class="string">&quot;Possible bug with the library encountered: {}; Please report to \
                    https://github.com/lawliet89/ferrous-chloride/issues&quot;</span>,
