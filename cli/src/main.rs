@@ -60,7 +60,7 @@ fn run_parse(args: &ArgMatches) -> Result<(), Error> {
 }
 
 /// Gets a `Read` depending on the path. If the path is `-`, read from STDIN
-fn input_reader(path: &str) -> Result<Box<Read>, Error> {
+fn input_reader(path: &str) -> Result<Box<dyn Read>, Error> {
     match path {
         "-" => Ok(Box::new(io::stdin())),
         path => {
@@ -71,7 +71,7 @@ fn input_reader(path: &str) -> Result<Box<Read>, Error> {
 }
 
 /// Gets a `Write` depending on the path. If the path is `-`, write to STDOUT
-fn output_writer(path: &str) -> Result<Box<Write>, Error> {
+fn output_writer(path: &str) -> Result<Box<dyn Write>, Error> {
     match path {
         "-" => Ok(Box::new(io::stdout())),
         path => {
