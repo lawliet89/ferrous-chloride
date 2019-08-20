@@ -32,7 +32,7 @@ impl FromStr for Number {
             Ok(i) => Ok(Number::Integer(i)),
             Err(_) => match s.parse() {
                 Ok(f) => Ok(Number::Float(f)),
-                Err(e) => Err(e)?,
+                Err(e) => Err(e.into()),
             },
         }
     }

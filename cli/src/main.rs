@@ -25,7 +25,7 @@ fn main() -> Result<(), Error> {
 fn run_subcommand(args: &ArgMatches) -> Result<(), Error> {
     match args.subcommand() {
         ("parse", Some(args)) => run_parse(args),
-        (unknown, _) => Err(Error::UnknownCommand(unknown.to_string()))?,
+        (unknown, _) => Err(Error::UnknownCommand(unknown.to_string())),
     }
 }
 

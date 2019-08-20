@@ -167,10 +167,11 @@ where
 {
     if let Some(len) = check_length {
         if tuple.len() != len {
-            Err(Error::InvalidTupleLength {
+            return Err(Error::InvalidTupleLength {
                 expected: len,
                 actual: tuple.len(),
-            })?;
+            }
+            .into());
         }
     }
 

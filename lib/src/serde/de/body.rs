@@ -137,7 +137,7 @@ impl<'de> de::MapAccess<'de> for MapAccess<'de> {
         match next.expect("to be some") {
             (ident, expr @ BodyValue::Expression(_)) => {
                 if !self.seen.insert(ident.clone()) {
-                    Err(Error::BodyDuplicateKey(ident.to_string()))?;
+                    return Err(Error::BodyDuplicateKey(ident.to_string()).into());
                 }
                 self.value = Some(expr);
                 seed.deserialize(ident.into_deserializer()).map(Some)

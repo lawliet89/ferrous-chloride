@@ -74,7 +74,7 @@ impl<'a> Expression<'a> {
     pub fn parse(s: &'a str) -> Result<Self, Error> {
         let (remaining, expr) = expression(CompleteStr(s)).map_err(|e| Error::from_err_str(&e))?;;
         if !remaining.is_empty() {
-            Err(Error::UnexpectedRemainingInput(remaining.to_string()))?;
+            return Err(Error::UnexpectedRemainingInput(remaining.to_string()));
         }
         Ok(expr)
     }
