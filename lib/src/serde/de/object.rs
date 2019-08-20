@@ -43,7 +43,7 @@ impl<'de> MapAccess<'de> for ObjectMapAccess<'de> {
         let key = key.as_str();
 
         if !self.seen_keys.insert(key.clone()) {
-            Err(Error::ObjectDuplicateKey(key.to_string()))?;
+            return Err(Error::ObjectDuplicateKey(key.to_string()).into());
         }
 
         self.expression = Some(value);

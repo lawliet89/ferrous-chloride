@@ -129,7 +129,6 @@ mod serde {
             tuple_struct map struct enum identifier ignored_any
         }
     }
-
 }
 
 #[cfg(test)]

@@ -184,13 +184,13 @@ pub fn parse_str(input: &str) -> Result<ConfigFile, Error> {
         config_file(CompleteStr(input)).map_err(|e| Error::from_err_str(&e))?;
 
     if !remaining_input.is_empty() {
-        Err(Error::Bug(format!(
+        return Err(Error::Bug(format!(
             r#"Input was not completely parsed:
 Input: {},
 Remaining: {}
 "#,
             input, remaining_input
-        )))?
+        )));
     }
 
     Ok(body)

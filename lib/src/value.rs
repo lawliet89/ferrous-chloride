@@ -800,20 +800,22 @@ impl<'a> MapValues<'a> {
                         | illegal @ Value::Float(_)
                         | illegal @ Value::Boolean(_)
                         | illegal @ Value::String(_)
-                        | illegal @ Value::List(_) => Err(Error::IllegalMultipleEntries {
-                            key,
-                            variant: illegal.variant_name(),
-                        })?,
+                        | illegal @ Value::List(_) => {
+                            return Err(Error::IllegalMultipleEntries {
+                                key,
+                                variant: illegal.variant_name(),
+                            })
+                        }
                         Value::Object(ref mut map) => {
                             // Check that the incoming value is also a Object
                             if let Value::Object(ref mut incoming) = value {
                                 map.append(incoming);
                             } else {
-                                Err(Error::ErrorMergingKeys {
+                                return Err(Error::ErrorMergingKeys {
                                     key,
                                     existing_variant: OBJECT,
                                     incoming_variant: value.variant_name(),
-                                })?;
+                                });
                             }
                         }
                         Value::Block(ref mut block) => {
@@ -822,11 +824,11 @@ impl<'a> MapValues<'a> {
                             if let Value::Block(incoming) = value {
                                 block.extend(incoming);
                             } else {
-                                Err(Error::ErrorMergingKeys {
+                                return Err(Error::ErrorMergingKeys {
                                     key,
                                     existing_variant: BLOCK,
                                     incoming_variant: value.variant_name(),
-                                })?;
+                                });
                             }
                         }
                     };
@@ -896,13 +898,13 @@ pub fn from_str(input: &str, merge: Option<MergeBehaviour>) -> Result<Body, Erro
         crate::parser::body(CompleteStr(input)).map_err(|e| Error::from_err_str(&e))?;
 
     if !remaining_input.is_empty() {
-        Err(Error::Bug(format!(
+        return Err(Error::Bug(format!(
             r#"Input was not completely parsed:
 Input: {},
 Remaining: {}
 "#,
             input, remaining_input
-        )))?
+        )));
     }
 
     let pairs = match merge {
@@ -960,5 +962,4 @@ mod tests {
             assert!(parsed.is_merged());
         }
     }
-
 }
