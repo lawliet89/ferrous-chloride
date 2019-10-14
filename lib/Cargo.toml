@@ -6,7 +6,7 @@ edition = "2018"
 build = "build.rs"
 
 [dependencies]
-failure = { version = "0.1.5", features=["backtrace"] }
+failure = { version = "0.1.6", features=["backtrace"] }
 failure_derive = "0.1.5"
 itertools = "0.8.0"
 log = "0.4"
