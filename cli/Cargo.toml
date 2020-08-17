@@ -5,7 +5,7 @@ authors = ["Yong Wen Chua <lawliet89@users.noreply.github.com>"]
 edition = "2018"
 
 [dependencies]
-clap = "2.32.0"
+clap = "2.33.3"
 failure = { version = "0.1.5", features=["backtrace"] }
 failure_derive = "0.1.5"
 ferrous-chloride = { path = "../lib" }
