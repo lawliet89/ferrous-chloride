@@ -21,7 +21,7 @@ serde_bytes = "0.11.2"
 
 [build-dependencies]
 yansi = "0.5"
-version_check = "0.9.1"
+version_check = "0.9.3"
 
 [features]
 default = ["serde"]
